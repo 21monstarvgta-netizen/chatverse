@@ -38,10 +38,12 @@ function setupChatSocket(io) {
       console.error('Error joining rooms:', e);
     }
 
+    // Personal channel for notifications
+    socket.join('user:' + userId);
     socket.join('general');
     broadcastOnlineUsers(io);
 
-    // Text message
+    // Text message - general
     socket.on('general:message', async (data) => {
       try {
         if (!data.content || !data.content.trim()) return;
@@ -61,6 +63,7 @@ function setupChatSocket(io) {
       }
     });
 
+    // Text message - room
     socket.on('room:message', async (data) => {
       try {
         if (!data.content || !data.content.trim() || !data.roomId) return;
@@ -100,12 +103,8 @@ function setupChatSocket(io) {
         await message.save();
         const populated = await Message.findById(message._id)
           .populate('sender', 'username profile');
-
         if (data.roomId) {
-          io.to('room:' + data.roomId).emit('room:message', {
-            roomId: data.roomId,
-            message: populated
-          });
+          io.to('room:' + data.roomId).emit('room:message', { roomId: data.roomId, message: populated });
         } else {
           io.to('general').emit('general:message', populated);
         }
@@ -137,12 +136,8 @@ function setupChatSocket(io) {
         const populated = await Message.findById(message._id)
           .populate('sender', 'username profile')
           .populate('shoppingList.items.boughtBy', 'username');
-
         if (data.roomId) {
-          io.to('room:' + data.roomId).emit('room:message', {
-            roomId: data.roomId,
-            message: populated
-          });
+          io.to('room:' + data.roomId).emit('room:message', { roomId: data.roomId, message: populated });
         } else {
           io.to('general').emit('general:message', populated);
         }
@@ -158,33 +153,47 @@ function setupChatSocket(io) {
         const diceType = data.diceType || 'd6';
         const sides = validDice[diceType] || 6;
         const result = Math.floor(Math.random() * sides) + 1;
-
         const message = new Message({
           content: '',
           sender: userId,
           room: data.roomId || null,
           type: 'dice',
-          diceResult: {
-            diceType: diceType,
-            sides: sides,
-            result: result,
-            rolledBy: user.username
-          }
+          diceResult: { diceType, sides, result, rolledBy: user.username }
         });
         await message.save();
         const populated = await Message.findById(message._id)
           .populate('sender', 'username profile');
-
         if (data.roomId) {
-          io.to('room:' + data.roomId).emit('room:message', {
-            roomId: data.roomId,
-            message: populated
-          });
+          io.to('room:' + data.roomId).emit('room:message', { roomId: data.roomId, message: populated });
         } else {
           io.to('general').emit('general:message', populated);
         }
       } catch (error) {
         console.error('Dice roll error:', error);
+      }
+    });
+
+    // Room created - notify members
+    socket.on('room:created', async (data) => {
+      try {
+        if (!data.roomId) return;
+        const room = await Room.findById(data.roomId)
+          .populate('owner', 'username profile.avatarColor')
+          .populate('members', 'username profile.avatarColor status');
+        if (!room) return;
+        room.members.forEach(member => {
+          const memberId = member._id.toString();
+          if (memberId !== userId) {
+            io.to('user:' + memberId).emit('room:new', room);
+          }
+          // Join all members to room channel
+          const memberSocket = findSocketByUserId(memberId);
+          if (memberSocket) {
+            memberSocket.join('room:' + room._id.toString());
+          }
+        });
+      } catch (e) {
+        console.error('Room created notify error:', e);
       }
     });
 
@@ -208,6 +217,12 @@ function setupChatSocket(io) {
       broadcastOnlineUsers(io);
     });
   });
+
+  function findSocketByUserId(userId) {
+    const userData = onlineUsers.get(userId);
+    if (!userData) return null;
+    return io.sockets.sockets.get(userData.socketId);
+  }
 }
 
 function broadcastOnlineUsers(io) {
