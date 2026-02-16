@@ -210,4 +210,523 @@ class ChatApp {
   // ===== Dice =====
   buildDicePicker() {
     var picker = document.getElementById('dice-picker');
-    
+    picker.innerHTML = '<div class="dice-picker-title">Бросить кубик</div>' +
+      DICE_TYPES.map(function(d) {
+        return '<div class="dice-option" onclick="app.rollDice(\'' + d.id + '\')">' +
+          '<span class="dice-emoji">' + d.emoji + '</span>' +
+          '<span class="dice-label">' + d.name + '</span>' +
+          '<span class="dice-range">1-' + d.sides + '</span></div>';
+      }).join('');
+  }
+
+  rollDice(diceType) {
+    var roomId = this.currentView === 'general' ? null : this.currentView;
+    this.socket.emit('dice:roll', { diceType: diceType, roomId: roomId });
+    document.getElementById('dice-picker').classList.add('hidden');
+  }
+
+  // ===== Image Upload =====
+  async handleImageUpload(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { showToast('Макс. размер 10MB', 'error'); return; }
+    showToast('Загрузка изображения...', 'info');
+    try {
+      var formData = new FormData();
+      formData.append('image', file);
+      var response = await fetch(API_URL + '/upload/chat-image', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() },
+        body: formData
+      });
+      var data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      var roomId = this.currentView === 'general' ? null : this.currentView;
+      this.socket.emit('image:message', { imageUrl: data.imageUrl, content: '', roomId: roomId });
+      showToast('Изображение отправлено!', 'success');
+    } catch (err) {
+      showToast(err.message || 'Ошибка загрузки', 'error');
+    }
+    e.target.value = '';
+  }
+
+  // ===== Shopping =====
+  buildShoppingModal() {
+    var container = document.getElementById('shopping-categories');
+    var html = '';
+    for (var cat in SHOPPING_CATEGORIES) {
+      html += '<div class="shopping-cat-group"><div class="shopping-cat-title" onclick="this.nextElementSibling.classList.toggle(\'open\')">▶ ' + cat + '</div>';
+      html += '<div class="shopping-cat-items">';
+      SHOPPING_CATEGORIES[cat].forEach(function(item) {
+        html += '<div class="shopping-product-tag" onclick="app.toggleShoppingProduct(this,\'' + escapeHTML(item) + '\',\'' + escapeHTML(cat) + '\')">' + escapeHTML(item) + '</div>';
+      });
+      html += '</div></div>';
+    }
+    container.innerHTML = html;
+  }
+
+  openShoppingModal() {
+    this.selectedShoppingItems = [];
+    document.getElementById('shopping-title-input').value = 'Список покупок';
+    document.getElementById('custom-item-input').value = '';
+    document.querySelectorAll('.shopping-product-tag').forEach(function(t) { t.classList.remove('selected'); });
+    this.renderSelectedItems();
+    document.getElementById('shopping-modal').classList.remove('hidden');
+  }
+
+  toggleShoppingProduct(el, name, category) {
+    var idx = this.selectedShoppingItems.findIndex(function(i) { return i.name === name; });
+    if (idx >= 0) {
+      this.selectedShoppingItems.splice(idx, 1);
+      el.classList.remove('selected');
+    } else {
+      this.selectedShoppingItems.push({ name: name, category: category });
+      el.classList.add('selected');
+    }
+    this.renderSelectedItems();
+  }
+
+  addCustomShoppingItem() {
+    var input = document.getElementById('custom-item-input');
+    var name = input.value.trim();
+    if (!name) return;
+    if (!this.selectedShoppingItems.find(function(i) { return i.name === name; })) {
+      this.selectedShoppingItems.push({ name: name, category: 'Другое' });
+      this.renderSelectedItems();
+    }
+    input.value = '';
+  }
+
+  renderSelectedItems() {
+    var preview = document.getElementById('selected-items-preview');
+    if (this.selectedShoppingItems.length === 0) {
+      preview.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">Товары не выбраны</span>';
+      return;
+    }
+    var self = this;
+    preview.innerHTML = this.selectedShoppingItems.map(function(item, i) {
+      return '<div class="selected-item-chip">' + escapeHTML(item.name) +
+        '<span class="remove-chip" onclick="app.removeShoppingItem(' + i + ')">✕</span></div>';
+    }).join('');
+  }
+
+  removeShoppingItem(index) {
+    var item = this.selectedShoppingItems[index];
+    this.selectedShoppingItems.splice(index, 1);
+    document.querySelectorAll('.shopping-product-tag').forEach(function(t) {
+      if (t.textContent === item.name) t.classList.remove('selected');
+    });
+    this.renderSelectedItems();
+  }
+
+  sendShoppingList() {
+    if (this.selectedShoppingItems.length === 0) { showToast('Добавьте товары', 'error'); return; }
+    var title = document.getElementById('shopping-title-input').value.trim() || 'Список покупок';
+    var roomId = this.currentView === 'general' ? null : this.currentView;
+    this.socket.emit('shopping:create', { title: title, items: this.selectedShoppingItems, roomId: roomId });
+    this.closeModal('shopping-modal');
+    showToast('Список отправлен!', 'success');
+  }
+
+  async toggleShoppingItem(messageId, itemId) {
+    try {
+      await apiRequest('/messages/shopping/' + messageId + '/toggle/' + itemId, { method: 'POST' });
+    } catch (e) {
+      showToast('Ошибка', 'error');
+    }
+  }
+
+  // ===== Messages =====
+  async loadGeneralMessages() {
+    try {
+      var data = await apiRequest('/messages/general');
+      this.renderMessages(data.messages);
+    } catch (e) { console.error(e); }
+  }
+
+  async loadRoomMessages(roomId) {
+    try {
+      var data = await apiRequest('/messages/room/' + roomId);
+      this.renderMessages(data.messages);
+    } catch (e) {
+      showToast('Ошибка загрузки', 'error');
+    }
+  }
+
+  renderMessages(messages) {
+    var container = document.getElementById('messages-container');
+    if (messages.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><h3>Пока нет сообщений</h3><p>Будьте первым!</p></div>';
+      return;
+    }
+    var self = this;
+    container.innerHTML = messages.map(function(msg) { return self.createMessageHTML(msg); }).join('');
+    this.scrollToBottom();
+  }
+
+  appendMessage(msg) {
+    var container = document.getElementById('messages-container');
+    var empty = container.querySelector('.empty-state');
+    if (empty) empty.remove();
+    var d = document.createElement('div');
+    d.innerHTML = this.createMessageHTML(msg);
+    if (d.firstElementChild) container.appendChild(d.firstElementChild);
+    this.scrollToBottom();
+  }
+
+  createMessageHTML(msg) {
+    if (!msg.sender) return '';
+    var isOwn = msg.sender._id === this.currentUser._id;
+    var avatar = createMiniAvatarHTML(msg.sender, 36);
+    var dn = getDisplayName(msg.sender);
+    var sc = getAvatarColor(msg.sender);
+
+    var bodyContent = '';
+    if (msg.type === 'text') {
+      bodyContent = '<div class="msg-text">' + escapeHTML(msg.content) + '</div>';
+    } else if (msg.type === 'image') {
+      bodyContent = (msg.content ? '<div class="msg-text">' + escapeHTML(msg.content) + '</div>' : '') +
+        '<img class="msg-image" src="' + msg.imageUrl + '" onclick="app.openImageFullscreen(\'' + msg.imageUrl + '\')" loading="lazy">';
+    } else if (msg.type === 'shopping') {
+      bodyContent = createShoppingListHTML(msg);
+    } else if (msg.type === 'dice') {
+      bodyContent = createDiceHTML(msg);
+    } else if (msg.type === 'system') {
+      return '<div class="message system-message"><div class="msg-content"><div class="msg-text">' + escapeHTML(msg.content) + '</div></div></div>';
+    }
+
+    return '<div class="message ' + (isOwn ? 'own-message' : '') + '" data-msg-id="' + msg._id + '">' +
+      '<div class="msg-avatar">' + avatar + '</div>' +
+      '<div class="msg-content"><div class="msg-header">' +
+      '<span class="msg-username" style="color:' + sc + '" onclick="app.showUserPopup(event,\'' + msg.sender._id + '\')">' + escapeHTML(dn) + '</span>' +
+      '<span class="msg-time">' + formatTime(msg.createdAt) + '</span></div>' +
+      '<div class="msg-body">' + bodyContent + '</div></div></div>';
+  }
+
+  openImageFullscreen(url) {
+    document.getElementById('fullscreen-img').src = url;
+    document.getElementById('image-fullscreen').classList.remove('hidden');
+  }
+
+  sendMessage() {
+    var input = document.getElementById('message-input');
+    var content = input.value.trim();
+    if (!content) return;
+    if (this.currentView === 'general') {
+      this.socket.emit('general:message', { content: content });
+    } else {
+      this.socket.emit('room:message', { content: content, roomId: this.currentView });
+    }
+    input.value = '';
+    input.style.height = 'auto';
+    this.isTyping = false;
+    this.socket.emit('typing:stop', { roomId: this.currentView === 'general' ? null : this.currentView });
+  }
+
+  scrollToBottom() {
+    var c = document.getElementById('messages-container');
+    setTimeout(function() { c.scrollTop = c.scrollHeight; }, 50);
+  }
+
+  // ===== Typing =====
+  handleTyping() {
+    var roomId = this.currentView === 'general' ? null : this.currentView;
+    if (!this.isTyping) {
+      this.isTyping = true;
+      this.socket.emit('typing:start', { roomId: roomId });
+    }
+    clearTimeout(this.typingTimeout);
+    var self = this;
+    this.typingTimeout = setTimeout(function() {
+      self.isTyping = false;
+      self.socket.emit('typing:stop', { roomId: roomId });
+    }, 2000);
+  }
+
+  renderTyping() {
+    var ind = document.getElementById('typing-indicator');
+    if (this.typingUsers.size === 0) { ind.innerHTML = ''; return; }
+    var names = Array.from(this.typingUsers.values());
+    var text = names.length === 1 ? names[0] + ' печатает' : names.join(', ') + ' печатают';
+    ind.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div><span>' + text + '...</span>';
+  }
+
+  // ===== Unread Badges =====
+  updateUnreadBadges() {
+    // General badge
+    var generalNav = document.getElementById('nav-general');
+    var existingGeneralBadge = generalNav.querySelector('.nav-badge');
+    if (existingGeneralBadge) existingGeneralBadge.remove();
+    var generalCount = this.unreadCounts['general'] || 0;
+    if (generalCount > 0) {
+      var badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      badge.textContent = generalCount > 99 ? '99+' : generalCount;
+      generalNav.appendChild(badge);
+    }
+
+    // Room badges
+    var self = this;
+    document.querySelectorAll('.room-item').forEach(function(el) {
+      var roomId = el.dataset.roomId;
+      var existingBadge = el.querySelector('.room-badge');
+      if (existingBadge) existingBadge.remove();
+      var count = self.unreadCounts[roomId] || 0;
+      if (count > 0) {
+        var b = document.createElement('span');
+        b.className = 'room-badge';
+        b.textContent = count > 99 ? '99+' : count;
+        el.appendChild(b);
+      }
+    });
+  }
+
+  // ===== Views =====
+  async switchView(viewId) {
+    this.currentView = viewId;
+    this.typingUsers.clear();
+    this.renderTyping();
+
+    // Clear unread for this view
+    delete this.unreadCounts[viewId];
+    this.updateUnreadBadges();
+
+    document.querySelectorAll('.nav-item, .room-item').forEach(function(el) { el.classList.remove('active'); });
+
+    if (viewId === 'general') {
+      document.getElementById('nav-general').classList.add('active');
+      document.getElementById('chat-title').textContent = '🌍 Общий чат';
+      document.getElementById('chat-header-actions').innerHTML = '';
+      await this.loadGeneralMessages();
+    } else {
+      var roomEl = document.querySelector('.room-item[data-room-id="' + viewId + '"]');
+      if (roomEl) roomEl.classList.add('active');
+      try {
+        var data = await apiRequest('/rooms/' + viewId);
+        var room = data.room;
+        document.getElementById('chat-title').textContent = '# ' + room.name;
+        var isOwner = room.owner._id === this.currentUser._id;
+        document.getElementById('chat-header-actions').innerHTML =
+          '<button class="btn-icon" onclick="app.showRoomInfo(\'' + viewId + '\')" title="Инфо">ℹ️</button>' +
+          (isOwner ? '<button class="btn-icon" onclick="app.openAddMemberModal(\'' + viewId + '\')" title="Добавить">👤+</button>' : '') +
+          '<button class="btn-icon" onclick="app.leaveRoom(\'' + viewId + '\')" title="Выйти">🚪</button>';
+        this.socket.emit('room:join', viewId);
+        await this.loadRoomMessages(viewId);
+      } catch (e) {
+        showToast('Ошибка', 'error');
+        this.switchView('general');
+        return;
+      }
+    }
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('show');
+    document.getElementById('message-input').focus();
+  }
+
+  // ===== Online =====
+  renderOnlineUsers() {
+    var list = document.getElementById('online-users-list');
+    var count = this.onlineUsers.length;
+    document.getElementById('online-count').textContent = count + ' онлайн';
+    document.getElementById('online-panel-count').textContent = count;
+    list.innerHTML = this.onlineUsers.map(function(u) {
+      var av = createMiniAvatarHTML(u, 32);
+      return '<div class="online-user-item" onclick="app.showUserPopup(event,\'' + u._id + '\')">' +
+        '<div style="position:relative;">' + av +
+        '<div style="width:10px;height:10px;border-radius:50%;background:#00b894;position:absolute;bottom:-2px;right:-2px;border:2px solid var(--bg-sidebar);"></div></div>' +
+        '<span class="user-name">' + escapeHTML(getDisplayName(u)) + '</span></div>';
+    }).join('');
+  }
+
+  // ===== User Popup =====
+  async showUserPopup(event, userId) {
+    event.stopPropagation();
+    try {
+      var data = await apiRequest('/users/' + userId);
+      var u = data.user;
+      var popup = document.getElementById('user-popup');
+      var bd = u.profile && u.profile.birthDate ? new Date(u.profile.birthDate).toLocaleDateString('ru-RU') : null;
+      popup.innerHTML = '<div class="user-popup-header">' + createAvatarHTML(u) +
+        '<div class="user-popup-info"><h3>' + escapeHTML(getDisplayName(u)) + '</h3>' +
+        '<div class="popup-username">@' + escapeHTML(u.username) + '</div></div></div>' +
+        (u.profile && u.profile.bio ? '<div class="user-popup-bio">' + escapeHTML(u.profile.bio) + '</div>' : '') +
+        '<div class="user-popup-details">' +
+        (u.status === 'online'
+          ? '<div class="detail-item"><span>🟢</span><span>Онлайн</span></div>'
+          : '<div class="detail-item"><span>⚫</span><span>Был(а) ' + formatTime(u.lastSeen) + '</span></div>') +
+        (u.profile && u.profile.location ? '<div class="detail-item"><span>📍</span><span>' + escapeHTML(u.profile.location) + '</span></div>' : '') +
+        (bd ? '<div class="detail-item"><span>🎂</span><span>' + bd + '</span></div>' : '') +
+        '</div>';
+      var rect = event.target.getBoundingClientRect();
+      popup.style.left = Math.min(rect.left, window.innerWidth - 300) + 'px';
+      popup.style.top = Math.min(rect.bottom + 8, window.innerHeight - 250) + 'px';
+      popup.classList.remove('hidden');
+    } catch (e) {}
+  }
+
+  // ===== Rooms =====
+  async loadRooms() {
+    try {
+      var data = await apiRequest('/rooms');
+      this.renderRooms(data.rooms);
+    } catch (e) {}
+  }
+
+  renderRooms(rooms) {
+    var list = document.getElementById('rooms-list');
+    var self = this;
+    if (rooms.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px;">Нет комнат</div>';
+      return;
+    }
+    list.innerHTML = rooms.map(function(r) {
+      return '<div class="room-item ' + (self.currentView === r._id ? 'active' : '') + '" data-room-id="' + r._id + '" onclick="app.switchView(\'' + r._id + '\')">' +
+        '<div class="room-icon" style="background:' + (r.color || '#6c5ce7') + '">' + r.name[0].toUpperCase() + '</div>' +
+        '<div class="room-info"><div class="room-name">' + escapeHTML(r.name) + '</div>' +
+        '<div class="room-members-count">' + r.members.length + ' уч.</div></div></div>';
+    }).join('');
+    this.updateUnreadBadges();
+  }
+
+  async openCreateRoomModal() {
+    document.getElementById('room-name-input').value = '';
+    document.getElementById('room-desc-input').value = '';
+    document.getElementById('member-search').value = '';
+    await this.searchUsersForRoom('', 'members-checkbox-list');
+    document.getElementById('create-room-modal').classList.remove('hidden');
+  }
+
+  async searchUsersForRoom(q, cid) {
+    try {
+      var data = await apiRequest('/users?search=' + encodeURIComponent(q));
+      var self = this;
+      document.getElementById(cid).innerHTML = data.users.filter(function(u) {
+        return u._id !== self.currentUser._id;
+      }).map(function(u) {
+        return '<label class="user-checkbox"><input type="checkbox" value="' + u._id + '" class="room-member-checkbox"><span class="checkmark">✓</span>' +
+          '<div class="check-user-info">' + createMiniAvatarHTML(u, 28) + '<span>' + escapeHTML(u.username) + '</span></div></label>';
+      }).join('');
+    } catch (e) {}
+  }
+
+  async createRoom() {
+    var name = document.getElementById('room-name-input').value.trim();
+    if (!name) { showToast('Введите название', 'error'); return; }
+    var members = Array.from(document.querySelectorAll('#members-checkbox-list .room-member-checkbox:checked')).map(function(c) { return c.value; });
+    try {
+      var data = await apiRequest('/rooms', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name,
+          description: document.getElementById('room-desc-input').value.trim(),
+          members: members
+        })
+      });
+      showToast('Комната создана!', 'success');
+      this.closeModal('create-room-modal');
+      await this.loadRooms();
+      if (data.room && data.room._id) {
+        this.socket.emit('room:join', data.room._id);
+        this.socket.emit('room:created', { roomId: data.room._id });
+      }
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async showRoomInfo(roomId) {
+    try {
+      var data = await apiRequest('/rooms/' + roomId);
+      var r = data.room;
+      document.getElementById('room-info-title').textContent = r.name;
+      document.getElementById('room-info-desc').textContent = r.description || 'Нет описания';
+      document.getElementById('room-members-list').innerHTML = r.members.map(function(m) {
+        return '<div class="online-user-item">' + createMiniAvatarHTML(m, 32) +
+          '<span class="user-name">' + escapeHTML(getDisplayName(m)) + '</span>' +
+          (m._id === r.owner._id ? '<span style="color:var(--warning);font-size:11px;">👑</span>' : '') + '</div>';
+      }).join('');
+      document.getElementById('room-admin-actions').innerHTML =
+        r.owner._id === this.currentUser._id
+          ? '<button class="btn btn-danger btn-sm" onclick="app.deleteRoom(\'' + roomId + '\')">🗑 Удалить</button>'
+          : '';
+      document.getElementById('room-info-modal').classList.remove('hidden');
+    } catch (e) { showToast('Ошибка', 'error'); }
+  }
+
+  async openAddMemberModal(roomId) {
+    this.addMemberRoomId = roomId;
+    document.getElementById('add-member-search').value = '';
+    await this.searchUsersForAddMember('');
+    document.getElementById('add-member-modal').classList.remove('hidden');
+  }
+
+  async searchUsersForAddMember(q) {
+    try {
+      var rd = await apiRequest('/rooms/' + this.addMemberRoomId);
+      var mids = rd.room.members.map(function(m) { return m._id; });
+      var data = await apiRequest('/users?search=' + encodeURIComponent(q));
+      var users = data.users.filter(function(u) { return mids.indexOf(u._id) === -1; });
+      var container = document.getElementById('add-members-list');
+      if (users.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);">Все добавлены</div>';
+        return;
+      }
+      container.innerHTML = users.map(function(u) {
+        return '<label class="user-checkbox"><input type="checkbox" value="' + u._id + '" class="add-member-checkbox"><span class="checkmark">✓</span>' +
+          '<div class="check-user-info">' + createMiniAvatarHTML(u, 28) + '<span>' + escapeHTML(u.username) + '</span></div></label>';
+      }).join('');
+    } catch (e) {}
+  }
+
+  async addMembersToRoom() {
+    var ids = Array.from(document.querySelectorAll('#add-members-list .add-member-checkbox:checked')).map(function(c) { return c.value; });
+    if (!ids.length) { showToast('Выберите', 'error'); return; }
+    try {
+      for (var i = 0; i < ids.length; i++) {
+        await apiRequest('/rooms/' + this.addMemberRoomId + '/members', {
+          method: 'POST',
+          body: JSON.stringify({ userId: ids[i] })
+        });
+      }
+      showToast('Добавлены!', 'success');
+      this.closeModal('add-member-modal');
+      await this.loadRooms();
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async leaveRoom(rid) {
+    if (!confirm('Покинуть?')) return;
+    try {
+      await apiRequest('/rooms/' + rid + '/leave', { method: 'POST' });
+      this.switchView('general');
+      await this.loadRooms();
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async deleteRoom(rid) {
+    if (!confirm('Удалить комнату?')) return;
+    try {
+      await apiRequest('/rooms/' + rid, { method: 'DELETE' });
+      this.closeModal('room-info-modal');
+      this.switchView('general');
+      await this.loadRooms();
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  // ===== Sidebar Profile =====
+  renderSidebarProfile() {
+    var u = this.currentUser;
+    document.getElementById('sidebar-user-profile').innerHTML =
+      '<div style="position:relative;">' + createMiniAvatarHTML(u, 40) +
+      '<div class="status-dot online"></div></div>' +
+      '<div class="user-info"><div class="user-name">' + escapeHTML(getDisplayName(u)) + '</div>' +
+      '<div class="user-status">Онлайн</div></div>';
+  }
+
+  closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+  }
+}
+
+var app;
+document.addEventListener('DOMContentLoaded', function() {
+  app = new ChatApp();
+});
