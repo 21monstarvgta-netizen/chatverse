@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatVerse — Профиль</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="profile-page">
+    <div class="profile-container">
+      <div class="profile-header-bar">
+        <button class="back-btn" id="back-btn">← Назад в чат</button>
+        <button class="btn btn-primary btn-sm" id="save-profile-btn">💾 Сохранить</button>
+      </div>
+
+      <div class="profile-card">
+        <div class="profile-banner" id="profile-banner"></div>
+        
+        <div class="profile-avatar-section">
+          <div class="user-avatar xl" id="profile-avatar">
+            <span id="profile-avatar-letter">?</span>
+          </div>
+          <div class="profile-info-header">
+            <h2 id="profile-display-name">Пользователь</h2>
+            <div class="username-tag" id="profile-username">@username</div>
+          </div>
+        </div>
+
+        <div class="profile-body">
+          <form id="profile-form" class="profile-form">
+            <div class="form-group">
+              <label>Имя</label>
+              <input type="text" class="form-input no-icon" id="firstName" placeholder="Ваше имя" maxlength="50">
+            </div>
+
+            <div class="form-group">
+              <label>Фамилия</label>
+              <input type="text" class="form-input no-icon" id="lastName" placeholder="Ваша фамилия" maxlength="50">
+            </div>
+
+            <div class="form-group">
+              <label>Дата рождения</label>
+              <input type="date" class="form-input no-icon" id="birthDate">
+            </div>
+
+            <div class="form-group">
+              <label>Местоположение</label>
+              <input type="text" class="form-input no-icon" id="location" placeholder="Город, страна" maxlength="100">
+            </div>
+
+            <div class="form-group full-width">
+              <label>О себе</label>
+              <textarea class="form-input no-icon" id="bio" placeholder="Расскажите о себе..." maxlength="500" rows="3"></textarea>
+            </div>
+
+            <div class="form-group full-width">
+              <label>Веб-сайт</label>
+              <input type="text" class="form-input no-icon" id="website" placeholder="https://example.com" maxlength="200">
+            </div>
+
+            <div class="form-group full-width">
+              <label>Цвет аватара</label>
+              <div class="color-picker-group" id="color-picker">
+                <div class="color-option" data-color="#6c5ce7" style="background:#6c5ce7"></div>
+                <div class="color-option" data-color="#0984e3" style="background:#0984e3"></div>
+                <div class="color-option" data-color="#00b894" style="background:#00b894"></div>
+                <div class="color-option" data-color="#00cec9" style="background:#00cec9"></div>
+                <div class="color-option" data-color="#e17055" style="background:#e17055"></div>
+                <div class="color-option" data-color="#e84393" style="background:#e84393"></div>
+                <div class="color-option" data-color="#fd79a8" style="background:#fd79a8"></div>
+                <div class="color-option" data-color="#fdcb6e" style="background:#fdcb6e"></div>
+                <div class="color-option" data-color="#fab1a0" style="background:#fab1a0"></div>
+                <div class="color-option" data-color="#636e72" style="background:#636e72"></div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/profile.js"></script>
+</body>
+</html>
