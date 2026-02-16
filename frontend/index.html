@@ -8,168 +8,90 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <!-- Loading Screen -->
-  <div id="loading-screen" class="loading-screen">
-    <div class="spinner"></div>
-    <p>Загрузка ChatVerse...</p>
-  </div>
-
-  <!-- Toast Container -->
+  <div id="loading-screen" class="loading-screen"><div class="spinner"></div><p>Загрузка ChatVerse...</p></div>
   <div id="toast-container" class="toast-container"></div>
-
-  <!-- Mobile sidebar overlay -->
   <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
-  <!-- Main Chat Layout -->
   <div id="chat-app" class="chat-layout hidden">
-    
-    <!-- Sidebar -->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
-        <div class="logo">
-          <div class="logo-mini">💬</div>
-          <h2>ChatVerse</h2>
-        </div>
+        <div class="logo"><div class="logo-mini">💬</div><h2>ChatVerse</h2></div>
         <div class="sidebar-header-actions">
           <button class="btn-icon" id="btn-profile" title="Профиль">👤</button>
           <button class="btn-icon" id="btn-logout" title="Выйти">🚪</button>
         </div>
       </div>
-
-      <!-- Navigation -->
       <nav class="sidebar-nav">
-        <button class="nav-item active" id="nav-general" data-view="general">
-          <span class="nav-icon">🌍</span>
-          <span>Общий чат</span>
-        </button>
+        <button class="nav-item active" id="nav-general" data-view="general"><span class="nav-icon">🌍</span><span>Общий чат</span></button>
       </nav>
-
-      <!-- Rooms -->
       <div class="sidebar-section">
-        <div class="section-header">
-          <h3>Комнаты</h3>
-          <button id="btn-create-room" title="Создать комнату">➕</button>
-        </div>
-        <div id="rooms-list">
-          <!-- Rooms will be inserted here -->
-        </div>
+        <div class="section-header"><h3>Комнаты</h3><button id="btn-create-room" title="Создать комнату">➕</button></div>
+        <div id="rooms-list"></div>
       </div>
-
-      <!-- User Profile Mini -->
-      <div class="sidebar-profile" id="sidebar-user-profile">
-        <!-- Will be filled by JS -->
-      </div>
+      <div class="sidebar-profile" id="sidebar-user-profile"></div>
     </aside>
 
-    <!-- Main Chat Area -->
     <main class="chat-main">
-      <!-- Chat Header -->
       <header class="chat-header">
         <div class="chat-header-info">
           <button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
-          <div>
-            <h2 id="chat-title">🌍 Общий чат</h2>
-            <span class="online-count" id="online-count">0 онлайн</span>
-          </div>
+          <div><h2 id="chat-title">🌍 Общий чат</h2><span class="online-count" id="online-count">0 онлайн</span></div>
         </div>
-        <div class="chat-header-actions" id="chat-header-actions">
-          <!-- Room actions will appear here -->
-        </div>
+        <div class="chat-header-actions" id="chat-header-actions"></div>
       </header>
-
-      <!-- Messages -->
       <div class="messages-container" id="messages-container">
-        <div class="empty-state" id="empty-messages">
-          <div class="empty-icon">💬</div>
-          <h3>Пока нет сообщений</h3>
-          <p>Будьте первым, кто напишет!</p>
-        </div>
+        <div class="empty-state"><div class="empty-icon">💬</div><h3>Пока нет сообщений</h3><p>Будьте первым, кто напишет!</p></div>
       </div>
-
-      <!-- Typing Indicator -->
       <div class="typing-indicator" id="typing-indicator"></div>
-
-      <!-- Message Input -->
       <div class="message-input-area">
-        <div class="message-input-wrapper">
-          <textarea 
-            class="message-input" 
-            id="message-input" 
-            placeholder="Написать сообщение..."
-            rows="1"
-            maxlength="2000"
-          ></textarea>
-          <button class="send-btn" id="send-btn" title="Отправить">
-            ➤
-          </button>
+        <div class="message-input-wrapper" style="position:relative;">
+          <div class="chat-toolbar">
+            <button class="toolbar-btn" id="btn-emoji" title="Эмодзи">😊</button>
+            <label class="toolbar-btn" id="btn-image" title="Отправить фото">🖼️
+              <input type="file" id="image-upload-input" accept="image/*" style="display:none;">
+            </label>
+            <button class="toolbar-btn" id="btn-shopping" title="Список покупок">🛒</button>
+            <button class="toolbar-btn" id="btn-dice" title="Бросить кубик">🎲</button>
+          </div>
+          <textarea class="message-input" id="message-input" placeholder="Написать сообщение..." rows="1" maxlength="5000"></textarea>
+          <button class="send-btn" id="send-btn" title="Отправить">➤</button>
+          <div id="emoji-picker" class="emoji-picker hidden"></div>
+          <div id="dice-picker" class="dice-picker hidden"></div>
         </div>
       </div>
     </main>
 
-    <!-- Online Users Panel -->
     <aside class="online-panel" id="online-panel">
-      <div class="online-panel-header">
-        <h3>
-          Онлайн
-          <span class="count" id="online-panel-count">0</span>
-        </h3>
-      </div>
-      <div class="online-users-list" id="online-users-list">
-        <!-- Online users will be inserted here -->
-      </div>
+      <div class="online-panel-header"><h3>Онлайн <span class="count" id="online-panel-count">0</span></h3></div>
+      <div class="online-users-list" id="online-users-list"></div>
     </aside>
   </div>
 
   <!-- Create Room Modal -->
   <div id="create-room-modal" class="modal-overlay hidden">
     <div class="modal">
-      <div class="modal-header">
-        <h2>Создать комнату</h2>
-        <button class="modal-close" id="close-create-room">✕</button>
-      </div>
+      <div class="modal-header"><h2>Создать комнату</h2><button class="modal-close" id="close-create-room">✕</button></div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>Название комнаты</label>
-          <input type="text" class="form-input no-icon" id="room-name-input" placeholder="Моя комната" maxlength="50">
-        </div>
-        <div class="form-group">
-          <label>Описание (необязательно)</label>
-          <input type="text" class="form-input no-icon" id="room-desc-input" placeholder="О чём эта комната" maxlength="200">
-        </div>
-        <div class="form-group">
-          <label>Добавить участников</label>
-          <div class="search-input-wrapper">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="member-search" placeholder="Поиск пользователей...">
-          </div>
-          <div class="users-checkbox-list" id="members-checkbox-list">
-            <!-- Users will be loaded here -->
-          </div>
+        <div class="form-group"><label>Название</label><input type="text" class="form-input no-icon" id="room-name-input" placeholder="Моя комната" maxlength="50"></div>
+        <div class="form-group"><label>Описание</label><input type="text" class="form-input no-icon" id="room-desc-input" placeholder="О чём эта комната" maxlength="200"></div>
+        <div class="form-group"><label>Участники</label>
+          <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="member-search" placeholder="Поиск..."></div>
+          <div class="users-checkbox-list" id="members-checkbox-list"></div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancel-create-room">Отмена</button>
-        <button class="btn btn-primary" style="width:auto" id="confirm-create-room">Создать</button>
-      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" id="cancel-create-room">Отмена</button><button class="btn btn-primary" style="width:auto" id="confirm-create-room">Создать</button></div>
     </div>
   </div>
 
   <!-- Room Info Modal -->
   <div id="room-info-modal" class="modal-overlay hidden">
     <div class="modal">
-      <div class="modal-header">
-        <h2 id="room-info-title">Комната</h2>
-        <button class="modal-close" id="close-room-info">✕</button>
-      </div>
+      <div class="modal-header"><h2 id="room-info-title">Комната</h2><button class="modal-close" id="close-room-info">✕</button></div>
       <div class="modal-body">
-        <p id="room-info-desc" style="color: var(--text-secondary); margin-bottom: 16px;"></p>
-        <h3 style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Участники</h3>
-        <div id="room-members-list" class="users-checkbox-list" style="max-height: 400px;">
-          <!-- Members list -->
-        </div>
-        <div id="room-admin-actions" class="mt-4" style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <!-- Admin actions -->
-        </div>
+        <p id="room-info-desc" style="color:var(--text-secondary);margin-bottom:16px;"></p>
+        <h3 style="font-size:14px;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;">Участники</h3>
+        <div id="room-members-list" class="users-checkbox-list" style="max-height:400px;"></div>
+        <div id="room-admin-actions" class="mt-4" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
       </div>
     </div>
   </div>
@@ -177,28 +99,40 @@
   <!-- Add Member Modal -->
   <div id="add-member-modal" class="modal-overlay hidden">
     <div class="modal">
-      <div class="modal-header">
-        <h2>Добавить участника</h2>
-        <button class="modal-close" id="close-add-member">✕</button>
-      </div>
+      <div class="modal-header"><h2>Добавить участника</h2><button class="modal-close" id="close-add-member">✕</button></div>
       <div class="modal-body">
-        <div class="search-input-wrapper">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="add-member-search" placeholder="Поиск пользователей...">
-        </div>
-        <div class="users-checkbox-list" id="add-members-list">
-          <!-- Users -->
-        </div>
+        <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="add-member-search" placeholder="Поиск..."></div>
+        <div class="users-checkbox-list" id="add-members-list"></div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancel-add-member">Отмена</button>
-        <button class="btn btn-primary" style="width:auto" id="confirm-add-member">Добавить</button>
+      <div class="modal-footer"><button class="btn btn-secondary" id="cancel-add-member">Отмена</button><button class="btn btn-primary" style="width:auto" id="confirm-add-member">Добавить</button></div>
+    </div>
+  </div>
+
+  <!-- Shopping List Modal -->
+  <div id="shopping-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:600px;">
+      <div class="modal-header"><h2>🛒 Список покупок</h2><button class="modal-close" id="close-shopping">✕</button></div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Название списка</label>
+          <input type="text" class="form-input no-icon" id="shopping-title-input" placeholder="Список покупок" maxlength="100">
+        </div>
+        <label style="font-size:13px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Выберите продукты (нажмите на категорию)</label>
+        <div class="shopping-modal-categories" id="shopping-categories"></div>
+        <div class="custom-item-row">
+          <input type="text" id="custom-item-input" placeholder="Добавить свой товар...">
+          <button class="btn btn-secondary btn-sm" id="add-custom-item">➕</button>
+        </div>
+        <div class="selected-items-preview" id="selected-items-preview"></div>
       </div>
+      <div class="modal-footer"><button class="btn btn-secondary" id="cancel-shopping">Отмена</button><button class="btn btn-primary" style="width:auto" id="confirm-shopping">Отправить список</button></div>
     </div>
   </div>
 
   <!-- User Popup -->
   <div id="user-popup" class="user-popup hidden"></div>
+  <!-- Image Fullscreen -->
+  <div id="image-fullscreen" class="image-fullscreen hidden" onclick="this.classList.add('hidden')"><img id="fullscreen-img" src=""></div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="/js/utils.js"></script>

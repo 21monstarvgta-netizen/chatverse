@@ -82,3 +82,54 @@ function formatTime(dateStr) {
 function escapeHTML(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 
 function debounce(func, wait) { let t; return function (...args) { clearTimeout(t); t = setTimeout(() => func.apply(this, args), wait); }; }
+// ===== Shopping list HTML =====
+function createShoppingListHTML(msg) {
+  const list = msg.shoppingList;
+  if (!list || !list.items) return '';
+
+  const grouped = {};
+  list.items.forEach(item => {
+    const cat = item.category || 'Другое';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(item);
+  });
+
+  let html = '<div class="shopping-list-card">';
+  html += '<div class="shopping-list-header">🛒 ' + escapeHTML(list.title) + '</div>';
+
+  const totalItems = list.items.length;
+  const boughtItems = list.items.filter(i => i.bought).length;
+  html += '<div class="shopping-progress"><div class="shopping-progress-bar" style="width:' + (totalItems > 0 ? Math.round(boughtItems / totalItems * 100) : 0) + '%"></div></div>';
+  html += '<div class="shopping-progress-text">' + boughtItems + ' из ' + totalItems + ' куплено</div>';
+
+  for (const cat in grouped) {
+    html += '<div class="shopping-category">' + escapeHTML(cat) + '</div>';
+    grouped[cat].forEach(item => {
+      const checked = item.bought ? 'checked' : '';
+      const boughtClass = item.bought ? ' bought' : '';
+      const boughtByText = item.bought && item.boughtBy ? ' — ' + escapeHTML(item.boughtBy.username || '') : '';
+      html += '<div class="shopping-item' + boughtClass + '" onclick="app.toggleShoppingItem(\'' + msg._id + '\',\'' + item._id + '\')">' +
+        '<div class="shopping-checkbox ' + checked + '">' + (item.bought ? '✓' : '') + '</div>' +
+        '<span class="shopping-item-name">' + escapeHTML(item.name) + '</span>' +
+        '<span class="shopping-bought-by">' + boughtByText + '</span>' +
+        '</div>';
+    });
+  }
+  html += '</div>';
+  return html;
+}
+
+// ===== Dice HTML =====
+function createDiceHTML(msg) {
+  const d = msg.diceResult;
+  if (!d) return '';
+  return '<div class="dice-result-card">' +
+    '<div class="dice-roll-animation" id="dice-' + msg._id + '">' +
+    '<div class="dice-cube">' + d.result + '</div>' +
+    '</div>' +
+    '<div class="dice-info">' +
+    '<span class="dice-type-badge">' + d.diceType.toUpperCase() + '</span>' +
+    '<span class="dice-rolled-by">' + escapeHTML(d.rolledBy) + ' бросил кубик</span>' +
+    '<span class="dice-result-number">Результат: <strong>' + d.result + '</strong> из ' + d.sides + '</span>' +
+    '</div></div>';
+}

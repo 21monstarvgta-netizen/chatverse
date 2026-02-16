@@ -29,7 +29,6 @@ function setupChatSocket(io) {
     await User.findByIdAndUpdate(userId, { status: 'online', lastSeen: new Date() });
     onlineUsers.set(userId, { socketId: socket.id, user });
 
-    // Join user's rooms
     try {
       const userRooms = await Room.find({ members: userId });
       userRooms.forEach(room => {
@@ -42,12 +41,12 @@ function setupChatSocket(io) {
     socket.join('general');
     broadcastOnlineUsers(io);
 
-    // General chat message
+    // Text message
     socket.on('general:message', async (data) => {
       try {
         if (!data.content || !data.content.trim()) return;
         const message = new Message({
-          content: data.content.trim().substring(0, 2000),
+          content: data.content.trim().substring(0, 5000),
           sender: userId,
           room: null,
           type: 'text'
@@ -62,7 +61,6 @@ function setupChatSocket(io) {
       }
     });
 
-    // Room message
     socket.on('room:message', async (data) => {
       try {
         if (!data.content || !data.content.trim() || !data.roomId) return;
@@ -71,7 +69,7 @@ function setupChatSocket(io) {
           return socket.emit('error', { message: 'Нет доступа' });
         }
         const message = new Message({
-          content: data.content.trim().substring(0, 2000),
+          content: data.content.trim().substring(0, 5000),
           sender: userId,
           room: data.roomId,
           type: 'text'
@@ -88,29 +86,119 @@ function setupChatSocket(io) {
       }
     });
 
-    socket.on('room:join', (roomId) => {
-      socket.join('room:' + roomId);
+    // Image message
+    socket.on('image:message', async (data) => {
+      try {
+        if (!data.imageUrl) return;
+        const message = new Message({
+          content: data.content || '',
+          sender: userId,
+          room: data.roomId || null,
+          type: 'image',
+          imageUrl: data.imageUrl
+        });
+        await message.save();
+        const populated = await Message.findById(message._id)
+          .populate('sender', 'username profile');
+
+        if (data.roomId) {
+          io.to('room:' + data.roomId).emit('room:message', {
+            roomId: data.roomId,
+            message: populated
+          });
+        } else {
+          io.to('general').emit('general:message', populated);
+        }
+      } catch (error) {
+        console.error('Image message error:', error);
+      }
     });
 
-    socket.on('room:leave', (roomId) => {
-      socket.leave('room:' + roomId);
+    // Shopping list
+    socket.on('shopping:create', async (data) => {
+      try {
+        if (!data.items || !data.items.length) return;
+        const message = new Message({
+          content: '',
+          sender: userId,
+          room: data.roomId || null,
+          type: 'shopping',
+          shoppingList: {
+            title: data.title || 'Список покупок',
+            items: data.items.map(item => ({
+              name: item.name.substring(0, 100),
+              category: item.category || '',
+              bought: false,
+              boughtBy: null
+            }))
+          }
+        });
+        await message.save();
+        const populated = await Message.findById(message._id)
+          .populate('sender', 'username profile')
+          .populate('shoppingList.items.boughtBy', 'username');
+
+        if (data.roomId) {
+          io.to('room:' + data.roomId).emit('room:message', {
+            roomId: data.roomId,
+            message: populated
+          });
+        } else {
+          io.to('general').emit('general:message', populated);
+        }
+      } catch (error) {
+        console.error('Shopping create error:', error);
+      }
     });
+
+    // Dice roll
+    socket.on('dice:roll', async (data) => {
+      try {
+        const validDice = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100 };
+        const diceType = data.diceType || 'd6';
+        const sides = validDice[diceType] || 6;
+        const result = Math.floor(Math.random() * sides) + 1;
+
+        const message = new Message({
+          content: '',
+          sender: userId,
+          room: data.roomId || null,
+          type: 'dice',
+          diceResult: {
+            diceType: diceType,
+            sides: sides,
+            result: result,
+            rolledBy: user.username
+          }
+        });
+        await message.save();
+        const populated = await Message.findById(message._id)
+          .populate('sender', 'username profile');
+
+        if (data.roomId) {
+          io.to('room:' + data.roomId).emit('room:message', {
+            roomId: data.roomId,
+            message: populated
+          });
+        } else {
+          io.to('general').emit('general:message', populated);
+        }
+      } catch (error) {
+        console.error('Dice roll error:', error);
+      }
+    });
+
+    socket.on('room:join', (roomId) => { socket.join('room:' + roomId); });
+    socket.on('room:leave', (roomId) => { socket.leave('room:' + roomId); });
 
     socket.on('typing:start', (data) => {
       const target = data.roomId ? 'room:' + data.roomId : 'general';
-      socket.to(target).emit('typing:start', {
-        userId,
-        username: user.username,
-        roomId: data.roomId || null
-      });
+      socket.to(target).emit('typing:start', { userId, username: user.username, roomId: data.roomId || null });
     });
 
     socket.on('typing:stop', (data) => {
       const target = data.roomId ? 'room:' + data.roomId : 'general';
-      socket.to(target).emit('typing:stop', {
-        userId,
-        roomId: data.roomId || null
-      });
+      socket.to(target).emit('typing:stop', { userId, roomId: data.roomId || null });
     });
 
     socket.on('disconnect', async () => {
@@ -124,10 +212,7 @@ function setupChatSocket(io) {
 
 function broadcastOnlineUsers(io) {
   const users = Array.from(onlineUsers.values()).map(u => ({
-    _id: u.user._id,
-    username: u.user.username,
-    profile: u.user.profile,
-    status: 'online'
+    _id: u.user._id, username: u.user.username, profile: u.user.profile, status: 'online'
   }));
   io.emit('users:online', users);
 }

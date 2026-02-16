@@ -6,37 +6,39 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Multer — store in memory temporarily
 const storage = multer.memoryStorage();
-const upload = multer({
+
+const avatarUpload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Только изображения!'), false);
-    }
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Только изображения!'), false);
+  }
+});
+
+const chatImageUpload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Только изображения!'), false);
   }
 });
 
 // Upload avatar
-router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
+router.post('/avatar', auth, avatarUpload.single('avatar'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Выберите изображение' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'Выберите изображение' });
 
-    // Upload to Cloudinary from buffer
     const result = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
+      const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'chatverse/avatars',
           public_id: 'user_' + req.userId,
@@ -51,10 +53,9 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
           else resolve(result);
         }
       );
-      uploadStream.end(req.file.buffer);
+      stream.end(req.file.buffer);
     });
 
-    // Save URL to user profile
     const user = await User.findByIdAndUpdate(
       req.userId,
       { $set: { 'profile.avatarUrl': result.secure_url } },
@@ -71,12 +72,9 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
 // Delete avatar
 router.delete('/avatar', auth, async (req, res) => {
   try {
-    // Delete from Cloudinary
     try {
       await cloudinary.uploader.destroy('chatverse/avatars/user_' + req.userId);
-    } catch (e) {
-      // ignore if not found
-    }
+    } catch (e) {}
 
     const user = await User.findByIdAndUpdate(
       req.userId,
@@ -87,6 +85,37 @@ router.delete('/avatar', auth, async (req, res) => {
     res.json({ user });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка удаления' });
+  }
+});
+
+// Upload chat image
+router.post('/chat-image', auth, chatImageUpload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Выберите изображение' });
+
+    const timestamp = Date.now();
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'chatverse/chat',
+          public_id: 'msg_' + req.userId + '_' + timestamp,
+          transformation: [
+            { width: 800, height: 800, crop: 'limit' },
+            { quality: 'auto', fetch_format: 'auto' }
+          ]
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      stream.end(req.file.buffer);
+    });
+
+    res.json({ imageUrl: result.secure_url });
+  } catch (error) {
+    console.error('Chat image upload error:', error);
+    res.status(500).json({ error: 'Ошибка загрузки изображения' });
   }
 });
 
