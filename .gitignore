@@ -1,7 +1,4 @@
-cat > .gitignore << 'EOF'
-node_modules/
-backend/node_modules/
-.env
-backend/.env
-.DS_Store
-EOF
+echo "node_modules/" > .gitignore
+echo "backend/node_modules/" >> .gitignore
+echo ".env" >> .gitignore
+echo "backend/.env" >> .gitignore
