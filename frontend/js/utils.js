@@ -132,4 +132,48 @@ function createDiceHTML(msg) {
     '<span class="dice-rolled-by">' + escapeHTML(d.rolledBy) + ' бросил кубик</span>' +
     '<span class="dice-result-number">Результат: <strong>' + d.result + '</strong> из ' + d.sides + '</span>' +
     '</div></div>';
+}// ===== Sound Notification =====
+var notificationSound = null;
+
+function initNotificationSound() {
+  try {
+    var AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    notificationSound = new AudioContext();
+  } catch(e) {}
+}
+
+function playNotificationSound() {
+  try {
+    if (!notificationSound) initNotificationSound();
+    if (!notificationSound) return;
+    
+    var ctx = notificationSound;
+    if (ctx.state === 'suspended') ctx.resume();
+    
+    var oscillator = ctx.createOscillator();
+    var gain = ctx.createGain();
+    
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
+    
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.3);
+  } catch(e) {}
+}
+
+// ===== Save/Restore current view =====
+function saveCurrentView(viewId) {
+  try { sessionStorage.setItem('chatverse_view', viewId); } catch(e) {}
+}
+
+function getSavedView() {
+  try { return sessionStorage.getItem('chatverse_view') || 'general'; } catch(e) { return 'general'; }
 }
