@@ -1,151 +1,84 @@
-// ===== Utility Functions =====
-
 const API_URL = window.location.origin + '/api';
 
-// Token management
-function getToken() {
-  return localStorage.getItem('chatverse_token');
-}
+function getToken() { return localStorage.getItem('chatverse_token'); }
+function setToken(token) { localStorage.setItem('chatverse_token', token); }
+function removeToken() { localStorage.removeItem('chatverse_token'); localStorage.removeItem('chatverse_user'); }
+function getUser() { const u = localStorage.getItem('chatverse_user'); return u ? JSON.parse(u) : null; }
+function setUser(user) { localStorage.setItem('chatverse_user', JSON.stringify(user)); }
 
-function setToken(token) {
-  localStorage.setItem('chatverse_token', token);
-}
-
-function removeToken() {
-  localStorage.removeItem('chatverse_token');
-  localStorage.removeItem('chatverse_user');
-}
-
-function getUser() {
-  const user = localStorage.getItem('chatverse_user');
-  return user ? JSON.parse(user) : null;
-}
-
-function setUser(user) {
-  localStorage.setItem('chatverse_user', JSON.stringify(user));
-}
-
-// API helper
 async function apiRequest(endpoint, options = {}) {
   const token = getToken();
-  const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    },
-    ...options
-  };
-
-  const response = await fetch(`${API_URL}${endpoint}`, config);
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || 'Ошибка запроса');
+  const headers = { ...(token ? { 'Authorization': 'Bearer ' + token } : {}) };
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
   }
-
+  const config = { headers, ...options };
+  const response = await fetch(API_URL + endpoint, config);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Ошибка запроса');
   return data;
 }
 
-// Check auth
-function requireAuth() {
-  const token = getToken();
-  if (!token) {
-    window.location.href = '/login.html';
-    return false;
-  }
-  return true;
-}
+function requireAuth() { if (!getToken()) { window.location.href = '/login.html'; return false; } return true; }
 
-function redirectIfAuth() {
-  const token = getToken();
-  if (token) {
-    window.location.href = '/';
-    return true;
-  }
-  return false;
-}
-
-// Toast notifications
-function showToast(message, type = 'info') {
+function showToast(message, type) {
+  type = type || 'info';
   const container = document.getElementById('toast-container');
   if (!container) return;
-
   const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  
+  toast.className = 'toast toast-' + type;
   const icons = { success: '✅', error: '❌', info: 'ℹ️' };
-  toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${message}</span>`;
-
+  toast.innerHTML = '<span>' + (icons[type] || 'ℹ️') + '</span><span>' + message + '</span>';
   container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.classList.add('toast-exit');
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
+  setTimeout(() => { toast.classList.add('toast-exit'); setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
-// Avatar helpers
 function getInitials(user) {
-  if (user.profile?.firstName && user.profile?.lastName) {
-    return (user.profile.firstName[0] + user.profile.lastName[0]).toUpperCase();
-  }
-  if (user.profile?.firstName) {
-    return user.profile.firstName[0].toUpperCase();
-  }
+  if (user.profile && user.profile.firstName && user.profile.lastName) return (user.profile.firstName[0] + user.profile.lastName[0]).toUpperCase();
+  if (user.profile && user.profile.firstName) return user.profile.firstName[0].toUpperCase();
   return user.username ? user.username[0].toUpperCase() : '?';
 }
 
 function getDisplayName(user) {
-  if (user.profile?.firstName || user.profile?.lastName) {
-    return [user.profile.firstName, user.profile.lastName].filter(Boolean).join(' ');
-  }
+  if (user.profile && (user.profile.firstName || user.profile.lastName)) return [user.profile.firstName, user.profile.lastName].filter(Boolean).join(' ');
   return user.username;
 }
 
-function getAvatarColor(user) {
-  return user.profile?.avatarColor || '#6c5ce7';
+function getAvatarColor(user) { return (user.profile && user.profile.avatarColor) || '#6c5ce7'; }
+
+function getAvatarUrl(user) { return (user.profile && user.profile.avatarUrl) || ''; }
+
+function createAvatarHTML(user, size) {
+  const sc = size ? ' ' + size : '';
+  const avatarUrl = getAvatarUrl(user);
+  if (avatarUrl) {
+    const sizeMap = { 'large': '80px', 'xl': '120px' };
+    const px = sizeMap[size] || '40px';
+    const radius = size === 'xl' ? '28px' : size === 'large' ? '20px' : '50%';
+    return '<div class="user-avatar' + sc + '" style="background:url(' + avatarUrl + ') center/cover; width:' + px + '; height:' + px + '; border-radius:' + radius + ';"></div>';
+  }
+  return '<div class="user-avatar' + sc + '" style="background:' + getAvatarColor(user) + '">' + getInitials(user) + '</div>';
 }
 
-function createAvatarHTML(user, size = '') {
-  const sizeClass = size ? ` ${size}` : '';
-  return `<div class="user-avatar${sizeClass}" style="background: ${getAvatarColor(user)}">${getInitials(user)}</div>`;
+function createMiniAvatarHTML(user, sizePx) {
+  sizePx = sizePx || 36;
+  const avatarUrl = getAvatarUrl(user);
+  if (avatarUrl) {
+    return '<div style="width:' + sizePx + 'px;height:' + sizePx + 'px;border-radius:50%;background:url(' + avatarUrl + ') center/cover;flex-shrink:0;"></div>';
+  }
+  return '<div style="background:' + getAvatarColor(user) + ';width:' + sizePx + 'px;height:' + sizePx + 'px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:' + Math.round(sizePx * 0.4) + 'px;flex-shrink:0;">' + getInitials(user) + '</div>';
 }
 
-// Time formatting
 function formatTime(dateStr) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diff = now - date;
-  
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  const time = `${hours}:${minutes}`;
-  
-  if (diff < 86400000 && date.getDate() === now.getDate()) {
-    return time;
-  }
-  
-  if (diff < 172800000) {
-    return `Вчера, ${time}`;
-  }
-  
-  const day = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  return `${day}.${month} ${time}`;
+  const date = new Date(dateStr); const now = new Date(); const diff = now - date;
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  const time = h + ':' + m;
+  if (diff < 86400000 && date.getDate() === now.getDate()) return time;
+  if (diff < 172800000) return 'Вчера, ' + time;
+  return date.getDate().toString().padStart(2, '0') + '.' + (date.getMonth() + 1).toString().padStart(2, '0') + ' ' + time;
 }
 
-// Escape HTML
-function escapeHTML(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+function escapeHTML(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 
-// Debounce
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-}
+function debounce(func, wait) { let t; return function (...args) { clearTimeout(t); t = setTimeout(() => func.apply(this, args), wait); }; }

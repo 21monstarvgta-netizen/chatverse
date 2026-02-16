@@ -22,7 +22,8 @@ const userSchema = new mongoose.Schema({
     birthDate: { type: Date, default: null },
     location: { type: String, default: '', maxlength: 100 },
     website: { type: String, default: '', maxlength: 200 },
-    avatarColor: { type: String, default: '#6c5ce7' }
+    avatarColor: { type: String, default: '#6c5ce7' },
+    avatarUrl: { type: String, default: '' }
   },
   status: {
     type: String,
@@ -33,23 +34,18 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
-}, {
-  timestamps: true
-});
+}, { timestamps: true });
 
-// Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
-// Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Remove password from JSON output
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
