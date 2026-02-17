@@ -54,9 +54,16 @@ router.get('/pinned/:roomId?', auth, async (req, res) => {
     } else {
       query.room = null;
     }
+    console.log('=== GET PINNED ===');
+    console.log('Query:', JSON.stringify(query));
     const messages = await Message.find(query)
       .populate(populateMsg)
       .sort({ pinnedAt: -1 }).limit(20);
+    console.log('Found pinned messages:', messages.length);
+    messages.forEach(function(m) {
+      console.log('  - id:', m._id, 'pinned:', m.pinned, 'content:', (m.content || '').substring(0, 30));
+    });
+    console.log('=== END GET PINNED ===');
     res.json({ messages });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -80,30 +87,44 @@ router.post('/pin/:messageId', auth, async (req, res) => {
       if (req.user.role !== 'admin') return res.status(403).json({ error: 'Нет прав' });
     }
 
-    const newPinned = !message.pinned;
+    const oldPinned = message.pinned;
+    const newPinned = !oldPinned;
 
-    const updated = await Message.findByIdAndUpdate(
-      req.params.messageId,
+    console.log('=== PIN TOGGLE ===');
+    console.log('Message ID:', req.params.messageId);
+    console.log('Old pinned:', oldPinned);
+    console.log('New pinned:', newPinned);
+
+    const result = await Message.updateOne(
+      { _id: req.params.messageId },
       {
         $set: {
           pinned: newPinned,
           pinnedBy: newPinned ? req.userId : null,
           pinnedAt: newPinned ? new Date() : null
         }
-      },
-      { new: true }
-    ).populate(populateMsg);
+      }
+    );
+
+    console.log('UpdateOne result:', JSON.stringify(result));
+
+    // Verify it actually changed
+    const verify = await Message.findById(req.params.messageId).select('pinned pinnedBy pinnedAt');
+    console.log('After update - pinned:', verify.pinned, 'pinnedBy:', verify.pinnedBy, 'pinnedAt:', verify.pinnedAt);
+    console.log('=== END PIN ===');
+
+    const populated = await Message.findById(req.params.messageId).populate(populateMsg);
 
     const io = req.app.get('io');
     const target = message.room ? 'room:' + message.room : 'general';
     io.to(target).emit('message:pinned', {
       messageId: message._id,
       pinned: newPinned,
-      message: updated,
+      message: populated,
       roomId: message.room ? message.room.toString() : null
     });
 
-    res.json({ message: updated });
+    res.json({ message: populated });
   } catch (error) {
     console.error('Pin error:', error);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -187,7 +208,6 @@ router.post('/bulk-delete', auth, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const messages = await Message.find({ _id: { $in: messageIds } });
 
-    // Check ownership — only own messages (or admin)
     for (const msg of messages) {
       const isOwner = msg.sender.toString() === req.userId.toString();
       if (!isOwner && !isAdmin) {
@@ -222,7 +242,6 @@ router.post('/bulk-forward', auth, async (req, res) => {
       return res.status(400).json({ error: 'Не выбраны сообщения' });
     }
 
-    // Check access to target
     if (targetRoomId) {
       const room = await Room.findById(targetRoomId);
       if (!room || !room.members.some(m => m.toString() === req.userId.toString())) {
