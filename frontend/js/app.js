@@ -36,7 +36,6 @@ ChatApp.prototype.init = async function() {
     }
     document.getElementById('loading-screen').classList.add('hidden');
     document.getElementById('chat-app').classList.remove('hidden');
-    // Enable sound on first interaction
     document.addEventListener('click', function() { if (notificationSound && notificationSound.state === 'suspended') notificationSound.resume(); }, { once: true });
   } catch (error) {
     removeToken();
@@ -199,6 +198,31 @@ ChatApp.prototype.setupEventListeners = function() {
   });
 
   document.querySelectorAll('.modal-overlay').forEach(function(o) { o.addEventListener('click', function(e) { if (e.target === o) o.classList.add('hidden'); }); });
+
+  // Long press for mobile context menu
+  var longPressTimer = null;
+  document.getElementById('messages-container').addEventListener('touchstart', function(e) {
+    var msgEl = e.target.closest('.message[data-msg-id]');
+    if (!msgEl) return;
+    longPressTimer = setTimeout(function() {
+      var msgId = msgEl.dataset.msgId;
+      if (msgId) {
+        var touch = e.changedTouches[0];
+        self.showContextMenu({
+          preventDefault: function(){},
+          stopPropagation: function(){},
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        }, msgId);
+      }
+    }, 500);
+  });
+  document.getElementById('messages-container').addEventListener('touchend', function() {
+    clearTimeout(longPressTimer);
+  });
+  document.getElementById('messages-container').addEventListener('touchmove', function() {
+    clearTimeout(longPressTimer);
+  });
 };
 
 // Emoji - DON'T close on select
@@ -551,7 +575,7 @@ ChatApp.prototype.renderOnlineUsers = function() {
   }).join('');
 };
 
-// User popup - link to full profile page
+// User popup
 ChatApp.prototype.showUserPopup = async function(event, userId) {
   event.stopPropagation();
   try {
@@ -566,7 +590,7 @@ ChatApp.prototype.showUserPopup = async function(event, userId) {
       adminActions = '<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">' +
         '<button class="btn btn-ghost btn-sm" onclick="window.location.href=\'/user.html?id=' + u._id + '\'">👁 Профиль</button>' +
         (u.role !== 'admin' ? '<button class="btn btn-ghost btn-sm" onclick="app.adminBanUser(\'' + u._id + '\')">🔨 Бан</button>' : '') +
-        (u.role !== 'admin' ? '<button class="btn btn-ghost btn-sm" onclick="app.adminSetRole(\'' + u._id + '\',\'admin\')">👑 Сделать админом</button>' : '<button class="btn btn-ghost btn-sm" onclick="app.adminSetRole(\'' + u._id + '\',\'user\')">Снять админку</button>') +
+        (u.role !== 'admin' ? '<button class="btn btn-ghost btn-sm" onclick="app.adminSetRole(\'' + u._id + '\',\'admin\')">👑 Админ</button>' : '<button class="btn btn-ghost btn-sm" onclick="app.adminSetRole(\'' + u._id + '\',\'user\')">Снять</button>') +
         '</div>';
     }
 
