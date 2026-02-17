@@ -127,21 +127,21 @@ ChatApp.prototype.initSocket = function() {
     var targetView = data.roomId || 'general';
     if (self.currentView === targetView) {
       self.loadPinnedMessages();
-      // Update UI immediately
+      // Обновляем UI сразу
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) {
-        var pinIndicator = el.querySelector('.pin-indicator');
-        if (data.pinned && !pinIndicator) {
-          var header = el.querySelector('.msg-header');
-          if (header) {
+        var pinInd = el.querySelector('.pin-indicator');
+        if (data.pinned && !pinInd) {
+          var hdr = el.querySelector('.msg-header');
+          if (hdr) {
             var pin = document.createElement('span');
             pin.className = 'pin-indicator';
             pin.title = 'Закреплено';
             pin.textContent = '📌 ';
-            header.insertBefore(pin, header.firstChild);
+            hdr.insertBefore(pin, hdr.firstChild);
           }
-        } else if (!data.pinned && pinIndicator) {
-          pinIndicator.remove();
+        } else if (!data.pinned && pinInd) {
+          pinInd.remove();
         }
       }
     }
@@ -535,11 +535,9 @@ ChatApp.prototype.createMessageHTML = function(msg) {
 // Context menu
 ChatApp.prototype.showContextMenu = function(event, messageId) {
   event.preventDefault();
-  // Right-click enters selection mode
-  if ((event.button === 2 || event.which === 3) && !this.selectionMode) {
-    this.toggleSelectionMode();
-  }
-  if (this.selectionMode) {
+  // ПКМ включает режим выбора
+  if ((event.button === 2 || event.which === 3)) {
+    if (!this.selectionMode) this.toggleSelectionMode();
     this.toggleMessageSelection(messageId);
     return;
   }
@@ -982,17 +980,15 @@ ChatApp.prototype.closeModal = function(id) { document.getElementById(id).classL
 
 var app;
 
-// Multi-select functionality
+// === МУЛЬТИСЕЛЕКТ ===
 ChatApp.prototype.toggleSelectionMode = function() {
   this.selectionMode = !this.selectionMode;
   if (this.selectionMode) {
     this.selectedMessages.clear();
     this.showSelectionToolbar();
-    document.body.classList.add('selection-mode');
   } else {
     this.selectedMessages.clear();
     this.hideSelectionToolbar();
-    document.body.classList.remove('selection-mode');
   }
   this.updateSelectionUI();
 };
@@ -1007,7 +1003,9 @@ ChatApp.prototype.showSelectionToolbar = function() {
     '<button class="btn btn-danger btn-sm" onclick="app.deleteSelectedMessages()">🗑️ Удалить</button>' +
     '<button class="btn btn-primary btn-sm" onclick="app.forwardSelectedMessages()">↗️ Переслать</button>' +
     '<button class="btn btn-ghost btn-sm" onclick="app.toggleSelectionMode()">✖️ Отмена</button>';
-  document.querySelector('.chat-main').insertBefore(toolbar, document.querySelector('.chat-input'));
+  var chatMain = document.querySelector('.chat-main');
+  var chatInput = document.querySelector('.chat-input');
+  if (chatMain && chatInput) chatMain.insertBefore(toolbar, chatInput);
 };
 
 ChatApp.prototype.hideSelectionToolbar = function() {
@@ -1019,9 +1017,7 @@ ChatApp.prototype.toggleMessageSelection = function(messageId) {
   if (this.selectedMessages.has(messageId)) {
     this.selectedMessages.delete(messageId);
   } else {
-    var messages = this.messagesCache[this.currentView];
-    var msg = messages ? messages.find(function(m) { return m._id === messageId; }) : null;
-    if (msg) this.selectedMessages.add(messageId);
+    this.selectedMessages.add(messageId);
   }
   this.updateSelectionUI();
 };
@@ -1053,7 +1049,7 @@ ChatApp.prototype.deleteSelectedMessages = async function() {
     showToast('Можно удалять только свои сообщения', 'error');
     return;
   }
-  if (!confirm('Удалить выбранные сообщения (' + toDelete.length + ')?')) return;
+  if (!confirm('Удалить ' + toDelete.length + ' сообщений?')) return;
   try {
     for (var i = 0; i < toDelete.length; i++) {
       await apiRequest('/messages/delete/' + toDelete[i], { method: 'DELETE' });
@@ -1080,7 +1076,7 @@ ChatApp.prototype.openForwardModalMultiple = function() {
   var html = '<div class="forward-target" onclick="app.forwardMultipleTo(null)"><span>🌍</span> Общий чат</div>';
   Object.keys(this.roomsCache).forEach(function(rid) {
     var r = self.roomsCache[rid];
-    html += '<div class="forward-target" onclick="app.forwardMultipleTo(\'' + rid + '\'\)"><span style="color:' + (r.color || '#6c5ce7') + '">●</span> ' + escapeHTML(r.name) + '</div>';
+    html += '<div class="forward-target" onclick="app.forwardMultipleTo(\'' + rid + '\')"><span style="color:' + (r.color || '#6c5ce7') + '">●</span> ' + escapeHTML(r.name) + '</div>';
   });
   document.getElementById('forward-targets').innerHTML = html;
   document.getElementById('forward-modal').classList.remove('hidden');
@@ -1102,22 +1098,18 @@ ChatApp.prototype.forwardMultipleTo = async function(targetRoomId) {
   }
 };
 
-
 document.addEventListener('DOMContentLoaded', function() { app = new ChatApp(); });
 
-// Add at end - mobile tap support for messages
-(function() {
-  var lastTap = 0;
-  document.addEventListener('click', function(e) {
-    if (!app || !app.selectionMode) return;
-    var msgEl = e.target.closest('.message');
-    if (msgEl && !msgEl.classList.contains('system-message')) {
-      var msgId = msgEl.dataset.msgId;
-      if (msgId && !e.target.closest('.msg-menu-btn') && !e.target.closest('.context-item')) {
-        e.stopPropagation();
-        e.preventDefault();
-        app.toggleMessageSelection(msgId);
-      }
+// Клик по сообщению в режиме выбора (для мобильных)
+document.addEventListener('click', function(e) {
+  if (!app || !app.selectionMode) return;
+  var msgEl = e.target.closest('.message');
+  if (msgEl && !msgEl.classList.contains('system-message')) {
+    var msgId = msgEl.dataset.msgId;
+    if (msgId && !e.target.closest('.msg-menu-btn')) {
+      e.stopPropagation();
+      app.toggleMessageSelection(msgId);
     }
-  });
-})();
+  }
+});
+
