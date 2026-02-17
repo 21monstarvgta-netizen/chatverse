@@ -188,7 +188,7 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
 .online-user-item:hover{background:var(--bg-card-hover)}
 .online-user-item .user-name{font-size:12px;font-weight:500}
 
-/* Profile Page - FIXED scrolling */
+/* Profile Page */
 .profile-page{height:100vh;height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;padding-bottom:40px}
 .profile-container{width:100%;max-width:700px;margin:0 auto;animation:fadeInUp .6s ease;padding-bottom:40px}
 .profile-header-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;gap:12px;position:sticky;top:0;z-index:10;background:var(--bg-dark);padding:8px 0}
@@ -265,7 +265,7 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
 .image-fullscreen{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;z-index:2000;cursor:pointer;animation:fadeIn .2s;padding:20px}
 .image-fullscreen img{max-width:100%;max-height:100%;border-radius:8px;object-fit:contain}
 
-/* Emoji Picker - FIXED position */
+/* Emoji Picker */
 .emoji-picker{position:absolute;bottom:100%;left:0;right:0;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;max-height:240px;overflow-y:auto;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;box-shadow:var(--shadow-lg);z-index:100;animation:scaleIn .2s;margin-bottom:4px}
 .emoji-picker span{font-size:22px;cursor:pointer;padding:4px;border-radius:6px;text-align:center}
 .emoji-picker span:hover{background:var(--bg-card-hover)}
@@ -367,9 +367,8 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
   .emoji-picker{grid-template-columns:repeat(7,1fr)}
 }
 
-
 /* ============================================================
-   v3.0 NEW STYLES — admin, edit, pin, forward, posts, user page
+   v3.0 — admin, edit, pin, forward, posts, user page, menu btn
    ============================================================ */
 
 /* Date input fix */
@@ -404,6 +403,11 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
 .ctx-danger{color:var(--danger)}
 .ctx-danger:hover{background:rgba(225,112,85,0.1)}
 
+/* Message menu button */
+.msg-menu-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;opacity:0;transition:opacity 0.15s;margin-left:auto;line-height:1}
+.msg-menu-btn:hover{background:var(--bg-card-hover);color:var(--text-primary)}
+.message:hover .msg-menu-btn{opacity:1}
+
 /* Forwarded message */
 .forwarded-header{font-size:11px;color:var(--text-muted);padding:4px 8px;border-left:2px solid var(--primary);margin-bottom:4px;background:rgba(108,92,231,0.05);border-radius:0 6px 6px 0}
 
@@ -419,7 +423,7 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
 .new-post-form{margin-bottom:20px}
 .post-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .post-content{font-size:14px;line-height:1.6;color:var(--text-secondary);white-space:pre-wrap;word-wrap:break-word;margin-bottom:8px}
-.post-image{width:100%;max-height:400px;object-fit:cover;border-radius:var(--radius);margin-bottom:8px}
+.post-image{width:100%;max-height:400px;object-fit:cover;border-radius:var(--radius);margin-bottom:8px;cursor:pointer}
 .post-actions{display:flex;gap:8px;padding-top:8px;border-top:1px solid var(--border)}
 .post-actions .liked{color:#ff6b6b}
 .post-form-actions{display:flex;flex-direction:column;gap:8px;margin-top:8px}
@@ -438,40 +442,10 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
 
 /* v3.0 mobile additions */
 @media(max-width:768px){
+  .msg-menu-btn{opacity:0.5;font-size:18px;padding:4px 8px}
   .context-menu{left:16px!important;right:16px;min-width:auto;width:calc(100vw - 32px);bottom:16px;top:auto!important}
   .pinned-bar{padding:6px 12px;font-size:12px}
   .edit-bar{font-size:11px;padding:4px 8px}
   .posts-page{padding:12px}
   .post-card{padding:12px}
-}
-/* Message menu button */
-.msg-menu-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  opacity: 0;
-  transition: opacity 0.15s;
-  margin-left: auto;
-  line-height: 1;
-}
-
-.msg-menu-btn:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-}
-
-.message:hover .msg-menu-btn {
-  opacity: 1;
-}
-
-@media (max-width: 768px) {
-  .msg-menu-btn {
-    opacity: 0.5;
-    font-size: 18px;
-    padding: 4px 8px;
-  }
 }
