@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatVerse — Профиль пользователя</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+  <div class="profile-page">
+    <div class="profile-container">
+      <div class="profile-header-bar">
+        <button class="back-btn" id="back-btn">← Назад</button>
+        <div id="admin-user-actions" style="display:flex;gap:8px;"></div>
+      </div>
+      <div class="profile-card" id="user-profile-card">
+        <div class="profile-banner" id="user-banner"></div>
+        <div class="profile-avatar-section">
+          <div class="user-avatar xl" id="user-avatar"><span id="user-avatar-letter">?</span></div>
+          <div class="profile-info-header">
+            <h2 id="user-display-name">Пользователь</h2>
+            <div class="username-tag" id="user-username">@username</div>
+            <div id="user-role-badge"></div>
+            <div id="user-status-custom" style="margin-top:6px;font-size:13px;color:var(--text-secondary);"></div>
+          </div>
+        </div>
+        <div class="profile-body" style="padding:20px 24px;">
+          <div id="user-bio" style="color:var(--text-secondary);margin-bottom:16px;line-height:1.6;"></div>
+          <div id="user-details" class="user-popup-details"></div>
+          <h3 style="font-size:14px;color:var(--text-muted);margin:20px 0 12px;text-transform:uppercase;">Посты</h3>
+          <div id="user-posts-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/js/utils.js"></script>
+  <script src="/js/userpage.js"></script>
+</body>
+</html>

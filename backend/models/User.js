@@ -15,6 +15,19 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
+  isBanned: {
+    type: Boolean,
+    default: false
+  },
+  banReason: {
+    type: String,
+    default: ''
+  },
   profile: {
     firstName: { type: String, default: '', maxlength: 50 },
     lastName: { type: String, default: '', maxlength: 50 },
@@ -23,7 +36,14 @@ const userSchema = new mongoose.Schema({
     location: { type: String, default: '', maxlength: 100 },
     website: { type: String, default: '', maxlength: 200 },
     avatarColor: { type: String, default: '#6c5ce7' },
-    avatarUrl: { type: String, default: '' }
+    avatarUrl: { type: String, default: '' },
+    bannerColor1: { type: String, default: '#6c5ce7' },
+    bannerColor2: { type: String, default: '#a29bfe' },
+    statusEmoji: { type: String, default: '' },
+    statusText: { type: String, default: '', maxlength: 100 },
+    theme: { type: String, default: 'default' },
+    nameGlow: { type: Boolean, default: false },
+    nameColor: { type: String, default: '' }
   },
   status: {
     type: String,

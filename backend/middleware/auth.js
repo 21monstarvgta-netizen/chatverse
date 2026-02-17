@@ -16,6 +16,10 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ error: 'Пользователь не найден' });
     }
 
+    if (user.isBanned) {
+      return res.status(403).json({ error: 'Ваш аккаунт заблокирован: ' + (user.banReason || 'Нарушение правил') });
+    }
+
     req.user = user;
     req.userId = user._id;
     next();

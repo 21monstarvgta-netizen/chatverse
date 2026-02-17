@@ -35,10 +35,14 @@
           <form id="profile-form" class="profile-form">
             <div class="form-group"><label>Имя</label><input type="text" class="form-input no-icon" id="firstName" placeholder="Ваше имя" maxlength="50"></div>
             <div class="form-group"><label>Фамилия</label><input type="text" class="form-input no-icon" id="lastName" placeholder="Ваша фамилия" maxlength="50"></div>
-            <div class="form-group"><label>Дата рождения</label><input type="date" class="form-input no-icon" id="birthDate"></div>
+            <div class="form-group"><label>Дата рождения</label><input type="date" class="form-input no-icon date-input" id="birthDate"></div>
             <div class="form-group"><label>Местоположение</label><input type="text" class="form-input no-icon" id="location" placeholder="Город, страна" maxlength="100"></div>
             <div class="form-group full-width"><label>О себе</label><textarea class="form-input no-icon" id="bio" placeholder="Расскажите о себе..." maxlength="500" rows="3"></textarea></div>
             <div class="form-group full-width"><label>Веб-сайт</label><input type="text" class="form-input no-icon" id="website" placeholder="https://example.com" maxlength="200"></div>
+            <div class="form-group full-width"><label>Статус-эмодзи</label><input type="text" class="form-input no-icon" id="statusEmoji" placeholder="🎮" maxlength="10" style="max-width:80px;"></div>
+            <div class="form-group full-width"><label>Текст статуса</label><input type="text" class="form-input no-icon" id="statusText" placeholder="Играю в игры..." maxlength="100"></div>
+            <div class="form-group"><label>Цвет баннера 1</label><input type="color" class="form-input no-icon color-input" id="bannerColor1" value="#6c5ce7"></div>
+            <div class="form-group"><label>Цвет баннера 2</label><input type="color" class="form-input no-icon color-input" id="bannerColor2" value="#a29bfe"></div>
             <div class="form-group full-width"><label>Цвет аватара</label>
               <div class="color-picker-group" id="color-picker">
                 <div class="color-option" data-color="#6c5ce7" style="background:#6c5ce7"></div>
@@ -53,6 +57,10 @@
                 <div class="color-option" data-color="#636e72" style="background:#636e72"></div>
               </div>
             </div>
+            <div class="form-group full-width">
+              <label><input type="checkbox" id="nameGlow"> Свечение имени</label>
+            </div>
+            <div class="form-group"><label>Цвет имени в чате</label><input type="color" class="form-input no-icon color-input" id="nameColor" value="#ffffff"></div>
           </form>
         </div>
       </div>

@@ -5,6 +5,13 @@ const Room = require('../models/Room');
 
 const onlineUsers = new Map();
 
+const populateMsg = [
+  { path: 'sender', select: 'username profile role' },
+  { path: 'shoppingList.items.boughtBy', select: 'username' },
+  { path: 'forwarded.originalSender', select: 'username profile' },
+  { path: 'pinnedBy', select: 'username' }
+];
+
 function setupChatSocket(io) {
   io.use(async (socket, next) => {
     try {
@@ -13,6 +20,7 @@ function setupChatSocket(io) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findById(decoded.userId).select('-password');
       if (!user) return next(new Error('User not found'));
+      if (user.isBanned) return next(new Error('Banned'));
       socket.userId = user._id.toString();
       socket.user = user;
       next();
@@ -31,19 +39,15 @@ function setupChatSocket(io) {
 
     try {
       const userRooms = await Room.find({ members: userId });
-      userRooms.forEach(room => {
-        socket.join('room:' + room._id.toString());
-      });
+      userRooms.forEach(room => socket.join('room:' + room._id.toString()));
     } catch (e) {
       console.error('Error joining rooms:', e);
     }
 
-    // Personal channel for notifications
     socket.join('user:' + userId);
     socket.join('general');
     broadcastOnlineUsers(io);
 
-    // Text message - general
     socket.on('general:message', async (data) => {
       try {
         if (!data.content || !data.content.trim()) return;
@@ -54,8 +58,7 @@ function setupChatSocket(io) {
           type: 'text'
         });
         await message.save();
-        const populated = await Message.findById(message._id)
-          .populate('sender', 'username profile');
+        const populated = await Message.findById(message._id).populate(populateMsg);
         io.to('general').emit('general:message', populated);
       } catch (error) {
         console.error('Message error:', error);
@@ -63,7 +66,6 @@ function setupChatSocket(io) {
       }
     });
 
-    // Text message - room
     socket.on('room:message', async (data) => {
       try {
         if (!data.content || !data.content.trim() || !data.roomId) return;
@@ -78,18 +80,13 @@ function setupChatSocket(io) {
           type: 'text'
         });
         await message.save();
-        const populated = await Message.findById(message._id)
-          .populate('sender', 'username profile');
-        io.to('room:' + data.roomId).emit('room:message', {
-          roomId: data.roomId,
-          message: populated
-        });
+        const populated = await Message.findById(message._id).populate(populateMsg);
+        io.to('room:' + data.roomId).emit('room:message', { roomId: data.roomId, message: populated });
       } catch (error) {
         console.error('Room message error:', error);
       }
     });
 
-    // Image message
     socket.on('image:message', async (data) => {
       try {
         if (!data.imageUrl) return;
@@ -101,8 +98,7 @@ function setupChatSocket(io) {
           imageUrl: data.imageUrl
         });
         await message.save();
-        const populated = await Message.findById(message._id)
-          .populate('sender', 'username profile');
+        const populated = await Message.findById(message._id).populate(populateMsg);
         if (data.roomId) {
           io.to('room:' + data.roomId).emit('room:message', { roomId: data.roomId, message: populated });
         } else {
@@ -113,7 +109,6 @@ function setupChatSocket(io) {
       }
     });
 
-    // Shopping list
     socket.on('shopping:create', async (data) => {
       try {
         if (!data.items || !data.items.length) return;
@@ -133,9 +128,7 @@ function setupChatSocket(io) {
           }
         });
         await message.save();
-        const populated = await Message.findById(message._id)
-          .populate('sender', 'username profile')
-          .populate('shoppingList.items.boughtBy', 'username');
+        const populated = await Message.findById(message._id).populate(populateMsg);
         if (data.roomId) {
           io.to('room:' + data.roomId).emit('room:message', { roomId: data.roomId, message: populated });
         } else {
@@ -146,7 +139,6 @@ function setupChatSocket(io) {
       }
     });
 
-    // Dice roll
     socket.on('dice:roll', async (data) => {
       try {
         const validDice = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100 };
@@ -161,8 +153,7 @@ function setupChatSocket(io) {
           diceResult: { diceType, sides, result, rolledBy: user.username }
         });
         await message.save();
-        const populated = await Message.findById(message._id)
-          .populate('sender', 'username profile');
+        const populated = await Message.findById(message._id).populate(populateMsg);
         if (data.roomId) {
           io.to('room:' + data.roomId).emit('room:message', { roomId: data.roomId, message: populated });
         } else {
@@ -173,7 +164,6 @@ function setupChatSocket(io) {
       }
     });
 
-    // Room created - notify members
     socket.on('room:created', async (data) => {
       try {
         if (!data.roomId) return;
@@ -183,14 +173,9 @@ function setupChatSocket(io) {
         if (!room) return;
         room.members.forEach(member => {
           const memberId = member._id.toString();
-          if (memberId !== userId) {
-            io.to('user:' + memberId).emit('room:new', room);
-          }
-          // Join all members to room channel
+          if (memberId !== userId) io.to('user:' + memberId).emit('room:new', room);
           const memberSocket = findSocketByUserId(memberId);
-          if (memberSocket) {
-            memberSocket.join('room:' + room._id.toString());
-          }
+          if (memberSocket) memberSocket.join('room:' + room._id.toString());
         });
       } catch (e) {
         console.error('Room created notify error:', e);
@@ -227,7 +212,7 @@ function setupChatSocket(io) {
 
 function broadcastOnlineUsers(io) {
   const users = Array.from(onlineUsers.values()).map(u => ({
-    _id: u.user._id, username: u.user.username, profile: u.user.profile, status: 'online'
+    _id: u.user._id, username: u.user.username, profile: u.user.profile, status: 'online', role: u.user.role
   }));
   io.emit('users:online', users);
 }

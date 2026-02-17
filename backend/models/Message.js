@@ -25,7 +25,7 @@ const messageSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['text', 'system', 'image', 'shopping', 'dice'],
+    enum: ['text', 'system', 'image', 'shopping', 'dice', 'forwarded'],
     default: 'text'
   },
   imageUrl: {
@@ -41,9 +41,36 @@ const messageSchema = new mongoose.Schema({
     sides: { type: Number, default: 6 },
     result: { type: Number, default: 1 },
     rolledBy: { type: String, default: '' }
+  },
+  edited: {
+    type: Boolean,
+    default: false
+  },
+  editedAt: {
+    type: Date,
+    default: null
+  },
+  forwarded: {
+    originalSender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    originalRoom: { type: String, default: '' },
+    originalDate: { type: Date, default: null }
+  },
+  pinned: {
+    type: Boolean,
+    default: false
+  },
+  pinnedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  pinnedAt: {
+    type: Date,
+    default: null
   }
 }, { timestamps: true });
 
 messageSchema.index({ room: 1, createdAt: -1 });
+messageSchema.index({ room: 1, pinned: 1 });
 
 module.exports = mongoose.model('Message', messageSchema);

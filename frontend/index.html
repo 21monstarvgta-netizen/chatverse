@@ -2,8 +2,9 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ChatVerse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -17,6 +18,7 @@
       <div class="sidebar-header">
         <div class="logo"><div class="logo-mini">💬</div><h2>ChatVerse</h2></div>
         <div class="sidebar-header-actions">
+          <button class="btn-icon" id="btn-posts" title="Посты">📝</button>
           <button class="btn-icon" id="btn-profile" title="Профиль">👤</button>
           <button class="btn-icon" id="btn-logout" title="Выйти">🚪</button>
         </div>
@@ -39,6 +41,12 @@
         </div>
         <div class="chat-header-actions" id="chat-header-actions"></div>
       </header>
+      <!-- Pinned messages bar -->
+      <div class="pinned-bar hidden" id="pinned-bar" onclick="app.scrollToPinnedMessage()">
+        <span class="pinned-icon">📌</span>
+        <span class="pinned-text" id="pinned-text">Закреплённое сообщение</span>
+        <button class="pinned-close" onclick="event.stopPropagation();document.getElementById('pinned-bar').classList.add('hidden')">✕</button>
+      </div>
       <div class="messages-container" id="messages-container">
         <div class="empty-state"><div class="empty-icon">💬</div><h3>Пока нет сообщений</h3><p>Будьте первым, кто напишет!</p></div>
       </div>
@@ -57,6 +65,11 @@
           <button class="send-btn" id="send-btn" title="Отправить">➤</button>
           <div id="emoji-picker" class="emoji-picker hidden"></div>
           <div id="dice-picker" class="dice-picker hidden"></div>
+        </div>
+        <!-- Edit bar -->
+        <div id="edit-bar" class="edit-bar hidden">
+          <span>✏️ Редактирование</span>
+          <button onclick="app.cancelEdit()">✕</button>
         </div>
       </div>
     </main>
@@ -113,25 +126,31 @@
     <div class="modal" style="max-width:600px;">
       <div class="modal-header"><h2>🛒 Список покупок</h2><button class="modal-close" id="close-shopping">✕</button></div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>Название списка</label>
-          <input type="text" class="form-input no-icon" id="shopping-title-input" placeholder="Список покупок" maxlength="100">
-        </div>
-        <label style="font-size:13px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Выберите продукты (нажмите на категорию)</label>
+        <div class="form-group"><label>Название списка</label><input type="text" class="form-input no-icon" id="shopping-title-input" placeholder="Список покупок" maxlength="100"></div>
+        <label style="font-size:13px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Выберите продукты</label>
         <div class="shopping-modal-categories" id="shopping-categories"></div>
-        <div class="custom-item-row">
-          <input type="text" id="custom-item-input" placeholder="Добавить свой товар...">
-          <button class="btn btn-secondary btn-sm" id="add-custom-item">➕</button>
-        </div>
+        <div class="custom-item-row"><input type="text" id="custom-item-input" placeholder="Добавить свой товар..."><button class="btn btn-secondary btn-sm" id="add-custom-item">➕</button></div>
         <div class="selected-items-preview" id="selected-items-preview"></div>
       </div>
       <div class="modal-footer"><button class="btn btn-secondary" id="cancel-shopping">Отмена</button><button class="btn btn-primary" style="width:auto" id="confirm-shopping">Отправить список</button></div>
     </div>
   </div>
 
+  <!-- Forward Modal -->
+  <div id="forward-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header"><h2>↗️ Переслать в</h2><button class="modal-close" id="close-forward">✕</button></div>
+      <div class="modal-body">
+        <div class="forward-targets" id="forward-targets"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Message Context Menu -->
+  <div id="msg-context-menu" class="context-menu hidden"></div>
+
   <!-- User Popup -->
   <div id="user-popup" class="user-popup hidden"></div>
-  <!-- Image Fullscreen -->
   <div id="image-fullscreen" class="image-fullscreen hidden" onclick="this.classList.add('hidden')"><img id="fullscreen-img" src=""></div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>

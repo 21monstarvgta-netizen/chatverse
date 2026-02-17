@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatVerse — Посты</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+  <div class="posts-page">
+    <div class="posts-container">
+      <div class="posts-header-bar">
+        <button class="back-btn" id="back-btn">← Назад в чат</button>
+        <h1 style="font-size:20px;background:linear-gradient(135deg,var(--primary-light),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">📝 Посты</h1>
+        <button class="btn btn-primary btn-sm" id="new-post-btn">✍️ Новый пост</button>
+      </div>
+
+      <!-- New Post Form -->
+      <div id="new-post-form" class="post-card new-post-form hidden">
+        <textarea id="post-content" class="form-input no-icon" placeholder="Что нового?" maxlength="5000" rows="3"></textarea>
+        <div class="post-form-actions">
+          <div class="post-form-tools">
+            <label class="toolbar-btn" title="Добавить фото">🖼️<input type="file" id="post-image-input" accept="image/*" style="display:none;"></label>
+            <button class="toolbar-btn" id="post-emoji-btn" title="Эмодзи">😊</button>
+          </div>
+          <div id="post-image-preview" class="hidden" style="margin:8px 0;"><img id="post-preview-img" style="max-width:200px;max-height:150px;border-radius:8px;"><button onclick="app_posts.clearImage()" style="margin-left:8px;" class="btn btn-ghost btn-sm">✕</button></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('new-post-form').classList.add('hidden')">Отмена</button>
+            <button class="btn btn-primary btn-sm" id="submit-post-btn">Опубликовать</button>
+          </div>
+        </div>
+        <div id="post-emoji-picker" class="emoji-picker hidden" style="position:relative;bottom:auto;left:auto;right:auto;margin-top:8px;"></div>
+      </div>
+
+      <div id="posts-list"></div>
+      <div id="posts-loading" class="hidden" style="text-align:center;padding:20px;"><div class="spinner" style="margin:0 auto;"></div></div>
+      <div id="posts-empty" class="empty-state hidden"><div class="empty-icon">📝</div><h3>Пока нет постов</h3><p>Будьте первым!</p></div>
+    </div>
+  </div>
+  <script src="/js/utils.js"></script>
+  <script src="/js/posts.js"></script>
+</body>
+</html>

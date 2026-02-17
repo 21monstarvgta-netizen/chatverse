@@ -1,6 +1,6 @@
 {
   "name": "chatverse-backend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "ChatVerse - Modern Chat Application",
   "main": "server.js",
   "scripts": {
