@@ -14,8 +14,7 @@ var ChatApp = function() {
   this.roomsCache = {};
   this.editingMessageId = null;
   this.pinnedMessages = {};
-  // Multi-select mode
-  this.selectMode = null; // null, 'delete', 'forward'
+  this.selectMode = null;
   this.selectedMessages = [];
   this.init();
 };
@@ -113,6 +112,12 @@ ChatApp.prototype.initSocket = function() {
           body.innerHTML = '<div class="msg-text">' + escapeHTML(data.message.content) + '</div><span class="msg-edited">(изменено ' + formatTime(data.message.editedAt) + ')</span>';
         }
       }
+      if (self.messagesCache[self.currentView]) {
+        self.messagesCache[self.currentView] = self.messagesCache[self.currentView].map(function(m) {
+          if (m._id === data.messageId) return data.message;
+          return m;
+        });
+      }
     }
   });
 
@@ -121,7 +126,6 @@ ChatApp.prototype.initSocket = function() {
     if (self.currentView === targetView) {
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) el.remove();
-      // Also remove from cache
       if (self.messagesCache[self.currentView]) {
         self.messagesCache[self.currentView] = self.messagesCache[self.currentView].filter(function(m) {
           return m._id !== data.messageId;
@@ -133,17 +137,15 @@ ChatApp.prototype.initSocket = function() {
   this.socket.on('message:pinned', function(data) {
     var targetView = data.roomId || 'general';
     if (self.currentView === targetView) {
-      // Update message in cache
       if (self.messagesCache[self.currentView]) {
         self.messagesCache[self.currentView] = self.messagesCache[self.currentView].map(function(m) {
           if (m._id === data.messageId) {
             m.pinned = data.pinned;
-            return data.message || m;
+            if (data.message) return data.message;
           }
           return m;
         });
       }
-      // Re-render the specific message pin indicator
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) {
         var pinInd = el.querySelector('.pin-indicator');
@@ -267,7 +269,7 @@ ChatApp.prototype.setupEventListeners = function() {
     if (!emoji.contains(e.target) && e.target.id !== 'btn-emoji') emoji.classList.add('hidden');
     if (!dice.contains(e.target) && e.target.id !== 'btn-dice') dice.classList.add('hidden');
     if (!popup.classList.contains('hidden') && !popup.contains(e.target) && !e.target.classList.contains('msg-username')) popup.classList.add('hidden');
-    if (!ctx.classList.contains('hidden') && !ctx.contains(e.target)) ctx.classList.add('hidden');
+    if (!ctx.classList.contains('hidden') && !ctx.contains(e.target) && !e.target.closest('.msg-menu-btn')) ctx.classList.add('hidden');
   });
 
   document.querySelectorAll('.modal-overlay').forEach(function(o) {
@@ -276,10 +278,14 @@ ChatApp.prototype.setupEventListeners = function() {
 
   // Long press for mobile context menu
   var longPressTimer = null;
+  var longPressTriggered = false;
   document.getElementById('messages-container').addEventListener('touchstart', function(e) {
     var msgEl = e.target.closest('.message[data-msg-id]');
     if (!msgEl) return;
+    if (self.selectMode) return;
+    longPressTriggered = false;
     longPressTimer = setTimeout(function() {
+      longPressTriggered = true;
       var msgId = msgEl.dataset.msgId;
       if (msgId) {
         var touch = e.changedTouches[0];
@@ -291,13 +297,58 @@ ChatApp.prototype.setupEventListeners = function() {
         }, msgId);
       }
     }, 500);
-  });
-  document.getElementById('messages-container').addEventListener('touchend', function() {
+  }, { passive: true });
+  document.getElementById('messages-container').addEventListener('touchend', function(e) {
     clearTimeout(longPressTimer);
+    if (longPressTriggered) {
+      e.preventDefault();
+    }
   });
   document.getElementById('messages-container').addEventListener('touchmove', function() {
     clearTimeout(longPressTimer);
+  }, { passive: true });
+
+  // Click on message in select mode
+  document.getElementById('messages-container').addEventListener('click', function(e) {
+    if (!self.selectMode) return;
+    var msgEl = e.target.closest('.message[data-msg-id]');
+    if (!msgEl) return;
+    // Dont toggle if clicking on username, image, shopping item etc
+    if (e.target.closest('.msg-username') || e.target.closest('.msg-image') || e.target.closest('.shopping-item') || e.target.closest('a')) return;
+    var msgId = msgEl.dataset.msgId;
+    if (!msgId) return;
+
+    // Check if this message can be selected
+    if (self.selectMode === 'delete') {
+      var msg = self.findMessageInCache(msgId);
+      if (!msg) return;
+      var isOwn = msg.sender._id === self.currentUser._id;
+      var amAdmin = self.currentUser.role === 'admin';
+      if (!isOwn && !amAdmin) {
+        showToast('Можно выбирать только свои сообщения', 'error');
+        return;
+      }
+    }
+
+    var idx = self.selectedMessages.indexOf(msgId);
+    if (idx >= 0) {
+      self.selectedMessages.splice(idx, 1);
+      msgEl.classList.remove('selected-message');
+    } else {
+      self.selectedMessages.push(msgId);
+      msgEl.classList.add('selected-message');
+    }
+    self.updateSelectBar();
   });
+};
+
+// Find message in cache
+ChatApp.prototype.findMessageInCache = function(msgId) {
+  var cache = this.messagesCache[this.currentView] || [];
+  for (var i = 0; i < cache.length; i++) {
+    if (cache[i]._id === msgId) return cache[i];
+  }
+  return null;
 };
 
 // Emoji
@@ -522,17 +573,7 @@ ChatApp.prototype.createMessageHTML = function(msg) {
   var pinnedIcon = msg.pinned ? '<span class="pin-indicator" title="Закреплено">📌</span> ' : '';
   var editedMark = msg.edited ? '<span class="msg-edited">(изменено ' + formatTime(msg.editedAt) + ')</span>' : '';
   var adminMsgClass = senderIsAdmin ? ' admin-message' : '';
-
-  // Select mode checkbox
-  var selectCheckbox = '';
-  if (this.selectMode) {
-    var canSelect = true;
-    if (this.selectMode === 'delete' && !isOwn && !isAdmin(this.currentUser)) canSelect = false;
-    if (canSelect) {
-      var checked = this.selectedMessages.indexOf(msg._id) >= 0 ? ' checked' : '';
-      selectCheckbox = '<label class="select-msg-checkbox" onclick="event.stopPropagation()"><input type="checkbox" data-select-msg="' + msg._id + '"' + checked + ' onchange="app.toggleSelectMessage(\'' + msg._id + '\',this.checked)"><span class="checkmark" style="width:18px;height:18px;border-radius:4px;">✓</span></label>';
-    }
-  }
+  var selectedClass = this.selectedMessages.indexOf(msg._id) >= 0 ? ' selected-message' : '';
 
   var bodyContent = '';
   if (msg.type === 'text') {
@@ -552,11 +593,10 @@ ChatApp.prototype.createMessageHTML = function(msg) {
 
   var menuBtn = '';
   if (!this.selectMode) {
-    menuBtn = '<button class="msg-menu-btn" onclick="event.stopPropagation();app.showContextMenu(event,\'' + msg._id + '\')" title="Меню">⋮</button>';
+    menuBtn = '<button class="msg-menu-btn" onclick="event.stopPropagation();event.preventDefault();app.openMenuForMessage(event,\'' + msg._id + '\');return false;" title="Меню">⋮</button>';
   }
 
-  return '<div class="message' + (isOwn ? ' own-message' : '') + adminMsgClass + (this.selectedMessages.indexOf(msg._id) >= 0 ? ' selected-message' : '') + '" data-msg-id="' + msg._id + '"' + (!this.selectMode ? ' oncontextmenu="app.showContextMenu(event,\'' + msg._id + '\')"' : '') + '>' +
-    selectCheckbox +
+  return '<div class="message' + (isOwn ? ' own-message' : '') + adminMsgClass + selectedClass + '" data-msg-id="' + msg._id + '">' +
     '<div class="msg-avatar">' + avatar + '</div>' +
     '<div class="msg-content"><div class="msg-header">' + pinnedIcon +
     '<span class="msg-username" style="' + nameStyle + '" onclick="app.showUserPopup(event,\'' + msg.sender._id + '\')">' + escapeHTML(dn) + '</span>' + adminBadge +
@@ -565,34 +605,51 @@ ChatApp.prototype.createMessageHTML = function(msg) {
     '</div><div class="msg-body">' + bodyContent + '</div></div></div>';
 };
 
+// Menu button handler (works on both mobile and desktop)
+ChatApp.prototype.openMenuForMessage = function(event, messageId) {
+  event.stopPropagation();
+  event.preventDefault();
+  this.showContextMenu(event, messageId);
+};
+
 // Multi-select
 ChatApp.prototype.enterSelectMode = function(mode) {
+  document.getElementById('msg-context-menu').classList.add('hidden');
   this.selectMode = mode;
   this.selectedMessages = [];
-  this.renderMessages(this.messagesCache[this.currentView] || []);
+  // Add visual indicator to messages
+  var self = this;
+  document.querySelectorAll('.message[data-msg-id]').forEach(function(el) {
+    el.classList.remove('selected-message');
+    if (mode === 'delete') {
+      var msgId = el.dataset.msgId;
+      var msg = self.findMessageInCache(msgId);
+      if (msg) {
+        var isOwn = msg.sender._id === self.currentUser._id;
+        var amAdmin = self.currentUser.role === 'admin';
+        if (!isOwn && !amAdmin) {
+          el.classList.add('msg-not-selectable');
+        } else {
+          el.classList.remove('msg-not-selectable');
+        }
+      }
+    }
+  });
+  // Hide menu buttons
+  document.querySelectorAll('.msg-menu-btn').forEach(function(btn) { btn.style.display = 'none'; });
   this.showSelectBar();
+  showToast(mode === 'delete' ? 'Нажимайте на сообщения для выбора' : 'Нажимайте на сообщения для выбора', 'info');
 };
 
 ChatApp.prototype.exitSelectMode = function() {
   this.selectMode = null;
   this.selectedMessages = [];
   this.hideSelectBar();
-  this.renderMessages(this.messagesCache[this.currentView] || []);
-};
-
-ChatApp.prototype.toggleSelectMessage = function(msgId, checked) {
-  if (checked) {
-    if (this.selectedMessages.indexOf(msgId) < 0) this.selectedMessages.push(msgId);
-  } else {
-    this.selectedMessages = this.selectedMessages.filter(function(id) { return id !== msgId; });
-  }
-  // Update visual selection
-  var el = document.querySelector('[data-msg-id="' + msgId + '"]');
-  if (el) {
-    if (checked) el.classList.add('selected-message');
-    else el.classList.remove('selected-message');
-  }
-  this.updateSelectBar();
+  document.querySelectorAll('.message[data-msg-id]').forEach(function(el) {
+    el.classList.remove('selected-message');
+    el.classList.remove('msg-not-selectable');
+  });
+  document.querySelectorAll('.msg-menu-btn').forEach(function(btn) { btn.style.display = ''; });
 };
 
 ChatApp.prototype.showSelectBar = function() {
@@ -601,11 +658,11 @@ ChatApp.prototype.showSelectBar = function() {
     bar = document.createElement('div');
     bar.id = 'select-bar';
     bar.className = 'select-bar';
-    document.querySelector('.message-input-area').before(bar);
+    var inputArea = document.querySelector('.message-input-area');
+    inputArea.parentNode.insertBefore(bar, inputArea);
   }
   this.updateSelectBar();
   bar.classList.remove('hidden');
-  // Hide input area
   document.querySelector('.message-input-area').classList.add('hidden');
 };
 
@@ -619,18 +676,17 @@ ChatApp.prototype.updateSelectBar = function() {
   var bar = document.getElementById('select-bar');
   if (!bar) return;
   var count = this.selectedMessages.length;
-  var self = this;
   if (this.selectMode === 'delete') {
-    bar.innerHTML = '<div class="select-bar-info"><span>Выбрано: ' + count + '</span></div>' +
+    bar.innerHTML = '<div class="select-bar-info">🗑 Выбрано: <strong>' + count + '</strong></div>' +
       '<div class="select-bar-actions">' +
-      '<button class="btn btn-secondary btn-sm" onclick="app.exitSelectMode()">Отмена</button>' +
-      '<button class="btn btn-danger btn-sm" ' + (count === 0 ? 'disabled' : '') + ' onclick="app.bulkDelete()">🗑 Удалить (' + count + ')</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="app.exitSelectMode()">✕ Отмена</button>' +
+      '<button class="btn btn-danger btn-sm" ' + (count === 0 ? 'disabled' : '') + ' onclick="app.bulkDelete()">Удалить (' + count + ')</button>' +
       '</div>';
   } else if (this.selectMode === 'forward') {
-    bar.innerHTML = '<div class="select-bar-info"><span>Выбрано: ' + count + '</span></div>' +
+    bar.innerHTML = '<div class="select-bar-info">↗️ Выбрано: <strong>' + count + '</strong></div>' +
       '<div class="select-bar-actions">' +
-      '<button class="btn btn-secondary btn-sm" onclick="app.exitSelectMode()">Отмена</button>' +
-      '<button class="btn btn-primary btn-sm" ' + (count === 0 ? 'disabled' : '') + ' onclick="app.bulkForwardChooseTarget()">↗️ Переслать (' + count + ')</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="app.exitSelectMode()">✕ Отмена</button>' +
+      '<button class="btn btn-primary btn-sm" style="width:auto" ' + (count === 0 ? 'disabled' : '') + ' onclick="app.bulkForwardChooseTarget()">Переслать (' + count + ')</button>' +
       '</div>';
   }
 };
@@ -674,44 +730,58 @@ ChatApp.prototype.bulkForwardTo = async function(targetRoomId) {
 
 // Context menu
 ChatApp.prototype.showContextMenu = function(event, messageId) {
-  if (this.selectMode) return; // Ignore context menu in select mode
+  if (this.selectMode) return;
   event.preventDefault();
   event.stopPropagation();
   var menu = document.getElementById('msg-context-menu');
-  var msg = null;
-  var cache = this.messagesCache[this.currentView] || [];
-  for (var i = 0; i < cache.length; i++) {
-    if (cache[i]._id === messageId) { msg = cache[i]; break; }
-  }
+  var msg = this.findMessageInCache(messageId);
   if (!msg) return;
 
   var isOwn = msg.sender._id === this.currentUser._id;
   var amAdmin = isAdmin(this.currentUser);
   var canEdit = (isOwn || amAdmin) && (msg.type === 'text' || msg.type === 'image');
   var canDelete = isOwn || amAdmin;
-  var canPin = amAdmin || (this.currentView !== 'general' && this.roomsCache[this.currentView] && this.roomsCache[this.currentView].owner._id === this.currentUser._id);
+  var canPin = amAdmin || (this.currentView !== 'general' && this.roomsCache[this.currentView] && this.roomsCache[this.currentView].owner && this.roomsCache[this.currentView].owner._id === this.currentUser._id);
 
   var html = '';
   if (canEdit) html += '<div class="ctx-item" onclick="app.startEdit(\'' + messageId + '\')">✏️ Редактировать</div>';
   html += '<div class="ctx-item" onclick="app.openForwardModal(\'' + messageId + '\')">↗️ Переслать</div>';
-  html += '<div class="ctx-item" onclick="app.enterSelectMode(\'forward\')">☑️ Выбрать для пересылки</div>';
   if (canPin) html += '<div class="ctx-item" onclick="app.togglePin(\'' + messageId + '\')">' + (msg.pinned ? '📌 Открепить' : '📌 Закрепить') + '</div>';
+  // Всегда показываем кнопку выбора для пересылки
+  html += '<div class="ctx-item" onclick="app.enterSelectMode(\'forward\')">☑️ Выбрать несколько для пересылки</div>';
   if (canDelete) {
     html += '<div class="ctx-item ctx-danger" onclick="app.deleteMessage(\'' + messageId + '\')">🗑 Удалить</div>';
-    html += '<div class="ctx-item ctx-danger" onclick="app.enterSelectMode(\'delete\')">☑️ Выбрать для удаления</div>';
+    html += '<div class="ctx-item ctx-danger" onclick="app.enterSelectMode(\'delete\')">☑️ Выбрать несколько для удаления</div>';
   }
 
-  if (!html) return;
   menu.innerHTML = html;
-  menu.style.left = Math.min(event.clientX, window.innerWidth - 200) + 'px';
-  menu.style.top = Math.min(event.clientY, window.innerHeight - 200) + 'px';
+
+  // Позиционирование с учётом мобильных
+  var menuWidth = 220;
+  var menuHeight = menu.children.length * 40 + 16;
+  var x = Math.min(event.clientX, window.innerWidth - menuWidth - 10);
+  var y = event.clientY;
+
+  // На мобильном — показываем снизу экрана
+  if (window.innerWidth <= 768) {
+    menu.style.left = '8px';
+    menu.style.right = '8px';
+    menu.style.bottom = '8px';
+    menu.style.top = 'auto';
+    menu.style.width = 'auto';
+  } else {
+    menu.style.left = Math.max(10, x) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - menuHeight - 10) + 'px';
+    menu.style.right = 'auto';
+    menu.style.bottom = 'auto';
+    menu.style.width = '';
+  }
   menu.classList.remove('hidden');
 };
 
 // Edit
 ChatApp.prototype.startEdit = function(messageId) {
-  var cache = this.messagesCache[this.currentView] || [];
-  var msg = cache.find(function(m) { return m._id === messageId; });
+  var msg = this.findMessageInCache(messageId);
   if (!msg) return;
   this.editingMessageId = messageId;
   document.getElementById('message-input').value = msg.content || '';
@@ -842,7 +912,6 @@ ChatApp.prototype.updateUnreadBadges = function() {
 
 // Views
 ChatApp.prototype.switchView = async function(viewId) {
-  // Exit select mode if active
   if (this.selectMode) this.exitSelectMode();
 
   this.currentView = viewId;

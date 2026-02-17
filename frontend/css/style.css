@@ -515,3 +515,60 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
     gap: 4px;
   }
 }
+/* ===== Multi-select mode v2 ===== */
+.message.selected-message {
+  background: rgba(108, 92, 231, 0.15) !important;
+  border-left: 3px solid var(--primary);
+}
+.message.msg-not-selectable {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.select-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  padding-bottom: calc(10px + var(--safe-bottom));
+  background: var(--bg-card);
+  border-top: 2px solid var(--primary);
+  animation: fadeInUp 0.2s ease;
+  flex-shrink: 0;
+}
+.select-bar-info {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.select-bar-info strong {
+  color: var(--primary-light);
+}
+.select-bar-actions {
+  display: flex;
+  gap: 8px;
+}
+.select-bar.hidden {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .select-bar {
+    padding: 8px 12px;
+    padding-bottom: calc(8px + var(--safe-bottom));
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .select-bar-info {
+    font-size: 13px;
+  }
+  .select-bar-actions {
+    gap: 6px;
+  }
+  /* На мобильном кнопка меню всегда видна */
+  .msg-menu-btn {
+    opacity: 0.7 !important;
+    font-size: 20px;
+    padding: 6px 10px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
