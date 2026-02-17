@@ -25,6 +25,26 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Для JS и CSS — без кэша, чтобы обновления применялись сразу
+app.use('/js', express.static(path.join(__dirname, '..', 'frontend', 'js'), {
+  maxAge: 0,
+  etag: true,
+  lastModified: true,
+  setHeaders: function(res) {
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  }
+}));
+app.use('/css', express.static(path.join(__dirname, '..', 'frontend', 'css'), {
+  maxAge: 0,
+  etag: true,
+  lastModified: true,
+  setHeaders: function(res) {
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  }
+}));
+
+// Для остальной статики (картинки и т.п.) — можно кэшировать
 app.use(express.static(path.join(__dirname, '..', 'frontend'), {
   maxAge: '1d',
   etag: true
