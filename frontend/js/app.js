@@ -36,7 +36,9 @@ ChatApp.prototype.init = async function() {
     }
     document.getElementById('loading-screen').classList.add('hidden');
     document.getElementById('chat-app').classList.remove('hidden');
-    document.addEventListener('click', function() { if (notificationSound && notificationSound.state === 'suspended') notificationSound.resume(); }, { once: true });
+    document.addEventListener('click', function() {
+      if (notificationSound && notificationSound.state === 'suspended') notificationSound.resume();
+    }, { once: true });
   } catch (error) {
     removeToken();
     window.location.href = '/login.html';
@@ -91,7 +93,10 @@ ChatApp.prototype.initSocket = function() {
     var targetView = data.roomId || 'general';
     if (self.currentView === targetView) {
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
-      if (el) { var body = el.querySelector('.msg-body'); if (body) body.innerHTML = createShoppingListHTML(data.message); }
+      if (el) {
+        var body = el.querySelector('.msg-body');
+        if (body) body.innerHTML = createShoppingListHTML(data.message);
+      }
     }
   });
 
@@ -154,15 +159,31 @@ ChatApp.prototype.setupEventListeners = function() {
   var self = this;
   document.getElementById('send-btn').addEventListener('click', function() { self.sendMessage(); });
   var msgInput = document.getElementById('message-input');
-  msgInput.addEventListener('keydown', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); self.sendMessage(); } });
-  msgInput.addEventListener('input', function() { msgInput.style.height = 'auto'; msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px'; self.handleTyping(); });
+  msgInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); self.sendMessage(); }
+  });
+  msgInput.addEventListener('input', function() {
+    msgInput.style.height = 'auto';
+    msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+    self.handleTyping();
+  });
 
   document.getElementById('nav-general').addEventListener('click', function() { self.switchView('general'); });
   document.getElementById('btn-profile').addEventListener('click', function() { window.location.href = '/profile.html'; });
   document.getElementById('btn-posts').addEventListener('click', function() { window.location.href = '/posts.html'; });
-  document.getElementById('btn-logout').addEventListener('click', function() { if (self.socket) self.socket.disconnect(); removeToken(); window.location.href = '/login.html'; });
-  document.getElementById('mobile-menu-btn').addEventListener('click', function() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('show'); });
-  document.getElementById('sidebar-overlay').addEventListener('click', function() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('show'); });
+  document.getElementById('btn-logout').addEventListener('click', function() {
+    if (self.socket) self.socket.disconnect();
+    removeToken();
+    window.location.href = '/login.html';
+  });
+  document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebar-overlay').classList.toggle('show');
+  });
+  document.getElementById('sidebar-overlay').addEventListener('click', function() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('show');
+  });
 
   document.getElementById('btn-create-room').addEventListener('click', function() { self.openCreateRoomModal(); });
   document.getElementById('close-create-room').addEventListener('click', function() { self.closeModal('create-room-modal'); });
@@ -172,18 +193,32 @@ ChatApp.prototype.setupEventListeners = function() {
   document.getElementById('close-add-member').addEventListener('click', function() { self.closeModal('add-member-modal'); });
   document.getElementById('cancel-add-member').addEventListener('click', function() { self.closeModal('add-member-modal'); });
   document.getElementById('confirm-add-member').addEventListener('click', function() { self.addMembersToRoom(); });
-  document.getElementById('member-search').addEventListener('input', debounce(function(e) { self.searchUsersForRoom(e.target.value, 'members-checkbox-list'); }, 300));
-  document.getElementById('add-member-search').addEventListener('input', debounce(function(e) { self.searchUsersForAddMember(e.target.value); }, 300));
+  document.getElementById('member-search').addEventListener('input', debounce(function(e) {
+    self.searchUsersForRoom(e.target.value, 'members-checkbox-list');
+  }, 300));
+  document.getElementById('add-member-search').addEventListener('input', debounce(function(e) {
+    self.searchUsersForAddMember(e.target.value);
+  }, 300));
 
-  document.getElementById('btn-emoji').addEventListener('click', function(e) { e.stopPropagation(); document.getElementById('emoji-picker').classList.toggle('hidden'); document.getElementById('dice-picker').classList.add('hidden'); });
+  document.getElementById('btn-emoji').addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.getElementById('emoji-picker').classList.toggle('hidden');
+    document.getElementById('dice-picker').classList.add('hidden');
+  });
   document.getElementById('image-upload-input').addEventListener('change', function(e) { self.handleImageUpload(e); });
   document.getElementById('btn-shopping').addEventListener('click', function() { self.openShoppingModal(); });
   document.getElementById('close-shopping').addEventListener('click', function() { self.closeModal('shopping-modal'); });
   document.getElementById('cancel-shopping').addEventListener('click', function() { self.closeModal('shopping-modal'); });
   document.getElementById('confirm-shopping').addEventListener('click', function() { self.sendShoppingList(); });
   document.getElementById('add-custom-item').addEventListener('click', function() { self.addCustomShoppingItem(); });
-  document.getElementById('custom-item-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); self.addCustomShoppingItem(); } });
-  document.getElementById('btn-dice').addEventListener('click', function(e) { e.stopPropagation(); document.getElementById('dice-picker').classList.toggle('hidden'); document.getElementById('emoji-picker').classList.add('hidden'); });
+  document.getElementById('custom-item-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); self.addCustomShoppingItem(); }
+  });
+  document.getElementById('btn-dice').addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.getElementById('dice-picker').classList.toggle('hidden');
+    document.getElementById('emoji-picker').classList.add('hidden');
+  });
   document.getElementById('close-forward').addEventListener('click', function() { self.closeModal('forward-modal'); });
 
   document.addEventListener('click', function(e) {
@@ -197,7 +232,9 @@ ChatApp.prototype.setupEventListeners = function() {
     if (!ctx.classList.contains('hidden') && !ctx.contains(e.target)) ctx.classList.add('hidden');
   });
 
-  document.querySelectorAll('.modal-overlay').forEach(function(o) { o.addEventListener('click', function(e) { if (e.target === o) o.classList.add('hidden'); }); });
+  document.querySelectorAll('.modal-overlay').forEach(function(o) {
+    o.addEventListener('click', function(e) { if (e.target === o) o.classList.add('hidden'); });
+  });
 
   // Long press for mobile context menu
   var longPressTimer = null;
@@ -209,8 +246,8 @@ ChatApp.prototype.setupEventListeners = function() {
       if (msgId) {
         var touch = e.changedTouches[0];
         self.showContextMenu({
-          preventDefault: function(){},
-          stopPropagation: function(){},
+          preventDefault: function() {},
+          stopPropagation: function() {},
           clientX: touch.clientX,
           clientY: touch.clientY
         }, msgId);
@@ -225,12 +262,14 @@ ChatApp.prototype.setupEventListeners = function() {
   });
 };
 
-// Emoji - DON'T close on select
+// Emoji
 ChatApp.prototype.buildEmojiPicker = function() {
   var self = this;
   var allEmojis = EMOJI_LIST.slice();
   if (isAdmin(this.currentUser)) allEmojis = ADMIN_EMOJI.concat(allEmojis);
-  document.getElementById('emoji-picker').innerHTML = allEmojis.map(function(e) { return '<span data-emoji="' + e + '">' + e + '</span>'; }).join('');
+  document.getElementById('emoji-picker').innerHTML = allEmojis.map(function(e) {
+    return '<span data-emoji="' + e + '">' + e + '</span>';
+  }).join('');
   document.getElementById('emoji-picker').addEventListener('click', function(ev) {
     if (ev.target.dataset.emoji) {
       ev.stopPropagation();
@@ -238,21 +277,30 @@ ChatApp.prototype.buildEmojiPicker = function() {
     }
   });
 };
-ChatApp.prototype.insertEmoji = function(emoji) { var input = document.getElementById('message-input'); input.value += emoji; input.focus(); };
+ChatApp.prototype.insertEmoji = function(emoji) {
+  var input = document.getElementById('message-input');
+  input.value += emoji;
+  input.focus();
+};
 
 // Dice
 ChatApp.prototype.buildDicePicker = function() {
   var self = this;
   document.getElementById('dice-picker').innerHTML = '<div class="dice-picker-title">Бросить кубик</div>' +
-    DICE_TYPES.map(function(d) { return '<div class="dice-option" data-dice="' + d.id + '"><span class="dice-emoji">' + d.emoji + '</span><span class="dice-label">' + d.name + '</span><span class="dice-range">1-' + d.sides + '</span></div>'; }).join('');
+    DICE_TYPES.map(function(d) {
+      return '<div class="dice-option" data-dice="' + d.id + '"><span class="dice-emoji">' + d.emoji + '</span><span class="dice-label">' + d.name + '</span><span class="dice-range">1-' + d.sides + '</span></div>';
+    }).join('');
   document.getElementById('dice-picker').addEventListener('click', function(ev) {
     var opt = ev.target.closest('.dice-option');
     if (opt) self.rollDice(opt.dataset.dice);
   });
 };
-ChatApp.prototype.rollDice = function(diceType) { this.socket.emit('dice:roll', { diceType: diceType, roomId: this.currentView === 'general' ? null : this.currentView }); document.getElementById('dice-picker').classList.add('hidden'); };
+ChatApp.prototype.rollDice = function(diceType) {
+  this.socket.emit('dice:roll', { diceType: diceType, roomId: this.currentView === 'general' ? null : this.currentView });
+  document.getElementById('dice-picker').classList.add('hidden');
+};
 
-// Image upload
+// Image
 ChatApp.prototype.handleImageUpload = async function(e) {
   var file = e.target.files[0];
   if (!file) return;
@@ -261,10 +309,17 @@ ChatApp.prototype.handleImageUpload = async function(e) {
   try {
     var formData = new FormData();
     formData.append('image', file);
-    var response = await fetch(API_URL + '/upload/chat-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + getToken() }, body: formData });
+    var response = await fetch(API_URL + '/upload/chat-image', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + getToken() },
+      body: formData
+    });
     var data = await response.json();
     if (!response.ok) throw new Error(data.error);
-    this.socket.emit('image:message', { imageUrl: data.imageUrl, content: '', roomId: this.currentView === 'general' ? null : this.currentView });
+    this.socket.emit('image:message', {
+      imageUrl: data.imageUrl, content: '',
+      roomId: this.currentView === 'general' ? null : this.currentView
+    });
     showToast('Отправлено!', 'success');
   } catch (err) { showToast(err.message || 'Ошибка', 'error'); }
   e.target.value = '';
@@ -275,7 +330,9 @@ ChatApp.prototype.buildShoppingModal = function() {
   var html = '';
   for (var cat in SHOPPING_CATEGORIES) {
     html += '<div class="shopping-cat-group"><div class="shopping-cat-title" onclick="this.nextElementSibling.classList.toggle(\'open\')">▶ ' + cat + '</div><div class="shopping-cat-items">';
-    SHOPPING_CATEGORIES[cat].forEach(function(item) { html += '<div class="shopping-product-tag" data-item="' + escapeHTML(item) + '" data-cat="' + escapeHTML(cat) + '">' + escapeHTML(item) + '</div>'; });
+    SHOPPING_CATEGORIES[cat].forEach(function(item) {
+      html += '<div class="shopping-product-tag" data-item="' + escapeHTML(item) + '" data-cat="' + escapeHTML(cat) + '">' + escapeHTML(item) + '</div>';
+    });
     html += '</div></div>';
   }
   document.getElementById('shopping-categories').innerHTML = html;
@@ -285,27 +342,83 @@ ChatApp.prototype.buildShoppingModal = function() {
     if (tag) self.toggleShoppingProduct(tag, tag.dataset.item, tag.dataset.cat);
   });
 };
-ChatApp.prototype.openShoppingModal = function() { this.selectedShoppingItems = []; document.getElementById('shopping-title-input').value = 'Список покупок'; document.getElementById('custom-item-input').value = ''; document.querySelectorAll('.shopping-product-tag').forEach(function(t) { t.classList.remove('selected'); }); this.renderSelectedItems(); document.getElementById('shopping-modal').classList.remove('hidden'); };
-ChatApp.prototype.toggleShoppingProduct = function(el, name, category) { var idx = this.selectedShoppingItems.findIndex(function(i) { return i.name === name; }); if (idx >= 0) { this.selectedShoppingItems.splice(idx, 1); el.classList.remove('selected'); } else { this.selectedShoppingItems.push({ name: name, category: category }); el.classList.add('selected'); } this.renderSelectedItems(); };
-ChatApp.prototype.addCustomShoppingItem = function() { var input = document.getElementById('custom-item-input'); var name = input.value.trim(); if (!name) return; if (!this.selectedShoppingItems.find(function(i) { return i.name === name; })) { this.selectedShoppingItems.push({ name: name, category: 'Другое' }); this.renderSelectedItems(); } input.value = ''; };
+ChatApp.prototype.openShoppingModal = function() {
+  this.selectedShoppingItems = [];
+  document.getElementById('shopping-title-input').value = 'Список покупок';
+  document.getElementById('custom-item-input').value = '';
+  document.querySelectorAll('.shopping-product-tag').forEach(function(t) { t.classList.remove('selected'); });
+  this.renderSelectedItems();
+  document.getElementById('shopping-modal').classList.remove('hidden');
+};
+ChatApp.prototype.toggleShoppingProduct = function(el, name, category) {
+  var idx = this.selectedShoppingItems.findIndex(function(i) { return i.name === name; });
+  if (idx >= 0) { this.selectedShoppingItems.splice(idx, 1); el.classList.remove('selected'); }
+  else { this.selectedShoppingItems.push({ name: name, category: category }); el.classList.add('selected'); }
+  this.renderSelectedItems();
+};
+ChatApp.prototype.addCustomShoppingItem = function() {
+  var input = document.getElementById('custom-item-input');
+  var name = input.value.trim();
+  if (!name) return;
+  if (!this.selectedShoppingItems.find(function(i) { return i.name === name; })) {
+    this.selectedShoppingItems.push({ name: name, category: 'Другое' });
+    this.renderSelectedItems();
+  }
+  input.value = '';
+};
 ChatApp.prototype.renderSelectedItems = function() {
   var preview = document.getElementById('selected-items-preview');
   var self = this;
-  if (this.selectedShoppingItems.length === 0) { preview.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">Товары не выбраны</span>'; return; }
-  preview.innerHTML = this.selectedShoppingItems.map(function(item, i) { return '<div class="selected-item-chip">' + escapeHTML(item.name) + '<span class="remove-chip" data-idx="' + i + '">✕</span></div>'; }).join('');
-  preview.querySelectorAll('.remove-chip').forEach(function(el) { el.addEventListener('click', function() { self.removeShoppingItem(parseInt(el.dataset.idx)); }); });
+  if (this.selectedShoppingItems.length === 0) {
+    preview.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">Товары не выбраны</span>';
+    return;
+  }
+  preview.innerHTML = this.selectedShoppingItems.map(function(item, i) {
+    return '<div class="selected-item-chip">' + escapeHTML(item.name) + '<span class="remove-chip" data-idx="' + i + '">✕</span></div>';
+  }).join('');
+  preview.querySelectorAll('.remove-chip').forEach(function(el) {
+    el.addEventListener('click', function() { self.removeShoppingItem(parseInt(el.dataset.idx)); });
+  });
 };
-ChatApp.prototype.removeShoppingItem = function(index) { var item = this.selectedShoppingItems[index]; this.selectedShoppingItems.splice(index, 1); document.querySelectorAll('.shopping-product-tag').forEach(function(t) { if (t.textContent === item.name) t.classList.remove('selected'); }); this.renderSelectedItems(); };
-ChatApp.prototype.sendShoppingList = function() { if (this.selectedShoppingItems.length === 0) { showToast('Добавьте товары', 'error'); return; } this.socket.emit('shopping:create', { title: document.getElementById('shopping-title-input').value.trim() || 'Список покупок', items: this.selectedShoppingItems, roomId: this.currentView === 'general' ? null : this.currentView }); this.closeModal('shopping-modal'); };
-ChatApp.prototype.toggleShoppingItem = async function(messageId, itemId) { try { await apiRequest('/messages/shopping/' + messageId + '/toggle/' + itemId, { method: 'POST' }); } catch (e) { showToast('Ошибка', 'error'); } };
+ChatApp.prototype.removeShoppingItem = function(index) {
+  var item = this.selectedShoppingItems[index];
+  this.selectedShoppingItems.splice(index, 1);
+  document.querySelectorAll('.shopping-product-tag').forEach(function(t) {
+    if (t.textContent === item.name) t.classList.remove('selected');
+  });
+  this.renderSelectedItems();
+};
+ChatApp.prototype.sendShoppingList = function() {
+  if (this.selectedShoppingItems.length === 0) { showToast('Добавьте товары', 'error'); return; }
+  this.socket.emit('shopping:create', {
+    title: document.getElementById('shopping-title-input').value.trim() || 'Список покупок',
+    items: this.selectedShoppingItems,
+    roomId: this.currentView === 'general' ? null : this.currentView
+  });
+  this.closeModal('shopping-modal');
+};
+ChatApp.prototype.toggleShoppingItem = async function(messageId, itemId) {
+  try { await apiRequest('/messages/shopping/' + messageId + '/toggle/' + itemId, { method: 'POST' }); }
+  catch (e) { showToast('Ошибка', 'error'); }
+};
 
 // Messages
 ChatApp.prototype.loadGeneralMessages = async function() {
-  try { var data = await apiRequest('/messages/general'); this.messagesCache['general'] = data.messages; this.renderMessages(data.messages); this.loadPinnedMessages(); } catch (e) { console.error(e); }
+  try {
+    var data = await apiRequest('/messages/general');
+    this.messagesCache['general'] = data.messages;
+    this.renderMessages(data.messages);
+    this.loadPinnedMessages();
+  } catch (e) { console.error(e); }
 };
 ChatApp.prototype.loadRoomMessages = async function(roomId) {
   if (this.messagesCache[roomId]) this.renderMessages(this.messagesCache[roomId]);
-  try { var data = await apiRequest('/messages/room/' + roomId); this.messagesCache[roomId] = data.messages; this.renderMessages(data.messages); this.loadPinnedMessages(); } catch (e) { showToast('Ошибка загрузки', 'error'); }
+  try {
+    var data = await apiRequest('/messages/room/' + roomId);
+    this.messagesCache[roomId] = data.messages;
+    this.renderMessages(data.messages);
+    this.loadPinnedMessages();
+  } catch (e) { showToast('Ошибка загрузки', 'error'); }
 };
 
 ChatApp.prototype.loadPinnedMessages = async function() {
@@ -329,16 +442,24 @@ ChatApp.prototype.scrollToPinnedMessage = function() {
   var msgs = this.pinnedMessages[this.currentView];
   if (!msgs || !msgs.length) return;
   var el = document.querySelector('[data-msg-id="' + msgs[0]._id + '"]');
-  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.background = 'rgba(108,92,231,0.2)'; setTimeout(function() { el.style.background = ''; }, 2000); }
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.style.background = 'rgba(108,92,231,0.2)';
+    setTimeout(function() { el.style.background = ''; }, 2000);
+  }
 };
 
 ChatApp.prototype.renderMessages = function(messages) {
   var container = document.getElementById('messages-container');
   var self = this;
-  if (messages.length === 0) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><h3>Пока нет сообщений</h3><p>Будьте первым!</p></div>'; return; }
+  if (messages.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><h3>Пока нет сообщений</h3><p>Будьте первым!</p></div>';
+    return;
+  }
   container.innerHTML = messages.map(function(msg) { return self.createMessageHTML(msg); }).join('');
   this.scrollToBottom();
 };
+
 ChatApp.prototype.appendMessage = function(msg) {
   var container = document.getElementById('messages-container');
   var empty = container.querySelector('.empty-state');
@@ -364,40 +485,52 @@ ChatApp.prototype.createMessageHTML = function(msg) {
   var adminMsgClass = senderIsAdmin ? ' admin-message' : '';
 
   var bodyContent = '';
-  if (msg.type === 'text') { bodyContent = '<div class="msg-text">' + escapeHTML(msg.content) + '</div>' + editedMark; }
-  else if (msg.type === 'image') { bodyContent = (msg.content ? '<div class="msg-text">' + escapeHTML(msg.content) + '</div>' : '') + '<img class="msg-image" src="' + msg.imageUrl + '" onclick="app.openImageFullscreen(\'' + msg.imageUrl + '\')" loading="lazy">' + editedMark; }
-  else if (msg.type === 'shopping') { bodyContent = createShoppingListHTML(msg); }
-  else if (msg.type === 'dice') { bodyContent = createDiceHTML(msg); }
-  else if (msg.type === 'forwarded') { bodyContent = createForwardedHTML(msg); }
-  else if (msg.type === 'system') { return '<div class="message system-message"><div class="msg-content"><div class="msg-text">' + escapeHTML(msg.content) + '</div></div></div>'; }
+  if (msg.type === 'text') {
+    bodyContent = '<div class="msg-text">' + escapeHTML(msg.content) + '</div>' + editedMark;
+  } else if (msg.type === 'image') {
+    bodyContent = (msg.content ? '<div class="msg-text">' + escapeHTML(msg.content) + '</div>' : '') +
+      '<img class="msg-image" src="' + msg.imageUrl + '" onclick="app.openImageFullscreen(\'' + msg.imageUrl + '\')" loading="lazy">' + editedMark;
+  } else if (msg.type === 'shopping') {
+    bodyContent = createShoppingListHTML(msg);
+  } else if (msg.type === 'dice') {
+    bodyContent = createDiceHTML(msg);
+  } else if (msg.type === 'forwarded') {
+    bodyContent = createForwardedHTML(msg);
+  } else if (msg.type === 'system') {
+    return '<div class="message system-message"><div class="msg-content"><div class="msg-text">' + escapeHTML(msg.content) + '</div></div></div>';
+  }
+
+  var menuBtn = '<button class="msg-menu-btn" onclick="event.stopPropagation();app.showContextMenu(event,\'' + msg._id + '\')" title="Меню">⋮</button>';
 
   return '<div class="message' + (isOwn ? ' own-message' : '') + adminMsgClass + '" data-msg-id="' + msg._id + '" oncontextmenu="app.showContextMenu(event,\'' + msg._id + '\')">' +
     '<div class="msg-avatar">' + avatar + '</div>' +
     '<div class="msg-content"><div class="msg-header">' + pinnedIcon +
     '<span class="msg-username" style="' + nameStyle + '" onclick="app.showUserPopup(event,\'' + msg.sender._id + '\')">' + escapeHTML(dn) + '</span>' + adminBadge +
-    '<span class="msg-time">' + formatTime(msg.createdAt) + '</span></div><div class="msg-body">' + bodyContent + '</div></div></div>';
+    '<span class="msg-time">' + formatTime(msg.createdAt) + '</span>' +
+    menuBtn +
+    '</div><div class="msg-body">' + bodyContent + '</div></div></div>';
 };
 
 // Context menu
 ChatApp.prototype.showContextMenu = function(event, messageId) {
   event.preventDefault();
   event.stopPropagation();
-  var self = this;
   var menu = document.getElementById('msg-context-menu');
   var msg = null;
   var cache = this.messagesCache[this.currentView] || [];
-  for (var i = 0; i < cache.length; i++) { if (cache[i]._id === messageId) { msg = cache[i]; break; } }
+  for (var i = 0; i < cache.length; i++) {
+    if (cache[i]._id === messageId) { msg = cache[i]; break; }
+  }
   if (!msg) return;
 
   var isOwn = msg.sender._id === this.currentUser._id;
   var amAdmin = isAdmin(this.currentUser);
-  var canEdit = isOwn && (msg.type === 'text' || msg.type === 'image');
-  var canEditAdmin = amAdmin && (msg.type === 'text' || msg.type === 'image');
+  var canEdit = (isOwn || amAdmin) && (msg.type === 'text' || msg.type === 'image');
   var canDelete = isOwn || amAdmin;
   var canPin = amAdmin || (this.currentView !== 'general' && this.roomsCache[this.currentView] && this.roomsCache[this.currentView].owner._id === this.currentUser._id);
 
   var html = '';
-  if (canEdit || canEditAdmin) html += '<div class="ctx-item" onclick="app.startEdit(\'' + messageId + '\')">✏️ Редактировать</div>';
+  if (canEdit) html += '<div class="ctx-item" onclick="app.startEdit(\'' + messageId + '\')">✏️ Редактировать</div>';
   html += '<div class="ctx-item" onclick="app.openForwardModal(\'' + messageId + '\')">↗️ Переслать</div>';
   if (canPin) html += '<div class="ctx-item" onclick="app.togglePin(\'' + messageId + '\')">' + (msg.pinned ? '📌 Открепить' : '📌 Закрепить') + '</div>';
   if (canDelete) html += '<div class="ctx-item ctx-danger" onclick="app.deleteMessage(\'' + messageId + '\')">🗑 Удалить</div>';
@@ -429,12 +562,18 @@ ChatApp.prototype.cancelEdit = function() {
 // Delete
 ChatApp.prototype.deleteMessage = async function(messageId) {
   if (!confirm('Удалить сообщение?')) return;
-  try { await apiRequest('/messages/delete/' + messageId, { method: 'DELETE' }); document.getElementById('msg-context-menu').classList.add('hidden'); } catch (e) { showToast(e.message, 'error'); }
+  try {
+    await apiRequest('/messages/delete/' + messageId, { method: 'DELETE' });
+    document.getElementById('msg-context-menu').classList.add('hidden');
+  } catch (e) { showToast(e.message, 'error'); }
 };
 
 // Pin
 ChatApp.prototype.togglePin = async function(messageId) {
-  try { await apiRequest('/messages/pin/' + messageId, { method: 'POST' }); document.getElementById('msg-context-menu').classList.add('hidden'); } catch (e) { showToast(e.message, 'error'); }
+  try {
+    await apiRequest('/messages/pin/' + messageId, { method: 'POST' });
+    document.getElementById('msg-context-menu').classList.add('hidden');
+  } catch (e) { showToast(e.message, 'error'); }
 };
 
 // Forward
@@ -458,14 +597,16 @@ ChatApp.prototype.forwardTo = async function(targetRoomId) {
   } catch (e) { showToast(e.message, 'error'); }
 };
 
-ChatApp.prototype.openImageFullscreen = function(url) { document.getElementById('fullscreen-img').src = url; document.getElementById('image-fullscreen').classList.remove('hidden'); };
+ChatApp.prototype.openImageFullscreen = function(url) {
+  document.getElementById('fullscreen-img').src = url;
+  document.getElementById('image-fullscreen').classList.remove('hidden');
+};
 
 ChatApp.prototype.sendMessage = async function() {
   var input = document.getElementById('message-input');
   var content = input.value.trim();
   if (!content) return;
 
-  // If editing
   if (this.editingMessageId) {
     try {
       await apiRequest('/messages/edit/' + this.editingMessageId, { method: 'PUT', body: JSON.stringify({ content: content }) });
@@ -482,7 +623,10 @@ ChatApp.prototype.sendMessage = async function() {
   this.socket.emit('typing:stop', { roomId: this.currentView === 'general' ? null : this.currentView });
 };
 
-ChatApp.prototype.scrollToBottom = function() { var c = document.getElementById('messages-container'); requestAnimationFrame(function() { c.scrollTop = c.scrollHeight; }); };
+ChatApp.prototype.scrollToBottom = function() {
+  var c = document.getElementById('messages-container');
+  requestAnimationFrame(function() { c.scrollTop = c.scrollHeight; });
+};
 
 // Typing
 ChatApp.prototype.handleTyping = function() {
@@ -490,13 +634,17 @@ ChatApp.prototype.handleTyping = function() {
   var self = this;
   if (!this.isTyping) { this.isTyping = true; this.socket.emit('typing:start', { roomId: roomId }); }
   clearTimeout(this.typingTimeout);
-  this.typingTimeout = setTimeout(function() { self.isTyping = false; self.socket.emit('typing:stop', { roomId: roomId }); }, 2000);
+  this.typingTimeout = setTimeout(function() {
+    self.isTyping = false;
+    self.socket.emit('typing:stop', { roomId: roomId });
+  }, 2000);
 };
 ChatApp.prototype.renderTyping = function() {
   var ind = document.getElementById('typing-indicator');
   if (this.typingUsers.size === 0) { ind.innerHTML = ''; return; }
   var names = Array.from(this.typingUsers.values());
-  ind.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div><span>' + (names.length === 1 ? names[0] + ' печатает' : names.join(', ') + ' печатают') + '...</span>';
+  ind.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div><span>' +
+    (names.length === 1 ? names[0] + ' печатает' : names.join(', ') + ' печатают') + '...</span>';
 };
 
 // Unread
@@ -506,13 +654,23 @@ ChatApp.prototype.updateUnreadBadges = function() {
   var eb = generalNav.querySelector('.nav-badge');
   if (eb) eb.remove();
   var gc = this.unreadCounts['general'] || 0;
-  if (gc > 0) { var b = document.createElement('span'); b.className = 'nav-badge'; b.textContent = gc > 99 ? '99+' : gc; generalNav.appendChild(b); }
+  if (gc > 0) {
+    var b = document.createElement('span');
+    b.className = 'nav-badge';
+    b.textContent = gc > 99 ? '99+' : gc;
+    generalNav.appendChild(b);
+  }
   document.querySelectorAll('.room-item').forEach(function(el) {
     var rid = el.dataset.roomId;
     var exb = el.querySelector('.room-badge');
     if (exb) exb.remove();
     var c = self.unreadCounts[rid] || 0;
-    if (c > 0) { var badge = document.createElement('span'); badge.className = 'room-badge'; badge.textContent = c > 99 ? '99+' : c; el.appendChild(badge); }
+    if (c > 0) {
+      var badge = document.createElement('span');
+      badge.className = 'room-badge';
+      badge.textContent = c > 99 ? '99+' : c;
+      el.appendChild(badge);
+    }
   });
 };
 
@@ -547,7 +705,11 @@ ChatApp.prototype.switchView = async function(viewId) {
       this.roomsCache[viewId] = room;
       document.getElementById('chat-title').textContent = '# ' + room.name;
       this.updateRoomHeaderActions(viewId, room);
-    } catch (e) { showToast('Ошибка', 'error'); this.switchView('general'); return; }
+    } catch (e) {
+      showToast('Ошибка', 'error');
+      this.switchView('general');
+      return;
+    }
   }
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebar-overlay').classList.remove('show');
@@ -571,7 +733,10 @@ ChatApp.prototype.renderOnlineUsers = function() {
   document.getElementById('online-panel-count').textContent = count;
   list.innerHTML = this.onlineUsers.map(function(u) {
     var badge = u.role === 'admin' ? ' 👑' : '';
-    return '<div class="online-user-item" onclick="app.showUserPopup(event,\'' + u._id + '\')"><div style="position:relative;">' + createMiniAvatarHTML(u, 32) + '<div style="width:10px;height:10px;border-radius:50%;background:#00b894;position:absolute;bottom:-2px;right:-2px;border:2px solid var(--bg-sidebar);"></div></div><span class="user-name">' + escapeHTML(getDisplayName(u)) + badge + '</span></div>';
+    return '<div class="online-user-item" onclick="app.showUserPopup(event,\'' + u._id + '\')">' +
+      '<div style="position:relative;">' + createMiniAvatarHTML(u, 32) +
+      '<div style="width:10px;height:10px;border-radius:50%;background:#00b894;position:absolute;bottom:-2px;right:-2px;border:2px solid var(--bg-sidebar);"></div></div>' +
+      '<span class="user-name">' + escapeHTML(getDisplayName(u)) + badge + '</span></div>';
   }).join('');
 };
 
@@ -583,22 +748,28 @@ ChatApp.prototype.showUserPopup = async function(event, userId) {
     var u = data.user;
     var popup = document.getElementById('user-popup');
     var bd = u.profile && u.profile.birthDate ? new Date(u.profile.birthDate).toLocaleDateString('ru-RU') : null;
-    var adminBadge = u.role === 'admin' ? '<span class="admin-badge">👑 Администратор</span>' : '';
-    var statusCustom = u.profile && (u.profile.statusEmoji || u.profile.statusText) ? '<div style="margin:6px 0;font-size:12px;">' + (u.profile.statusEmoji || '') + ' ' + escapeHTML(u.profile.statusText || '') + '</div>' : '';
+    var adminBadgeHTML = u.role === 'admin' ? '<span class="admin-badge">👑 Администратор</span>' : '';
+    var statusCustom = u.profile && (u.profile.statusEmoji || u.profile.statusText)
+      ? '<div style="margin:6px 0;font-size:12px;">' + (u.profile.statusEmoji || '') + ' ' + escapeHTML(u.profile.statusText || '') + '</div>' : '';
     var adminActions = '';
     if (isAdmin(this.currentUser) && u._id !== this.currentUser._id) {
       adminActions = '<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">' +
         '<button class="btn btn-ghost btn-sm" onclick="window.location.href=\'/user.html?id=' + u._id + '\'">👁 Профиль</button>' +
         (u.role !== 'admin' ? '<button class="btn btn-ghost btn-sm" onclick="app.adminBanUser(\'' + u._id + '\')">🔨 Бан</button>' : '') +
-        (u.role !== 'admin' ? '<button class="btn btn-ghost btn-sm" onclick="app.adminSetRole(\'' + u._id + '\',\'admin\')">👑 Админ</button>' : '<button class="btn btn-ghost btn-sm" onclick="app.adminSetRole(\'' + u._id + '\',\'user\')">Снять</button>') +
+        (u.role !== 'admin' ? '<button class="btn btn-ghost btn-sm" onclick="app.adminSetRole(\'' + u._id + '\',\'admin\')">👑 Админ</button>'
+          : '<button class="btn btn-ghost btn-sm" onclick="app.adminSetRole(\'' + u._id + '\',\'user\')">Снять</button>') +
         '</div>';
     }
 
-    popup.innerHTML = '<div class="user-popup-header">' + createAvatarHTML(u) + '<div class="user-popup-info"><h3 style="' + getNameStyle(u) + '">' + escapeHTML(getDisplayName(u)) + '</h3><div class="popup-username">@' + escapeHTML(u.username) + '</div>' + adminBadge + '</div></div>' +
+    popup.innerHTML =
+      '<div class="user-popup-header">' + createAvatarHTML(u) +
+      '<div class="user-popup-info"><h3 style="' + getNameStyle(u) + '">' + escapeHTML(getDisplayName(u)) + '</h3>' +
+      '<div class="popup-username">@' + escapeHTML(u.username) + '</div>' + adminBadgeHTML + '</div></div>' +
       statusCustom +
       (u.profile && u.profile.bio ? '<div class="user-popup-bio">' + escapeHTML(u.profile.bio) + '</div>' : '') +
       '<div class="user-popup-details">' +
-      (u.status === 'online' ? '<div class="detail-item"><span>🟢</span><span>Онлайн</span></div>' : '<div class="detail-item"><span>⚫</span><span>Был(а) ' + formatTime(u.lastSeen) + '</span></div>') +
+      (u.status === 'online' ? '<div class="detail-item"><span>🟢</span><span>Онлайн</span></div>'
+        : '<div class="detail-item"><span>⚫</span><span>Был(а) ' + formatTime(u.lastSeen) + '</span></div>') +
       (u.profile && u.profile.location ? '<div class="detail-item"><span>📍</span><span>' + escapeHTML(u.profile.location) + '</span></div>' : '') +
       (bd ? '<div class="detail-item"><span>🎂</span><span>' + bd + '</span></div>' : '') +
       '</div>' +
@@ -616,10 +787,18 @@ ChatApp.prototype.showUserPopup = async function(event, userId) {
 ChatApp.prototype.adminBanUser = async function(userId) {
   var reason = prompt('Причина бана:');
   if (reason === null) return;
-  try { await apiRequest('/users/admin/ban/' + userId, { method: 'POST', body: JSON.stringify({ reason: reason }) }); showToast('Пользователь забанен', 'success'); document.getElementById('user-popup').classList.add('hidden'); } catch (e) { showToast(e.message, 'error'); }
+  try {
+    await apiRequest('/users/admin/ban/' + userId, { method: 'POST', body: JSON.stringify({ reason: reason }) });
+    showToast('Пользователь забанен', 'success');
+    document.getElementById('user-popup').classList.add('hidden');
+  } catch (e) { showToast(e.message, 'error'); }
 };
 ChatApp.prototype.adminSetRole = async function(userId, role) {
-  try { await apiRequest('/users/admin/role/' + userId, { method: 'POST', body: JSON.stringify({ role: role }) }); showToast('Роль изменена', 'success'); document.getElementById('user-popup').classList.add('hidden'); } catch (e) { showToast(e.message, 'error'); }
+  try {
+    await apiRequest('/users/admin/role/' + userId, { method: 'POST', body: JSON.stringify({ role: role }) });
+    showToast('Роль изменена', 'success');
+    document.getElementById('user-popup').classList.add('hidden');
+  } catch (e) { showToast(e.message, 'error'); }
 };
 
 // Rooms
@@ -634,24 +813,53 @@ ChatApp.prototype.loadRooms = async function() {
 ChatApp.prototype.renderRooms = function(rooms) {
   var list = document.getElementById('rooms-list');
   var self = this;
-  if (rooms.length === 0) { list.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px;">Нет комнат</div>'; return; }
+  if (rooms.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px;">Нет комнат</div>';
+    return;
+  }
   list.innerHTML = rooms.map(function(r) {
-    return '<div class="room-item ' + (self.currentView === r._id ? 'active' : '') + '" data-room-id="' + r._id + '" onclick="app.switchView(\'' + r._id + '\')"><div class="room-icon" style="background:' + (r.color || '#6c5ce7') + '">' + r.name[0].toUpperCase() + '</div><div class="room-info"><div class="room-name">' + escapeHTML(r.name) + '</div><div class="room-members-count">' + r.members.length + ' уч.</div></div></div>';
+    return '<div class="room-item ' + (self.currentView === r._id ? 'active' : '') + '" data-room-id="' + r._id + '" onclick="app.switchView(\'' + r._id + '\')">' +
+      '<div class="room-icon" style="background:' + (r.color || '#6c5ce7') + '">' + r.name[0].toUpperCase() + '</div>' +
+      '<div class="room-info"><div class="room-name">' + escapeHTML(r.name) + '</div>' +
+      '<div class="room-members-count">' + r.members.length + ' уч.</div></div></div>';
   }).join('');
   this.updateUnreadBadges();
 };
-ChatApp.prototype.openCreateRoomModal = async function() { document.getElementById('room-name-input').value = ''; document.getElementById('room-desc-input').value = ''; document.getElementById('member-search').value = ''; await this.searchUsersForRoom('', 'members-checkbox-list'); document.getElementById('create-room-modal').classList.remove('hidden'); };
-ChatApp.prototype.searchUsersForRoom = async function(q, cid) { try { var data = await apiRequest('/users?search=' + encodeURIComponent(q)); var self = this; document.getElementById(cid).innerHTML = data.users.filter(function(u) { return u._id !== self.currentUser._id; }).map(function(u) { return '<label class="user-checkbox"><input type="checkbox" value="' + u._id + '" class="room-member-checkbox"><span class="checkmark">✓</span><div class="check-user-info">' + createMiniAvatarHTML(u, 28) + '<span>' + escapeHTML(u.username) + '</span></div></label>'; }).join(''); } catch (e) {} };
+ChatApp.prototype.openCreateRoomModal = async function() {
+  document.getElementById('room-name-input').value = '';
+  document.getElementById('room-desc-input').value = '';
+  document.getElementById('member-search').value = '';
+  await this.searchUsersForRoom('', 'members-checkbox-list');
+  document.getElementById('create-room-modal').classList.remove('hidden');
+};
+ChatApp.prototype.searchUsersForRoom = async function(q, cid) {
+  try {
+    var data = await apiRequest('/users?search=' + encodeURIComponent(q));
+    var self = this;
+    document.getElementById(cid).innerHTML = data.users.filter(function(u) {
+      return u._id !== self.currentUser._id;
+    }).map(function(u) {
+      return '<label class="user-checkbox"><input type="checkbox" value="' + u._id + '" class="room-member-checkbox"><span class="checkmark">✓</span>' +
+        '<div class="check-user-info">' + createMiniAvatarHTML(u, 28) + '<span>' + escapeHTML(u.username) + '</span></div></label>';
+    }).join('');
+  } catch (e) {}
+};
 ChatApp.prototype.createRoom = async function() {
   var name = document.getElementById('room-name-input').value.trim();
   if (!name) { showToast('Введите название', 'error'); return; }
   var members = Array.from(document.querySelectorAll('#members-checkbox-list .room-member-checkbox:checked')).map(function(c) { return c.value; });
   try {
-    var data = await apiRequest('/rooms', { method: 'POST', body: JSON.stringify({ name: name, description: document.getElementById('room-desc-input').value.trim(), members: members }) });
+    var data = await apiRequest('/rooms', {
+      method: 'POST',
+      body: JSON.stringify({ name: name, description: document.getElementById('room-desc-input').value.trim(), members: members })
+    });
     showToast('Создана!', 'success');
     this.closeModal('create-room-modal');
     await this.loadRooms();
-    if (data.room && data.room._id) { this.socket.emit('room:join', data.room._id); this.socket.emit('room:created', { roomId: data.room._id }); }
+    if (data.room && data.room._id) {
+      this.socket.emit('room:join', data.room._id);
+      this.socket.emit('room:created', { roomId: data.room._id });
+    }
   } catch (e) { showToast(e.message, 'error'); }
 };
 ChatApp.prototype.showRoomInfo = async function(roomId) {
@@ -660,38 +868,81 @@ ChatApp.prototype.showRoomInfo = async function(roomId) {
     var r = data.room;
     document.getElementById('room-info-title').textContent = r.name;
     document.getElementById('room-info-desc').textContent = r.description || 'Нет описания';
-    document.getElementById('room-members-list').innerHTML = r.members.map(function(m) { return '<div class="online-user-item"><a href="/user.html?id=' + m._id + '" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;">' + createMiniAvatarHTML(m, 32) + '<span class="user-name">' + escapeHTML(getDisplayName(m)) + '</span>' + (m._id === r.owner._id ? '<span style="color:var(--warning);font-size:11px;">👑</span>' : '') + '</a></div>'; }).join('');
+    document.getElementById('room-members-list').innerHTML = r.members.map(function(m) {
+      return '<div class="online-user-item"><a href="/user.html?id=' + m._id + '" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;">' +
+        createMiniAvatarHTML(m, 32) + '<span class="user-name">' + escapeHTML(getDisplayName(m)) + '</span>' +
+        (m._id === r.owner._id ? '<span style="color:var(--warning);font-size:11px;">👑</span>' : '') + '</a></div>';
+    }).join('');
     var isOwner = r.owner._id === this.currentUser._id;
     var amAdmin = isAdmin(this.currentUser);
-    document.getElementById('room-admin-actions').innerHTML = (isOwner || amAdmin) ? '<button class="btn btn-danger btn-sm" onclick="app.deleteRoom(\'' + roomId + '\')">🗑 Удалить</button>' : '';
+    document.getElementById('room-admin-actions').innerHTML = (isOwner || amAdmin)
+      ? '<button class="btn btn-danger btn-sm" onclick="app.deleteRoom(\'' + roomId + '\')">🗑 Удалить</button>' : '';
     document.getElementById('room-info-modal').classList.remove('hidden');
   } catch (e) { showToast('Ошибка', 'error'); }
 };
-ChatApp.prototype.openAddMemberModal = async function(roomId) { this.addMemberRoomId = roomId; document.getElementById('add-member-search').value = ''; await this.searchUsersForAddMember(''); document.getElementById('add-member-modal').classList.remove('hidden'); };
+ChatApp.prototype.openAddMemberModal = async function(roomId) {
+  this.addMemberRoomId = roomId;
+  document.getElementById('add-member-search').value = '';
+  await this.searchUsersForAddMember('');
+  document.getElementById('add-member-modal').classList.remove('hidden');
+};
 ChatApp.prototype.searchUsersForAddMember = async function(q) {
   try {
     var rd = await apiRequest('/rooms/' + this.addMemberRoomId);
     var mids = rd.room.members.map(function(m) { return m._id; });
     var data = await apiRequest('/users?search=' + encodeURIComponent(q));
     var users = data.users.filter(function(u) { return mids.indexOf(u._id) === -1; });
-    document.getElementById('add-members-list').innerHTML = users.length === 0 ? '<div style="text-align:center;padding:16px;color:var(--text-muted);">Все добавлены</div>' :
-      users.map(function(u) { return '<label class="user-checkbox"><input type="checkbox" value="' + u._id + '" class="add-member-checkbox"><span class="checkmark">✓</span><div class="check-user-info">' + createMiniAvatarHTML(u, 28) + '<span>' + escapeHTML(u.username) + '</span></div></label>'; }).join('');
+    document.getElementById('add-members-list').innerHTML = users.length === 0
+      ? '<div style="text-align:center;padding:16px;color:var(--text-muted);">Все добавлены</div>'
+      : users.map(function(u) {
+        return '<label class="user-checkbox"><input type="checkbox" value="' + u._id + '" class="add-member-checkbox"><span class="checkmark">✓</span>' +
+          '<div class="check-user-info">' + createMiniAvatarHTML(u, 28) + '<span>' + escapeHTML(u.username) + '</span></div></label>';
+      }).join('');
   } catch (e) {}
 };
 ChatApp.prototype.addMembersToRoom = async function() {
   var ids = Array.from(document.querySelectorAll('#add-members-list .add-member-checkbox:checked')).map(function(c) { return c.value; });
   if (!ids.length) { showToast('Выберите', 'error'); return; }
-  try { for (var i = 0; i < ids.length; i++) await apiRequest('/rooms/' + this.addMemberRoomId + '/members', { method: 'POST', body: JSON.stringify({ userId: ids[i] }) }); showToast('Добавлены!', 'success'); this.closeModal('add-member-modal'); await this.loadRooms(); } catch (e) { showToast(e.message, 'error'); }
+  try {
+    for (var i = 0; i < ids.length; i++) {
+      await apiRequest('/rooms/' + this.addMemberRoomId + '/members', { method: 'POST', body: JSON.stringify({ userId: ids[i] }) });
+    }
+    showToast('Добавлены!', 'success');
+    this.closeModal('add-member-modal');
+    await this.loadRooms();
+  } catch (e) { showToast(e.message, 'error'); }
 };
-ChatApp.prototype.leaveRoom = async function(rid) { if (!confirm('Покинуть?')) return; try { await apiRequest('/rooms/' + rid + '/leave', { method: 'POST' }); delete this.roomsCache[rid]; delete this.messagesCache[rid]; this.switchView('general'); await this.loadRooms(); } catch (e) { showToast(e.message, 'error'); } };
-ChatApp.prototype.deleteRoom = async function(rid) { if (!confirm('Удалить?')) return; try { await apiRequest('/rooms/' + rid, { method: 'DELETE' }); delete this.roomsCache[rid]; delete this.messagesCache[rid]; this.closeModal('room-info-modal'); this.switchView('general'); await this.loadRooms(); } catch (e) { showToast(e.message, 'error'); } };
+ChatApp.prototype.leaveRoom = async function(rid) {
+  if (!confirm('Покинуть?')) return;
+  try {
+    await apiRequest('/rooms/' + rid + '/leave', { method: 'POST' });
+    delete this.roomsCache[rid];
+    delete this.messagesCache[rid];
+    this.switchView('general');
+    await this.loadRooms();
+  } catch (e) { showToast(e.message, 'error'); }
+};
+ChatApp.prototype.deleteRoom = async function(rid) {
+  if (!confirm('Удалить?')) return;
+  try {
+    await apiRequest('/rooms/' + rid, { method: 'DELETE' });
+    delete this.roomsCache[rid];
+    delete this.messagesCache[rid];
+    this.closeModal('room-info-modal');
+    this.switchView('general');
+    await this.loadRooms();
+  } catch (e) { showToast(e.message, 'error'); }
+};
 
 ChatApp.prototype.renderSidebarProfile = function() {
   var u = this.currentUser;
   var adminBadge = u.role === 'admin' ? ' 👑' : '';
   var statusText = u.profile && u.profile.statusEmoji ? u.profile.statusEmoji + ' ' : '';
   statusText += u.profile && u.profile.statusText ? u.profile.statusText : 'Онлайн';
-  document.getElementById('sidebar-user-profile').innerHTML = '<div style="position:relative;">' + createMiniAvatarHTML(u, 40) + '<div class="status-dot online"></div></div><div class="user-info"><div class="user-name">' + escapeHTML(getDisplayName(u)) + adminBadge + '</div><div class="user-status">' + escapeHTML(statusText) + '</div></div>';
+  document.getElementById('sidebar-user-profile').innerHTML =
+    '<div style="position:relative;">' + createMiniAvatarHTML(u, 40) + '<div class="status-dot online"></div></div>' +
+    '<div class="user-info"><div class="user-name">' + escapeHTML(getDisplayName(u)) + adminBadge + '</div>' +
+    '<div class="user-status">' + escapeHTML(statusText) + '</div></div>';
 };
 ChatApp.prototype.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
 

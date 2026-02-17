@@ -444,3 +444,34 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
   .posts-page{padding:12px}
   .post-card{padding:12px}
 }
+/* Message menu button */
+.msg-menu-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  margin-left: auto;
+  line-height: 1;
+}
+
+.msg-menu-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.message:hover .msg-menu-btn {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .msg-menu-btn {
+    opacity: 0.5;
+    font-size: 18px;
+    padding: 4px 8px;
+  }
+}
