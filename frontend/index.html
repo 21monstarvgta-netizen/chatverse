@@ -6,7 +6,7 @@
   <title>ChatVerse</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/style.css?_=20250101">
+  <link rel="stylesheet" href="/css/style.css?_=20250203">
 </head>
 <body>
   <div id="loading-screen" class="loading-screen"><div class="spinner"></div><p>Загрузка ChatVerse...</p></div>
@@ -41,7 +41,6 @@
         </div>
         <div class="chat-header-actions" id="chat-header-actions"></div>
       </header>
-      <!-- Pinned messages bar -->
       <div class="pinned-bar hidden" id="pinned-bar" onclick="app.scrollToPinnedMessage()">
         <span class="pinned-icon">📌</span>
         <span class="pinned-text" id="pinned-text">Закреплённое сообщение</span>
@@ -66,7 +65,6 @@
           <div id="emoji-picker" class="emoji-picker hidden"></div>
           <div id="dice-picker" class="dice-picker hidden"></div>
         </div>
-        <!-- Edit bar -->
         <div id="edit-bar" class="edit-bar hidden">
           <span>✏️ Редактирование</span>
           <button onclick="app.cancelEdit()">✕</button>
@@ -80,7 +78,6 @@
     </aside>
   </div>
 
-  <!-- Create Room Modal -->
   <div id="create-room-modal" class="modal-overlay hidden">
     <div class="modal">
       <div class="modal-header"><h2>Создать комнату</h2><button class="modal-close" id="close-create-room">✕</button></div>
@@ -96,7 +93,6 @@
     </div>
   </div>
 
-  <!-- Room Info Modal -->
   <div id="room-info-modal" class="modal-overlay hidden">
     <div class="modal">
       <div class="modal-header"><h2 id="room-info-title">Комната</h2><button class="modal-close" id="close-room-info">✕</button></div>
@@ -109,7 +105,6 @@
     </div>
   </div>
 
-  <!-- Add Member Modal -->
   <div id="add-member-modal" class="modal-overlay hidden">
     <div class="modal">
       <div class="modal-header"><h2>Добавить участника</h2><button class="modal-close" id="close-add-member">✕</button></div>
@@ -121,7 +116,6 @@
     </div>
   </div>
 
-  <!-- Shopping List Modal -->
   <div id="shopping-modal" class="modal-overlay hidden">
     <div class="modal" style="max-width:600px;">
       <div class="modal-header"><h2>🛒 Список покупок</h2><button class="modal-close" id="close-shopping">✕</button></div>
@@ -136,7 +130,6 @@
     </div>
   </div>
 
-  <!-- Forward Modal -->
   <div id="forward-modal" class="modal-overlay hidden">
     <div class="modal">
       <div class="modal-header"><h2>↗️ Переслать в</h2><button class="modal-close" id="close-forward">✕</button></div>
@@ -146,17 +139,14 @@
     </div>
   </div>
 
-  <!-- Message Context Menu -->
   <div id="msg-context-menu" class="context-menu hidden"></div>
-
-  <!-- User Popup -->
   <div id="user-popup" class="user-popup hidden"></div>
   <div id="image-fullscreen" class="image-fullscreen hidden" onclick="this.classList.add('hidden')"><img id="fullscreen-img" src=""></div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script src="/js/utils.js?_=20250101"></script>
-  <script src="/js/chat.js?_=20250101"></script>
-  <script src="/js/rooms.js?_=20250101"></script>
-  <script src="/js/app.js?_=20250202"></script>
+  <script src="/js/utils.js?_=20250203"></script>
+  <script src="/js/chat.js?_=20250203"></script>
+  <script src="/js/rooms.js?_=20250203"></script>
+  <script src="/js/app.js?_=20250203"></script>
 </body>
 </html>

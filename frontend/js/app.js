@@ -113,8 +113,9 @@ ChatApp.prototype.initSocket = function() {
         }
       }
       if (self.messagesCache[self.currentView]) {
+        var msgIdStr = data.messageId.toString();
         self.messagesCache[self.currentView] = self.messagesCache[self.currentView].map(function(m) {
-          if (m._id === data.messageId) return data.message;
+          if (m._id.toString() === msgIdStr) return data.message;
           return m;
         });
       }
@@ -127,14 +128,15 @@ ChatApp.prototype.initSocket = function() {
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) el.remove();
       if (self.messagesCache[self.currentView]) {
+        var msgIdStr = data.messageId.toString();
         self.messagesCache[self.currentView] = self.messagesCache[self.currentView].filter(function(m) {
-          return m._id !== data.messageId;
+          return m._id.toString() !== msgIdStr;
         });
       }
     }
   });
 
-    this.socket.on('message:pinned', function(data) {
+  this.socket.on('message:pinned', function(data) {
     var targetView = data.roomId || 'general';
     if (self.currentView === targetView) {
       var msgIdStr = data.messageId.toString();
@@ -148,25 +150,6 @@ ChatApp.prototype.initSocket = function() {
         });
       }
       var el = document.querySelector('[data-msg-id="' + msgIdStr + '"]');
-      if (el) {
-        var pinInd = el.querySelector('.pin-indicator');
-        if (data.pinned && !pinInd) {
-          var header = el.querySelector('.msg-header');
-          if (header) {
-            var span = document.createElement('span');
-            span.className = 'pin-indicator';
-            span.title = 'Закреплено';
-            span.textContent = '📌';
-            header.insertBefore(span, header.firstChild);
-          }
-        } else if (!data.pinned && pinInd) {
-          pinInd.remove();
-        }
-      }
-      self.loadPinnedMessages();
-    }
-  });
-      var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) {
         var pinInd = el.querySelector('.pin-indicator');
         if (data.pinned && !pinInd) {
@@ -296,7 +279,6 @@ ChatApp.prototype.setupEventListeners = function() {
     o.addEventListener('click', function(e) { if (e.target === o) o.classList.add('hidden'); });
   });
 
-  // Long press for mobile context menu
   var longPressTimer = null;
   var longPressTriggered = false;
   document.getElementById('messages-container').addEventListener('touchstart', function(e) {
@@ -328,17 +310,14 @@ ChatApp.prototype.setupEventListeners = function() {
     clearTimeout(longPressTimer);
   }, { passive: true });
 
-  // Click on message in select mode
   document.getElementById('messages-container').addEventListener('click', function(e) {
     if (!self.selectMode) return;
     var msgEl = e.target.closest('.message[data-msg-id]');
     if (!msgEl) return;
-    // Dont toggle if clicking on username, image, shopping item etc
     if (e.target.closest('.msg-username') || e.target.closest('.msg-image') || e.target.closest('.shopping-item') || e.target.closest('a')) return;
     var msgId = msgEl.dataset.msgId;
     if (!msgId) return;
 
-    // Check if this message can be selected
     if (self.selectMode === 'delete') {
       var msg = self.findMessageInCache(msgId);
       if (!msg) return;
@@ -362,7 +341,6 @@ ChatApp.prototype.setupEventListeners = function() {
   });
 };
 
-// Find message in cache
 ChatApp.prototype.findMessageInCache = function(msgId) {
   var cache = this.messagesCache[this.currentView] || [];
   var idStr = msgId.toString();
@@ -372,7 +350,6 @@ ChatApp.prototype.findMessageInCache = function(msgId) {
   return null;
 };
 
-// Emoji
 ChatApp.prototype.buildEmojiPicker = function() {
   var self = this;
   var allEmojis = EMOJI_LIST.slice();
@@ -393,7 +370,6 @@ ChatApp.prototype.insertEmoji = function(emoji) {
   input.focus();
 };
 
-// Dice
 ChatApp.prototype.buildDicePicker = function() {
   var self = this;
   document.getElementById('dice-picker').innerHTML = '<div class="dice-picker-title">Бросить кубик</div>' +
@@ -410,7 +386,6 @@ ChatApp.prototype.rollDice = function(diceType) {
   document.getElementById('dice-picker').classList.add('hidden');
 };
 
-// Image
 ChatApp.prototype.handleImageUpload = async function(e) {
   var file = e.target.files[0];
   if (!file) return;
@@ -435,7 +410,6 @@ ChatApp.prototype.handleImageUpload = async function(e) {
   e.target.value = '';
 };
 
-// Shopping
 ChatApp.prototype.buildShoppingModal = function() {
   var html = '';
   for (var cat in SHOPPING_CATEGORIES) {
@@ -512,7 +486,6 @@ ChatApp.prototype.toggleShoppingItem = async function(messageId, itemId) {
   catch (e) { showToast('Ошибка', 'error'); }
 };
 
-// Messages
 ChatApp.prototype.loadGeneralMessages = async function() {
   try {
     var data = await apiRequest('/messages/general');
@@ -626,19 +599,16 @@ ChatApp.prototype.createMessageHTML = function(msg) {
     '</div><div class="msg-body">' + bodyContent + '</div></div></div>';
 };
 
-// Menu button handler (works on both mobile and desktop)
 ChatApp.prototype.openMenuForMessage = function(event, messageId) {
   event.stopPropagation();
   event.preventDefault();
   this.showContextMenu(event, messageId);
 };
 
-// Multi-select
 ChatApp.prototype.enterSelectMode = function(mode) {
   document.getElementById('msg-context-menu').classList.add('hidden');
   this.selectMode = mode;
   this.selectedMessages = [];
-  // Add visual indicator to messages
   var self = this;
   document.querySelectorAll('.message[data-msg-id]').forEach(function(el) {
     el.classList.remove('selected-message');
@@ -656,7 +626,6 @@ ChatApp.prototype.enterSelectMode = function(mode) {
       }
     }
   });
-  // Hide menu buttons
   document.querySelectorAll('.msg-menu-btn').forEach(function(btn) { btn.style.display = 'none'; });
   this.showSelectBar();
   showToast(mode === 'delete' ? 'Нажимайте на сообщения для выбора' : 'Нажимайте на сообщения для выбора', 'info');
@@ -749,7 +718,6 @@ ChatApp.prototype.bulkForwardTo = async function(targetRoomId) {
   } catch (e) { showToast(e.message, 'error'); }
 };
 
-// Context menu
 ChatApp.prototype.showContextMenu = function(event, messageId) {
   if (this.selectMode) return;
   event.preventDefault();
@@ -768,7 +736,6 @@ ChatApp.prototype.showContextMenu = function(event, messageId) {
   if (canEdit) html += '<div class="ctx-item" onclick="app.startEdit(\'' + messageId + '\')">✏️ Редактировать</div>';
   html += '<div class="ctx-item" onclick="app.openForwardModal(\'' + messageId + '\')">↗️ Переслать</div>';
   if (canPin) html += '<div class="ctx-item" onclick="app.togglePin(\'' + messageId + '\')">' + (msg.pinned ? '📌 Открепить' : '📌 Закрепить') + '</div>';
-  // Всегда показываем кнопку выбора для пересылки
   html += '<div class="ctx-item" onclick="app.enterSelectMode(\'forward\')">☑️ Выбрать несколько для пересылки</div>';
   if (canDelete) {
     html += '<div class="ctx-item ctx-danger" onclick="app.deleteMessage(\'' + messageId + '\')">🗑 Удалить</div>';
@@ -777,13 +744,6 @@ ChatApp.prototype.showContextMenu = function(event, messageId) {
 
   menu.innerHTML = html;
 
-  // Позиционирование с учётом мобильных
-  var menuWidth = 220;
-  var menuHeight = menu.children.length * 40 + 16;
-  var x = Math.min(event.clientX, window.innerWidth - menuWidth - 10);
-  var y = event.clientY;
-
-  // На мобильном — показываем снизу экрана
   if (window.innerWidth <= 768) {
     menu.style.left = '8px';
     menu.style.right = '8px';
@@ -791,8 +751,8 @@ ChatApp.prototype.showContextMenu = function(event, messageId) {
     menu.style.top = 'auto';
     menu.style.width = 'auto';
   } else {
-    menu.style.left = Math.max(10, x) + 'px';
-    menu.style.top = Math.min(y, window.innerHeight - menuHeight - 10) + 'px';
+    menu.style.left = Math.max(10, Math.min(event.clientX, window.innerWidth - 220)) + 'px';
+    menu.style.top = Math.min(event.clientY, window.innerHeight - 300) + 'px';
     menu.style.right = 'auto';
     menu.style.bottom = 'auto';
     menu.style.width = '';
@@ -800,7 +760,6 @@ ChatApp.prototype.showContextMenu = function(event, messageId) {
   menu.classList.remove('hidden');
 };
 
-// Edit
 ChatApp.prototype.startEdit = function(messageId) {
   var msg = this.findMessageInCache(messageId);
   if (!msg) return;
@@ -816,7 +775,6 @@ ChatApp.prototype.cancelEdit = function() {
   document.getElementById('edit-bar').classList.add('hidden');
 };
 
-// Delete
 ChatApp.prototype.deleteMessage = async function(messageId) {
   if (!confirm('Удалить сообщение?')) return;
   try {
@@ -825,17 +783,16 @@ ChatApp.prototype.deleteMessage = async function(messageId) {
   } catch (e) { showToast(e.message, 'error'); }
 };
 
-// Pin
 ChatApp.prototype.togglePin = async function(messageId) {
   try {
     console.log('Toggle pin for:', messageId);
     var result = await apiRequest('/messages/pin/' + messageId, { method: 'POST' });
     console.log('Pin result:', result);
     document.getElementById('msg-context-menu').classList.add('hidden');
-    // Update cache immediately
     if (this.messagesCache[this.currentView]) {
+      var msgIdStr = messageId.toString();
       this.messagesCache[this.currentView] = this.messagesCache[this.currentView].map(function(m) {
-        if (m._id === messageId) {
+        if (m._id.toString() === msgIdStr) {
           return result.message || m;
         }
         return m;
@@ -847,7 +804,6 @@ ChatApp.prototype.togglePin = async function(messageId) {
   }
 };
 
-// Forward (single)
 ChatApp.prototype.openForwardModal = function(messageId) {
   this.forwardMessageId = messageId;
   var self = this;
@@ -899,7 +855,6 @@ ChatApp.prototype.scrollToBottom = function() {
   requestAnimationFrame(function() { c.scrollTop = c.scrollHeight; });
 };
 
-// Typing
 ChatApp.prototype.handleTyping = function() {
   var roomId = this.currentView === 'general' ? null : this.currentView;
   var self = this;
@@ -918,7 +873,6 @@ ChatApp.prototype.renderTyping = function() {
     (names.length === 1 ? names[0] + ' печатает' : names.join(', ') + ' печатают') + '...</span>';
 };
 
-// Unread
 ChatApp.prototype.updateUnreadBadges = function() {
   var self = this;
   var generalNav = document.getElementById('nav-general');
@@ -945,7 +899,6 @@ ChatApp.prototype.updateUnreadBadges = function() {
   });
 };
 
-// Views
 ChatApp.prototype.switchView = async function(viewId) {
   if (this.selectMode) this.exitSelectMode();
 
@@ -998,7 +951,6 @@ ChatApp.prototype.updateRoomHeaderActions = function(viewId, room) {
     '<button class="btn-icon" onclick="app.leaveRoom(\'' + viewId + '\')" title="Выйти">🚪</button>';
 };
 
-// Online
 ChatApp.prototype.renderOnlineUsers = function() {
   var list = document.getElementById('online-users-list');
   var count = this.onlineUsers.length;
@@ -1013,7 +965,6 @@ ChatApp.prototype.renderOnlineUsers = function() {
   }).join('');
 };
 
-// User popup
 ChatApp.prototype.showUserPopup = async function(event, userId) {
   event.stopPropagation();
   try {
@@ -1056,7 +1007,6 @@ ChatApp.prototype.showUserPopup = async function(event, userId) {
   } catch (e) {}
 };
 
-// Admin actions
 ChatApp.prototype.adminBanUser = async function(userId) {
   var reason = prompt('Причина бана:');
   if (reason === null) return;
@@ -1074,7 +1024,6 @@ ChatApp.prototype.adminSetRole = async function(userId, role) {
   } catch (e) { showToast(e.message, 'error'); }
 };
 
-// Rooms
 ChatApp.prototype.loadRooms = async function() {
   try {
     var data = await apiRequest('/rooms');
