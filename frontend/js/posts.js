@@ -3,43 +3,23 @@ var postsApp = {
   postImageUrl: '',
 
   init: async function() {
-    var token = localStorage.getItem('chatverse_token');
-    if (!token) {
-      window.location.href = '/login.html';
-      return;
-    }
+    if (!requireAuth()) return;
     try {
-      var response = await fetch(API_URL + '/auth/me', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      if (!response.ok) {
-        showToast('Ошибка авторизации', 'error');
-        return;
-      }
-      var data = await response.json();
+      var data = await apiRequest('/auth/me');
       this.currentUser = data.user;
+      setUser(data.user);
       this.setupEvents();
       this.buildEmojiPicker();
       await this.loadPosts();
     } catch (e) {
       console.error('Posts init error:', e);
-      showToast('Ошибка загрузки', 'error');
+      removeToken();
+      window.location.href = '/login.html';
     }
   },
 
   apiCall: async function(endpoint, options) {
-    options = options || {};
-    var token = localStorage.getItem('chatverse_token');
-    var headers = {};
-    if (token) headers['Authorization'] = 'Bearer ' + token;
-    if (options.body && !(options.body instanceof FormData)) {
-      headers['Content-Type'] = 'application/json';
-    }
-    options.headers = headers;
-    var response = await fetch(API_URL + endpoint, options);
-    var data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Ошибка');
-    return data;
+    return await apiRequest(endpoint, options);
   },
 
   setupEvents: function() {
@@ -69,7 +49,6 @@ var postsApp = {
         picker.classList.add('hidden');
       }
     });
-    // Enter to submit post
     document.getElementById('post-content').addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && e.ctrlKey) {
         e.preventDefault();
@@ -140,7 +119,6 @@ var postsApp = {
 
     var html = '<div class="post-card" data-post-id="' + post._id + '">';
 
-    // Header
     html += '<div class="post-header">';
     html += '<a href="/user.html?id=' + post.author._id + '" style="text-decoration:none;">' + createMiniAvatarHTML(post.author, 40) + '</a>';
     html += '<div style="flex:1;min-width:0;"><div style="font-weight:700;' + nameStyle + '">' + escapeHTML(getDisplayName(post.author)) + adminBadge + '</div>';
@@ -150,18 +128,15 @@ var postsApp = {
     }
     html += '</div>';
 
-    // Content
     if (post.emoji) html += '<div style="font-size:32px;margin:8px 0;">' + post.emoji + '</div>';
     html += '<div class="post-content">' + escapeHTML(post.content) + '</div>';
     if (post.imageUrl) html += '<img class="post-image" src="' + post.imageUrl + '" loading="lazy" onclick="postsApp.openImage(\'' + post.imageUrl + '\')">';
 
-    // Actions
     html += '<div class="post-actions">';
     html += '<button class="btn btn-ghost btn-sm' + (isLiked ? ' liked' : '') + '" onclick="postsApp.likePost(\'' + post._id + '\')">❤️ ' + likesCount + '</button>';
     html += '<button class="btn btn-ghost btn-sm" onclick="postsApp.toggleComments(\'' + post._id + '\')">💬 ' + commentsCount + (commentsCount > 0 ? ' — показать' : '') + '</button>';
     html += '</div>';
 
-    // Comments (collapsed)
     html += '<div class="post-comments hidden" id="comments-' + post._id + '">';
     if (post.comments && post.comments.length) {
       post.comments.forEach(function(c) {
@@ -216,12 +191,11 @@ var postsApp = {
     if (file.size > 10 * 1024 * 1024) { showToast('Макс. 10MB', 'error'); return; }
     showToast('Загрузка фото...', 'info');
     try {
-      var token = localStorage.getItem('chatverse_token');
       var formData = new FormData();
       formData.append('image', file);
       var response = await fetch(API_URL + '/upload/chat-image', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token },
+        headers: { 'Authorization': 'Bearer ' + getToken() },
         body: formData
       });
       var data = await response.json();

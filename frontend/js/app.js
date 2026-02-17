@@ -14,8 +14,9 @@ var ChatApp = function() {
   this.roomsCache = {};
   this.editingMessageId = null;
   this.pinnedMessages = {};
-  this.selectedMessages = new Set();
-  this.selectionMode = false;
+  // Multi-select mode
+  this.selectMode = null; // null, 'delete', 'forward'
+  this.selectedMessages = [];
   this.init();
 };
 
@@ -120,30 +121,46 @@ ChatApp.prototype.initSocket = function() {
     if (self.currentView === targetView) {
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) el.remove();
+      // Also remove from cache
+      if (self.messagesCache[self.currentView]) {
+        self.messagesCache[self.currentView] = self.messagesCache[self.currentView].filter(function(m) {
+          return m._id !== data.messageId;
+        });
+      }
     }
   });
 
   this.socket.on('message:pinned', function(data) {
     var targetView = data.roomId || 'general';
     if (self.currentView === targetView) {
-      self.loadPinnedMessages();
-      // Обновляем UI сразу
+      // Update message in cache
+      if (self.messagesCache[self.currentView]) {
+        self.messagesCache[self.currentView] = self.messagesCache[self.currentView].map(function(m) {
+          if (m._id === data.messageId) {
+            m.pinned = data.pinned;
+            return data.message || m;
+          }
+          return m;
+        });
+      }
+      // Re-render the specific message pin indicator
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) {
         var pinInd = el.querySelector('.pin-indicator');
         if (data.pinned && !pinInd) {
-          var hdr = el.querySelector('.msg-header');
-          if (hdr) {
-            var pin = document.createElement('span');
-            pin.className = 'pin-indicator';
-            pin.title = 'Закреплено';
-            pin.textContent = '📌 ';
-            hdr.insertBefore(pin, hdr.firstChild);
+          var header = el.querySelector('.msg-header');
+          if (header) {
+            var span = document.createElement('span');
+            span.className = 'pin-indicator';
+            span.title = 'Закреплено';
+            span.textContent = '📌';
+            header.insertBefore(span, header.firstChild);
           }
         } else if (!data.pinned && pinInd) {
           pinInd.remove();
         }
       }
+      self.loadPinnedMessages();
     }
   });
 
@@ -190,9 +207,9 @@ ChatApp.prototype.setupEventListeners = function() {
   });
 
   document.getElementById('nav-general').addEventListener('click', function() { self.switchView('general'); });
-  document.getElementById('btn-profile').addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault(); window.location.href = '/profile.html'; });
-  document.getElementById('btn-posts').addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault(); window.location.href = '/posts.html'; });
-  document.getElementById('btn-logout').addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault();
+  document.getElementById('btn-profile').addEventListener('click', function() { window.location.href = '/profile.html'; });
+  document.getElementById('btn-posts').addEventListener('click', function() { window.location.href = '/posts.html'; });
+  document.getElementById('btn-logout').addEventListener('click', function() {
     if (self.socket) self.socket.disconnect();
     removeToken();
     window.location.href = '/login.html';
@@ -454,6 +471,7 @@ ChatApp.prototype.loadPinnedMessages = async function() {
       document.getElementById('pinned-text').textContent = '📌 ' + text + (data.messages.length > 1 ? ' (+' + (data.messages.length - 1) + ')' : '');
       bar.classList.remove('hidden');
     } else {
+      this.pinnedMessages[this.currentView] = [];
       bar.classList.add('hidden');
     }
   } catch (e) {}
@@ -505,6 +523,17 @@ ChatApp.prototype.createMessageHTML = function(msg) {
   var editedMark = msg.edited ? '<span class="msg-edited">(изменено ' + formatTime(msg.editedAt) + ')</span>' : '';
   var adminMsgClass = senderIsAdmin ? ' admin-message' : '';
 
+  // Select mode checkbox
+  var selectCheckbox = '';
+  if (this.selectMode) {
+    var canSelect = true;
+    if (this.selectMode === 'delete' && !isOwn && !isAdmin(this.currentUser)) canSelect = false;
+    if (canSelect) {
+      var checked = this.selectedMessages.indexOf(msg._id) >= 0 ? ' checked' : '';
+      selectCheckbox = '<label class="select-msg-checkbox" onclick="event.stopPropagation()"><input type="checkbox" data-select-msg="' + msg._id + '"' + checked + ' onchange="app.toggleSelectMessage(\'' + msg._id + '\',this.checked)"><span class="checkmark" style="width:18px;height:18px;border-radius:4px;">✓</span></label>';
+    }
+  }
+
   var bodyContent = '';
   if (msg.type === 'text') {
     bodyContent = '<div class="msg-text">' + escapeHTML(msg.content) + '</div>' + editedMark;
@@ -521,9 +550,13 @@ ChatApp.prototype.createMessageHTML = function(msg) {
     return '<div class="message system-message"><div class="msg-content"><div class="msg-text">' + escapeHTML(msg.content) + '</div></div></div>';
   }
 
-  var menuBtn = '<button class="msg-menu-btn" onclick="event.stopPropagation();app.showContextMenu(event,\'' + msg._id + '\')" title="Меню">⋮</button>';
+  var menuBtn = '';
+  if (!this.selectMode) {
+    menuBtn = '<button class="msg-menu-btn" onclick="event.stopPropagation();app.showContextMenu(event,\'' + msg._id + '\')" title="Меню">⋮</button>';
+  }
 
-  return '<div class="message' + (isOwn ? ' own-message' : '') + adminMsgClass + '" data-msg-id="' + msg._id + '" oncontextmenu="app.showContextMenu(event,\'' + msg._id + '\')">' +
+  return '<div class="message' + (isOwn ? ' own-message' : '') + adminMsgClass + (this.selectedMessages.indexOf(msg._id) >= 0 ? ' selected-message' : '') + '" data-msg-id="' + msg._id + '"' + (!this.selectMode ? ' oncontextmenu="app.showContextMenu(event,\'' + msg._id + '\')"' : '') + '>' +
+    selectCheckbox +
     '<div class="msg-avatar">' + avatar + '</div>' +
     '<div class="msg-content"><div class="msg-header">' + pinnedIcon +
     '<span class="msg-username" style="' + nameStyle + '" onclick="app.showUserPopup(event,\'' + msg.sender._id + '\')">' + escapeHTML(dn) + '</span>' + adminBadge +
@@ -532,15 +565,117 @@ ChatApp.prototype.createMessageHTML = function(msg) {
     '</div><div class="msg-body">' + bodyContent + '</div></div></div>';
 };
 
+// Multi-select
+ChatApp.prototype.enterSelectMode = function(mode) {
+  this.selectMode = mode;
+  this.selectedMessages = [];
+  this.renderMessages(this.messagesCache[this.currentView] || []);
+  this.showSelectBar();
+};
+
+ChatApp.prototype.exitSelectMode = function() {
+  this.selectMode = null;
+  this.selectedMessages = [];
+  this.hideSelectBar();
+  this.renderMessages(this.messagesCache[this.currentView] || []);
+};
+
+ChatApp.prototype.toggleSelectMessage = function(msgId, checked) {
+  if (checked) {
+    if (this.selectedMessages.indexOf(msgId) < 0) this.selectedMessages.push(msgId);
+  } else {
+    this.selectedMessages = this.selectedMessages.filter(function(id) { return id !== msgId; });
+  }
+  // Update visual selection
+  var el = document.querySelector('[data-msg-id="' + msgId + '"]');
+  if (el) {
+    if (checked) el.classList.add('selected-message');
+    else el.classList.remove('selected-message');
+  }
+  this.updateSelectBar();
+};
+
+ChatApp.prototype.showSelectBar = function() {
+  var bar = document.getElementById('select-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'select-bar';
+    bar.className = 'select-bar';
+    document.querySelector('.message-input-area').before(bar);
+  }
+  this.updateSelectBar();
+  bar.classList.remove('hidden');
+  // Hide input area
+  document.querySelector('.message-input-area').classList.add('hidden');
+};
+
+ChatApp.prototype.hideSelectBar = function() {
+  var bar = document.getElementById('select-bar');
+  if (bar) bar.classList.add('hidden');
+  document.querySelector('.message-input-area').classList.remove('hidden');
+};
+
+ChatApp.prototype.updateSelectBar = function() {
+  var bar = document.getElementById('select-bar');
+  if (!bar) return;
+  var count = this.selectedMessages.length;
+  var self = this;
+  if (this.selectMode === 'delete') {
+    bar.innerHTML = '<div class="select-bar-info"><span>Выбрано: ' + count + '</span></div>' +
+      '<div class="select-bar-actions">' +
+      '<button class="btn btn-secondary btn-sm" onclick="app.exitSelectMode()">Отмена</button>' +
+      '<button class="btn btn-danger btn-sm" ' + (count === 0 ? 'disabled' : '') + ' onclick="app.bulkDelete()">🗑 Удалить (' + count + ')</button>' +
+      '</div>';
+  } else if (this.selectMode === 'forward') {
+    bar.innerHTML = '<div class="select-bar-info"><span>Выбрано: ' + count + '</span></div>' +
+      '<div class="select-bar-actions">' +
+      '<button class="btn btn-secondary btn-sm" onclick="app.exitSelectMode()">Отмена</button>' +
+      '<button class="btn btn-primary btn-sm" ' + (count === 0 ? 'disabled' : '') + ' onclick="app.bulkForwardChooseTarget()">↗️ Переслать (' + count + ')</button>' +
+      '</div>';
+  }
+};
+
+ChatApp.prototype.bulkDelete = async function() {
+  if (this.selectedMessages.length === 0) return;
+  if (!confirm('Удалить выбранные сообщения (' + this.selectedMessages.length + ')?')) return;
+  try {
+    await apiRequest('/messages/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ messageIds: this.selectedMessages })
+    });
+    showToast('Удалено: ' + this.selectedMessages.length, 'success');
+    this.exitSelectMode();
+  } catch (e) { showToast(e.message, 'error'); }
+};
+
+ChatApp.prototype.bulkForwardChooseTarget = function() {
+  if (this.selectedMessages.length === 0) return;
+  var self = this;
+  var html = '<div class="forward-target" onclick="app.bulkForwardTo(null)"><span>🌍</span> Общий чат</div>';
+  Object.keys(this.roomsCache).forEach(function(rid) {
+    var r = self.roomsCache[rid];
+    html += '<div class="forward-target" onclick="app.bulkForwardTo(\'' + rid + '\')"><span style="color:' + (r.color || '#6c5ce7') + '">●</span> ' + escapeHTML(r.name) + '</div>';
+  });
+  document.getElementById('forward-targets').innerHTML = html;
+  document.getElementById('forward-modal').classList.remove('hidden');
+};
+
+ChatApp.prototype.bulkForwardTo = async function(targetRoomId) {
+  try {
+    await apiRequest('/messages/bulk-forward', {
+      method: 'POST',
+      body: JSON.stringify({ messageIds: this.selectedMessages, targetRoomId: targetRoomId })
+    });
+    showToast('Переслано: ' + this.selectedMessages.length, 'success');
+    this.closeModal('forward-modal');
+    this.exitSelectMode();
+  } catch (e) { showToast(e.message, 'error'); }
+};
+
 // Context menu
 ChatApp.prototype.showContextMenu = function(event, messageId) {
+  if (this.selectMode) return; // Ignore context menu in select mode
   event.preventDefault();
-  // ПКМ включает режим выбора
-  if ((event.button === 2 || event.which === 3)) {
-    if (!this.selectionMode) this.toggleSelectionMode();
-    this.toggleMessageSelection(messageId);
-    return;
-  }
   event.stopPropagation();
   var menu = document.getElementById('msg-context-menu');
   var msg = null;
@@ -559,8 +694,12 @@ ChatApp.prototype.showContextMenu = function(event, messageId) {
   var html = '';
   if (canEdit) html += '<div class="ctx-item" onclick="app.startEdit(\'' + messageId + '\')">✏️ Редактировать</div>';
   html += '<div class="ctx-item" onclick="app.openForwardModal(\'' + messageId + '\')">↗️ Переслать</div>';
+  html += '<div class="ctx-item" onclick="app.enterSelectMode(\'forward\')">☑️ Выбрать для пересылки</div>';
   if (canPin) html += '<div class="ctx-item" onclick="app.togglePin(\'' + messageId + '\')">' + (msg.pinned ? '📌 Открепить' : '📌 Закрепить') + '</div>';
-  if (canDelete) html += '<div class="ctx-item ctx-danger" onclick="app.deleteMessage(\'' + messageId + '\')">🗑 Удалить</div>';
+  if (canDelete) {
+    html += '<div class="ctx-item ctx-danger" onclick="app.deleteMessage(\'' + messageId + '\')">🗑 Удалить</div>';
+    html += '<div class="ctx-item ctx-danger" onclick="app.enterSelectMode(\'delete\')">☑️ Выбрать для удаления</div>';
+  }
 
   if (!html) return;
   menu.innerHTML = html;
@@ -598,17 +737,12 @@ ChatApp.prototype.deleteMessage = async function(messageId) {
 // Pin
 ChatApp.prototype.togglePin = async function(messageId) {
   try {
-    var result = await apiRequest('/messages/pin/' + messageId, { method: 'POST' });
+    await apiRequest('/messages/pin/' + messageId, { method: 'POST' });
     document.getElementById('msg-context-menu').classList.add('hidden');
-    if (result.message && result.message.pinned) {
-      showToast('Закреплено', 'success');
-    } else {
-      showToast('Откреплено', 'success');
-    }
   } catch (e) { showToast(e.message, 'error'); }
 };
 
-// Forward
+// Forward (single)
 ChatApp.prototype.openForwardModal = function(messageId) {
   this.forwardMessageId = messageId;
   var self = this;
@@ -708,6 +842,9 @@ ChatApp.prototype.updateUnreadBadges = function() {
 
 // Views
 ChatApp.prototype.switchView = async function(viewId) {
+  // Exit select mode if active
+  if (this.selectMode) this.exitSelectMode();
+
   this.currentView = viewId;
   this.typingUsers.clear();
   this.renderTyping();
@@ -979,137 +1116,4 @@ ChatApp.prototype.renderSidebarProfile = function() {
 ChatApp.prototype.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
 
 var app;
-
-// === МУЛЬТИСЕЛЕКТ ===
-ChatApp.prototype.toggleSelectionMode = function() {
-  this.selectionMode = !this.selectionMode;
-  if (this.selectionMode) {
-    this.selectedMessages.clear();
-    this.showSelectionToolbar();
-  } else {
-    this.selectedMessages.clear();
-    this.hideSelectionToolbar();
-  }
-  this.updateSelectionUI();
-};
-
-ChatApp.prototype.showSelectionToolbar = function() {
-  var existing = document.getElementById('selection-toolbar');
-  if (existing) return;
-  var toolbar = document.createElement('div');
-  toolbar.id = 'selection-toolbar';
-  toolbar.className = 'selection-toolbar';
-  toolbar.innerHTML = '<div class="selection-info"><span id="selection-count">0</span> выбрано</div>' +
-    '<button class="btn btn-danger btn-sm" onclick="app.deleteSelectedMessages()">🗑️ Удалить</button>' +
-    '<button class="btn btn-primary btn-sm" onclick="app.forwardSelectedMessages()">↗️ Переслать</button>' +
-    '<button class="btn btn-ghost btn-sm" onclick="app.toggleSelectionMode()">✖️ Отмена</button>';
-  var chatMain = document.querySelector('.chat-main');
-  var chatInput = document.querySelector('.chat-input');
-  if (chatMain && chatInput) chatMain.insertBefore(toolbar, chatInput);
-};
-
-ChatApp.prototype.hideSelectionToolbar = function() {
-  var toolbar = document.getElementById('selection-toolbar');
-  if (toolbar) toolbar.remove();
-};
-
-ChatApp.prototype.toggleMessageSelection = function(messageId) {
-  if (this.selectedMessages.has(messageId)) {
-    this.selectedMessages.delete(messageId);
-  } else {
-    this.selectedMessages.add(messageId);
-  }
-  this.updateSelectionUI();
-};
-
-ChatApp.prototype.updateSelectionUI = function() {
-  var self = this;
-  document.querySelectorAll('.message').forEach(function(el) {
-    var msgId = el.dataset.msgId;
-    if (!msgId || el.classList.contains('system-message')) return;
-    if (self.selectedMessages.has(msgId)) {
-      el.classList.add('selected');
-    } else {
-      el.classList.remove('selected');
-    }
-  });
-  var countEl = document.getElementById('selection-count');
-  if (countEl) countEl.textContent = this.selectedMessages.size;
-};
-
-ChatApp.prototype.deleteSelectedMessages = async function() {
-  if (this.selectedMessages.size === 0) return;
-  var messages = this.messagesCache[this.currentView] || [];
-  var self = this;
-  var toDelete = Array.from(this.selectedMessages).filter(function(msgId) {
-    var msg = messages.find(function(m) { return m._id === msgId; });
-    return msg && msg.sender._id === self.currentUser._id;
-  });
-  if (toDelete.length === 0) {
-    showToast('Можно удалять только свои сообщения', 'error');
-    return;
-  }
-  if (!confirm('Удалить ' + toDelete.length + ' сообщений?')) return;
-  try {
-    for (var i = 0; i < toDelete.length; i++) {
-      await apiRequest('/messages/delete/' + toDelete[i], { method: 'DELETE' });
-    }
-    showToast('Удалено!', 'success');
-    this.toggleSelectionMode();
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-};
-
-ChatApp.prototype.forwardSelectedMessages = function() {
-  if (this.selectedMessages.size === 0) return;
-  if (this.selectedMessages.size > 10) {
-    showToast('Максимум 10 сообщений', 'error');
-    return;
-  }
-  this.forwardMessageIds = Array.from(this.selectedMessages);
-  this.openForwardModalMultiple();
-};
-
-ChatApp.prototype.openForwardModalMultiple = function() {
-  var self = this;
-  var html = '<div class="forward-target" onclick="app.forwardMultipleTo(null)"><span>🌍</span> Общий чат</div>';
-  Object.keys(this.roomsCache).forEach(function(rid) {
-    var r = self.roomsCache[rid];
-    html += '<div class="forward-target" onclick="app.forwardMultipleTo(\'' + rid + '\')"><span style="color:' + (r.color || '#6c5ce7') + '">●</span> ' + escapeHTML(r.name) + '</div>';
-  });
-  document.getElementById('forward-targets').innerHTML = html;
-  document.getElementById('forward-modal').classList.remove('hidden');
-};
-
-ChatApp.prototype.forwardMultipleTo = async function(targetRoomId) {
-  try {
-    for (var i = 0; i < this.forwardMessageIds.length; i++) {
-      await apiRequest('/messages/forward/' + this.forwardMessageIds[i], {
-        method: 'POST',
-        body: JSON.stringify({ targetRoomId: targetRoomId })
-      });
-    }
-    showToast('Переслано!', 'success');
-    this.closeModal('forward-modal');
-    this.toggleSelectionMode();
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-};
-
 document.addEventListener('DOMContentLoaded', function() { app = new ChatApp(); });
-
-// Клик по сообщению в режиме выбора (для мобильных)
-document.addEventListener('click', function(e) {
-  if (!app || !app.selectionMode) return;
-  var msgEl = e.target.closest('.message');
-  if (msgEl && !msgEl.classList.contains('system-message')) {
-    var msgId = msgEl.dataset.msgId;
-    if (msgId && !e.target.closest('.msg-menu-btn')) {
-      e.stopPropagation();
-      app.toggleMessageSelection(msgId);
-    }
-  }
-});
-

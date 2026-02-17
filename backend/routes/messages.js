@@ -80,23 +80,30 @@ router.post('/pin/:messageId', auth, async (req, res) => {
       if (req.user.role !== 'admin') return res.status(403).json({ error: 'Нет прав' });
     }
 
-    message.pinned = !message.pinned;
-    message.pinnedBy = message.pinned ? req.userId : null;
-    message.pinnedAt = message.pinned ? new Date() : null;
-    await message.save();
+    const newPinned = !message.pinned;
 
-    const populated = await Message.findById(message._id).populate(populateMsg);
+    const updated = await Message.findByIdAndUpdate(
+      req.params.messageId,
+      {
+        $set: {
+          pinned: newPinned,
+          pinnedBy: newPinned ? req.userId : null,
+          pinnedAt: newPinned ? new Date() : null
+        }
+      },
+      { new: true }
+    ).populate(populateMsg);
 
     const io = req.app.get('io');
     const target = message.room ? 'room:' + message.room : 'general';
     io.to(target).emit('message:pinned', {
       messageId: message._id,
-      pinned: message.pinned,
-      message: populated,
+      pinned: newPinned,
+      message: updated,
       roomId: message.room ? message.room.toString() : null
     });
 
-    res.json({ message: populated });
+    res.json({ message: updated });
   } catch (error) {
     console.error('Pin error:', error);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -169,14 +176,51 @@ router.delete('/delete/:messageId', auth, async (req, res) => {
   }
 });
 
-// Forward message
-router.post('/forward/:messageId', auth, async (req, res) => {
+// Bulk delete messages
+router.post('/bulk-delete', auth, async (req, res) => {
   try {
-    const originalMsg = await Message.findById(req.params.messageId)
-      .populate('sender', 'username profile');
-    if (!originalMsg) return res.status(404).json({ error: 'Сообщение не найдено' });
+    const { messageIds } = req.body;
+    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.status(400).json({ error: 'Не выбраны сообщения' });
+    }
 
-    const { targetRoomId } = req.body; // null = general
+    const isAdmin = req.user.role === 'admin';
+    const messages = await Message.find({ _id: { $in: messageIds } });
+
+    // Check ownership — only own messages (or admin)
+    for (const msg of messages) {
+      const isOwner = msg.sender.toString() === req.userId.toString();
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ error: 'Можно удалять только свои сообщения' });
+      }
+    }
+
+    const io = req.app.get('io');
+
+    for (const msg of messages) {
+      const roomId = msg.room ? msg.room.toString() : null;
+      await Message.findByIdAndDelete(msg._id);
+      const target = roomId ? 'room:' + roomId : 'general';
+      io.to(target).emit('message:deleted', {
+        messageId: msg._id.toString(),
+        roomId: roomId
+      });
+    }
+
+    res.json({ success: true, deleted: messages.length });
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Bulk forward messages
+router.post('/bulk-forward', auth, async (req, res) => {
+  try {
+    const { messageIds, targetRoomId } = req.body;
+    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.status(400).json({ error: 'Не выбраны сообщения' });
+    }
 
     // Check access to target
     if (targetRoomId) {
@@ -186,7 +230,67 @@ router.post('/forward/:messageId', auth, async (req, res) => {
       }
     }
 
-    // Determine original room name
+    const messages = await Message.find({ _id: { $in: messageIds } })
+      .populate('sender', 'username profile')
+      .sort({ createdAt: 1 });
+
+    const io = req.app.get('io');
+    const forwarded = [];
+
+    for (const originalMsg of messages) {
+      let originalRoomName = 'Общий чат';
+      if (originalMsg.room) {
+        const origRoom = await Room.findById(originalMsg.room);
+        if (origRoom) originalRoomName = origRoom.name;
+      }
+
+      const newMsg = new Message({
+        content: originalMsg.content,
+        sender: req.userId,
+        room: targetRoomId || null,
+        type: 'forwarded',
+        imageUrl: originalMsg.imageUrl || '',
+        forwarded: {
+          originalSender: originalMsg.sender._id,
+          originalRoom: originalRoomName,
+          originalDate: originalMsg.createdAt
+        }
+      });
+
+      await newMsg.save();
+      const populated = await Message.findById(newMsg._id).populate(populateMsg);
+
+      if (targetRoomId) {
+        io.to('room:' + targetRoomId).emit('room:message', { roomId: targetRoomId, message: populated });
+      } else {
+        io.to('general').emit('general:message', populated);
+      }
+      forwarded.push(populated);
+    }
+
+    res.json({ success: true, forwarded: forwarded.length });
+  } catch (error) {
+    console.error('Bulk forward error:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Forward message
+router.post('/forward/:messageId', auth, async (req, res) => {
+  try {
+    const originalMsg = await Message.findById(req.params.messageId)
+      .populate('sender', 'username profile');
+    if (!originalMsg) return res.status(404).json({ error: 'Сообщение не найдено' });
+
+    const { targetRoomId } = req.body;
+
+    if (targetRoomId) {
+      const room = await Room.findById(targetRoomId);
+      if (!room || !room.members.some(m => m.toString() === req.userId.toString())) {
+        return res.status(403).json({ error: 'Нет доступа к комнате' });
+      }
+    }
+
     let originalRoomName = 'Общий чат';
     if (originalMsg.room) {
       const origRoom = await Room.findById(originalMsg.room);

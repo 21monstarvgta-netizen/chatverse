@@ -448,354 +448,70 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
   .edit-bar{font-size:11px;padding:4px 8px}
   .posts-page{padding:12px}
   .post-card{padding:12px}
-}/* Multi-select mode styles - ADD THIS TO YOUR app.css */
-
-/* Selection toolbar */
-.selection-toolbar {
+}
+/* ===== Multi-select mode ===== */
+.select-msg-checkbox {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: var(--bg-dark);
-  border-top: 1px solid var(--border-color);
-  gap: 12px;
-}
-
-.selection-count {
-  font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.selection-count span {
-  color: var(--primary);
-  font-size: 16px;
-}
-
-.selection-toolbar .btn {
-  padding: 8px 16px;
-  font-size: 13px;
-  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  font-weight: 500;
+  flex-shrink: 0;
+  margin-right: 4px;
 }
-
-.selection-toolbar .btn-danger {
-  background: #ff4757;
-  color: white;
+.select-msg-checkbox input[type="checkbox"] {
+  display: none;
 }
-
-.selection-toolbar .btn-danger:hover {
-  background: #e84045;
-  transform: translateY(-1px);
-}
-
-.selection-toolbar .btn-primary {
-  background: var(--primary);
-  color: white;
-}
-
-.selection-toolbar .btn-primary:hover {
-  background: #5b4bc4;
-  transform: translateY(-1px);
-}
-
-/* Messages in selection mode */
-.message.selectable {
-  cursor: pointer;
-  position: relative;
-  transition: all 0.2s;
-}
-
-.message.selectable:hover {
-  background: rgba(108, 92, 231, 0.05);
-}
-
-.message.selectable::before {
-  content: '○';
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 20px;
-  color: var(--text-muted);
-  opacity: 0.5;
-  transition: all 0.2s;
-}
-
-.message.selectable.selected {
-  background: rgba(108, 92, 231, 0.15);
-  border-left: 3px solid var(--primary);
-}
-
-.message.selectable.selected::before {
-  content: '●';
-  color: var(--primary);
-  opacity: 1;
-  font-size: 24px;
-}
-
-.message.selectable .msg-avatar {
-  margin-left: 24px;
-}
-
-/* Multi-select button active state */
-.toolbar-btn.active {
-  background: var(--primary);
-  color: white;
-}
-
-.toolbar-btn.active:hover {
-  background: #5b4bc4;
-}
-
-/* Mobile optimizations */
-@media (max-width: 768px) {
-  .selection-toolbar {
-    padding: 10px 12px;
-    gap: 8px;
-  }
-
-  .selection-toolbar .btn {
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-
-  .selection-count {
-    font-size: 13px;
-  }
-
-  .message.selectable::before {
-    left: 4px;
-    font-size: 18px;
-  }
-
-  .message.selectable.selected::before {
-    font-size: 20px;
-  }
-
-  .message.selectable .msg-avatar {
-    margin-left: 20px;
-  }
-}
-
-/* Dark mode adjustments */
-body.dark-theme .selection-toolbar {
-  background: #1a1a2e;
-  border-top-color: #2d2d44;
-}
-
-body.dark-theme .message.selectable:hover {
-  background: rgba(108, 92, 231, 0.08);
-}
-
-body.dark-theme .message.selectable.selected {
-  background: rgba(108, 92, 231, 0.2);
-}
-
-/* Multi-select styles */
-.selection-toolbar {
+.select-msg-checkbox .checkmark {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-radius: 4px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: var(--bg-dark);
-  border-top: 1px solid var(--border-color);
-  gap: 12px;
-  position: sticky;
-  bottom: 60px;
-  z-index: 10;
+  justify-content: center;
+  font-size: 11px;
+  color: transparent;
+  transition: var(--transition);
+  flex-shrink: 0;
 }
-
-.selection-info {
-  font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 600;
+.select-msg-checkbox input:checked + .checkmark {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
 }
-
-.selection-info span {
-  color: var(--primary);
-  font-size: 16px;
-}
-
-body.selection-mode .message:not(.system-message) {
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-body.selection-mode .message:not(.system-message):hover {
-  background: rgba(108, 92, 231, 0.05);
-}
-
-.message.selected {
+.message.selected-message {
   background: rgba(108, 92, 231, 0.15) !important;
   border-left: 3px solid var(--primary);
 }
-
-.message.selected::before {
-  content: '✓';
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 20px;
-  color: var(--primary);
-  font-weight: bold;
-}
-
-/* Mobile: selection button next to message */
-@media (max-width: 768px) {
-  body.selection-mode .message:not(.system-message) {
-    padding-right: 50px;
-    position: relative;
-  }
-  
-  body.selection-mode .message:not(.system-message)::after {
-    content: '☐';
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 24px;
-    color: var(--text-muted);
-  }
-  
-  body.selection-mode .message.selected::after {
-    content: '☑';
-    color: var(--primary);
-  }
-  
-  .selection-toolbar {
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 12px;
-  }
-  
-  .selection-toolbar .btn {
-    font-size: 12px;
-    padding: 6px 12px;
-  }
-}
-
-/* Dark theme adjustments */
-body.dark-theme .selection-toolbar {
-  background: #1a1a2e;
-  border-top-color: #2d2d44;
-}
-
-body.dark-theme .message.selected {
-  background: rgba(108, 92, 231, 0.25) !important;
-}
-/* === ДОБАВЬТЕ ЭТО В КОНЕЦ style.css === */
-
-/* Мультиселект - панель инструментов */
-.selection-toolbar {
+.select-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  background: var(--bg-dark);
-  border-top: 1px solid var(--border-color);
-  gap: 12px;
-  z-index: 100;
+  padding: 10px 16px;
+  padding-bottom: calc(10px + var(--safe-bottom));
+  background: rgba(10, 10, 26, 0.98);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  animation: fadeInUp 0.2s ease;
 }
-
-.selection-info {
+.select-bar-info {
   font-size: 14px;
-  color: var(--text-primary);
   font-weight: 600;
-}
-
-.selection-info span {
-  color: var(--primary);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-/* Выбранное сообщение */
-.message.selected {
-  background: rgba(108, 92, 231, 0.15) !important;
-  border-left: 4px solid var(--primary) !important;
-}
-
-.message.selected::before {
-  content: '✓';
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 22px;
-  color: var(--primary);
-  font-weight: bold;
-  z-index: 10;
-}
-
-/* Кнопки в панели */
-.selection-toolbar .btn {
-  padding: 8px 16px;
-  font-size: 13px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  font-weight: 500;
-}
-
-.selection-toolbar .btn-danger {
-  background: #ff4757;
-  color: white;
-}
-
-.selection-toolbar .btn-danger:hover {
-  background: #e84045;
-}
-
-.selection-toolbar .btn-primary {
-  background: var(--primary);
-  color: white;
-}
-
-.selection-toolbar .btn-primary:hover {
-  background: #5b4bc4;
-}
-
-.selection-toolbar .btn-ghost {
-  background: transparent;
   color: var(--text-secondary);
-  border: 1px solid var(--border-color);
+}
+.select-bar-actions {
+  display: flex;
+  gap: 8px;
 }
 
-.selection-toolbar .btn-ghost:hover {
-  background: var(--bg-sidebar);
-}
-
-/* Мобильные устройства */
 @media (max-width: 768px) {
-  .selection-toolbar {
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 12px;
+  .select-bar {
+    padding: 8px 12px;
+    padding-bottom: calc(8px + var(--safe-bottom));
   }
-  
-  .selection-toolbar .btn {
+  .select-bar-info {
     font-size: 12px;
-    padding: 6px 12px;
   }
-  
-  .message.selected::before {
-    font-size: 18px;
-    left: 4px;
+  .select-bar-actions {
+    gap: 4px;
   }
-}
-
-/* Темная тема */
-body.dark-theme .selection-toolbar {
-  background: #1a1a2e;
-  border-top-color: #2d2d44;
-}
-
-body.dark-theme .message.selected {
-  background: rgba(108, 92, 231, 0.25) !important;
 }
