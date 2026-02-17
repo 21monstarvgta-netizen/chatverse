@@ -1,32 +1,6 @@
-// ChatApp v3.1 — Fixed: multi-select messages, unpin, posts button
-var app;
+var ADMIN_EMOJI = ['👑', '⚡', '🛡️', '🔱', '💎', '🌟', '🏆', '🎖️', '🔥', '✨', '🦁', '🐉'];
 
-var EMOJI_LIST = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🙈','🙉','🙊','💋','💌','💘','💝','💖','💗','💓','💞','💕','💟','❣️','💔','❤️','🧡','💛','💚','💙','💜','🤎','🖤','🤍','💯','💢','💥','💫','💦','💨','🕳️','💣','💬','👁️‍🗨️','🗨️','🗯️','💭','💤','👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄'];
-
-var ADMIN_EMOJI = ['⚡','🔥','✨','💎','👑','🏆','🌟','💫','🎯','🎪'];
-
-var DICE_TYPES = [
-  { id: 'd4', name: 'D4', sides: 4, emoji: '🎲' },
-  { id: 'd6', name: 'D6', sides: 6, emoji: '🎲' },
-  { id: 'd8', name: 'D8', sides: 8, emoji: '🎲' },
-  { id: 'd10', name: 'D10', sides: 10, emoji: '🎲' },
-  { id: 'd12', name: 'D12', sides: 12, emoji: '🎲' },
-  { id: 'd20', name: 'D20', sides: 20, emoji: '🎲' },
-  { id: 'd100', name: 'D100', sides: 100, emoji: '🎲' }
-];
-
-var SHOPPING_CATEGORIES = {
-  'Фрукты и овощи': ['Яблоки','Бананы','Апельсины','Картофель','Морковь','Помидоры','Огурцы','Лук','Чеснок','Капуста','Перец','Салат','Зелень','Виноград','Клубника'],
-  'Молочные': ['Молоко','Сметана','Творог','Йогурт','Кефир','Масло сливочное','Сыр','Ряженка'],
-  'Мясо и рыба': ['Курица','Говядина','Свинина','Фарш','Сосиски','Колбаса','Рыба','Креветки','Икра'],
-  'Хлеб и выпечка': ['Хлеб белый','Хлеб чёрный','Булочки','Батон','Лаваш','Печенье','Торт'],
-  'Крупы и макароны': ['Гречка','Рис','Овсянка','Макароны','Перловка','Пшено','Манка'],
-  'Напитки': ['Вода','Сок','Газировка','Чай','Кофе','Пиво','Вино'],
-  'Сладости': ['Шоколад','Конфеты','Мороженое','Варенье','Мёд','Зефир'],
-  'Другое': ['Яйца','Соль','Сахар','Мука','Масло растительное','Специи','Соус','Консервы']
-};
-
-function ChatApp() {
+var ChatApp = function() {
   this.currentUser = null;
   this.socket = null;
   this.currentView = 'general';
@@ -40,8 +14,8 @@ function ChatApp() {
   this.roomsCache = {};
   this.editingMessageId = null;
   this.pinnedMessages = {};
-  this.selectedMessages = new Set(); // NEW: for multi-select
-  this.selectionMode = false; // NEW: track if in selection mode
+  this.selectedMessages = new Set();
+  this.selectionMode = false;
   this.init();
 };
 
@@ -147,35 +121,27 @@ ChatApp.prototype.initSocket = function() {
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) el.remove();
     }
-    // Remove from selection if in multi-select
-    if (self.selectedMessages.has(data.messageId)) {
-      self.selectedMessages.delete(data.messageId);
-      self.updateSelectionUI();
-    }
   });
 
   this.socket.on('message:pinned', function(data) {
     var targetView = data.roomId || 'general';
     if (self.currentView === targetView) {
-      // FIXED: Reload pinned messages AND update the message UI
       self.loadPinnedMessages();
-      // Update the pin indicator on the message
+      // Update UI immediately
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) {
         var pinIndicator = el.querySelector('.pin-indicator');
-        if (data.pinned) {
-          if (!pinIndicator) {
-            var header = el.querySelector('.msg-header');
-            if (header) {
-              var pin = document.createElement('span');
-              pin.className = 'pin-indicator';
-              pin.title = 'Закреплено';
-              pin.textContent = '📌';
-              header.insertBefore(pin, header.firstChild);
-            }
+        if (data.pinned && !pinIndicator) {
+          var header = el.querySelector('.msg-header');
+          if (header) {
+            var pin = document.createElement('span');
+            pin.className = 'pin-indicator';
+            pin.title = 'Закреплено';
+            pin.textContent = '📌 ';
+            header.insertBefore(pin, header.firstChild);
           }
-        } else {
-          if (pinIndicator) pinIndicator.remove();
+        } else if (!data.pinned && pinIndicator) {
+          pinIndicator.remove();
         }
       }
     }
@@ -224,16 +190,9 @@ ChatApp.prototype.setupEventListeners = function() {
   });
 
   document.getElementById('nav-general').addEventListener('click', function() { self.switchView('general'); });
-  document.getElementById('btn-profile').addEventListener('click', function(e) { 
-    e.stopPropagation(); // FIXED: prevent event bubbling
-    window.location.href = '/profile.html'; 
-  });
-  document.getElementById('btn-posts').addEventListener('click', function(e) { 
-    e.stopPropagation(); // FIXED: prevent event bubbling that was causing logout
-    window.location.href = '/posts.html'; 
-  });
-  document.getElementById('btn-logout').addEventListener('click', function(e) {
-    e.stopPropagation();
+  document.getElementById('btn-profile').addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault(); window.location.href = '/profile.html'; });
+  document.getElementById('btn-posts').addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault(); window.location.href = '/posts.html'; });
+  document.getElementById('btn-logout').addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault();
     if (self.socket) self.socket.disconnect();
     removeToken();
     window.location.href = '/login.html';
@@ -267,61 +226,53 @@ ChatApp.prototype.setupEventListeners = function() {
     document.getElementById('emoji-picker').classList.toggle('hidden');
     document.getElementById('dice-picker').classList.add('hidden');
   });
+  document.getElementById('image-upload-input').addEventListener('change', function(e) { self.handleImageUpload(e); });
+  document.getElementById('btn-shopping').addEventListener('click', function() { self.openShoppingModal(); });
+  document.getElementById('close-shopping').addEventListener('click', function() { self.closeModal('shopping-modal'); });
+  document.getElementById('cancel-shopping').addEventListener('click', function() { self.closeModal('shopping-modal'); });
+  document.getElementById('confirm-shopping').addEventListener('click', function() { self.sendShoppingList(); });
+  document.getElementById('add-custom-item').addEventListener('click', function() { self.addCustomShoppingItem(); });
+  document.getElementById('custom-item-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); self.addCustomShoppingItem(); }
+  });
   document.getElementById('btn-dice').addEventListener('click', function(e) {
     e.stopPropagation();
     document.getElementById('dice-picker').classList.toggle('hidden');
     document.getElementById('emoji-picker').classList.add('hidden');
   });
-  document.getElementById('btn-shopping').addEventListener('click', function() { self.openShoppingModal(); });
-  document.getElementById('image-input').addEventListener('change', function(e) { self.handleImageUpload(e); });
-  document.getElementById('btn-image').addEventListener('click', function() { document.getElementById('image-input').click(); });
-
-  document.getElementById('close-shopping').addEventListener('click', function() { self.closeModal('shopping-modal'); });
-  document.getElementById('cancel-shopping').addEventListener('click', function() { self.closeModal('shopping-modal'); });
-  document.getElementById('confirm-shopping').addEventListener('click', function() { self.sendShoppingList(); });
-  document.getElementById('add-custom-item-btn').addEventListener('click', function() { self.addCustomItem(); });
-  document.getElementById('custom-item-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); self.addCustomItem(); }
-  });
-
   document.getElementById('close-forward').addEventListener('click', function() { self.closeModal('forward-modal'); });
-  document.getElementById('cancel-forward').addEventListener('click', function() { self.closeModal('forward-modal'); });
-  document.getElementById('close-image-fullscreen').addEventListener('click', function() { self.closeModal('image-fullscreen'); });
-  document.getElementById('cancel-edit').addEventListener('click', function() { self.cancelEdit(); });
-
-  document.getElementById('search-input').addEventListener('input', debounce(function(e) {
-    self.searchMessages(e.target.value);
-  }, 300));
 
   document.addEventListener('click', function(e) {
-    if (!e.target.closest('#emoji-picker') && !e.target.closest('#btn-emoji')) {
-      document.getElementById('emoji-picker').classList.add('hidden');
-    }
-    if (!e.target.closest('#dice-picker') && !e.target.closest('#btn-dice')) {
-      document.getElementById('dice-picker').classList.add('hidden');
-    }
-    if (!e.target.closest('#msg-context-menu')) {
-      document.getElementById('msg-context-menu').classList.add('hidden');
-    }
+    var emoji = document.getElementById('emoji-picker');
+    var dice = document.getElementById('dice-picker');
+    var popup = document.getElementById('user-popup');
+    var ctx = document.getElementById('msg-context-menu');
+    if (!emoji.contains(e.target) && e.target.id !== 'btn-emoji') emoji.classList.add('hidden');
+    if (!dice.contains(e.target) && e.target.id !== 'btn-dice') dice.classList.add('hidden');
+    if (!popup.classList.contains('hidden') && !popup.contains(e.target) && !e.target.classList.contains('msg-username')) popup.classList.add('hidden');
+    if (!ctx.classList.contains('hidden') && !ctx.contains(e.target)) ctx.classList.add('hidden');
   });
 
-  // NEW: Multi-select button
-  var multiSelectBtn = document.createElement('button');
-  multiSelectBtn.id = 'btn-multi-select';
-  multiSelectBtn.className = 'toolbar-btn';
-  multiSelectBtn.title = 'Выбрать несколько';
-  multiSelectBtn.textContent = '☑️';
-  multiSelectBtn.addEventListener('click', function() { self.toggleSelectionMode(); });
-  document.querySelector('.chat-toolbar').appendChild(multiSelectBtn);
+  document.querySelectorAll('.modal-overlay').forEach(function(o) {
+    o.addEventListener('click', function(e) { if (e.target === o) o.classList.add('hidden'); });
+  });
 
-  // Long press for mobile
-  var longPressTimer;
+  // Long press for mobile context menu
+  var longPressTimer = null;
   document.getElementById('messages-container').addEventListener('touchstart', function(e) {
-    var msgEl = e.target.closest('.message');
-    if (!msgEl || msgEl.classList.contains('system-message')) return;
+    var msgEl = e.target.closest('.message[data-msg-id]');
+    if (!msgEl) return;
     longPressTimer = setTimeout(function() {
       var msgId = msgEl.dataset.msgId;
-      if (msgId) self.showContextMenu(e, msgId);
+      if (msgId) {
+        var touch = e.changedTouches[0];
+        self.showContextMenu({
+          preventDefault: function() {},
+          stopPropagation: function() {},
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        }, msgId);
+      }
     }, 500);
   });
   document.getElementById('messages-container').addEventListener('touchend', function() {
@@ -330,139 +281,6 @@ ChatApp.prototype.setupEventListeners = function() {
   document.getElementById('messages-container').addEventListener('touchmove', function() {
     clearTimeout(longPressTimer);
   });
-};
-
-// NEW: Multi-select mode
-ChatApp.prototype.toggleSelectionMode = function() {
-  this.selectionMode = !this.selectionMode;
-  var btn = document.getElementById('btn-multi-select');
-  
-  if (this.selectionMode) {
-    btn.classList.add('active');
-    btn.textContent = '✖️';
-    btn.title = 'Отменить выбор';
-    this.showSelectionToolbar();
-  } else {
-    btn.classList.remove('active');
-    btn.textContent = '☑️';
-    btn.title = 'Выбрать несколько';
-    this.selectedMessages.clear();
-    this.hideSelectionToolbar();
-    this.updateSelectionUI();
-  }
-};
-
-ChatApp.prototype.showSelectionToolbar = function() {
-  var existing = document.getElementById('selection-toolbar');
-  if (existing) return;
-  
-  var toolbar = document.createElement('div');
-  toolbar.id = 'selection-toolbar';
-  toolbar.className = 'selection-toolbar';
-  toolbar.innerHTML = '<div class="selection-count"><span id="selection-count">0</span> выбрано</div>' +
-    '<button class="btn btn-danger btn-sm" onclick="app.deleteSelectedMessages()">🗑️ Удалить</button>' +
-    '<button class="btn btn-primary btn-sm" onclick="app.forwardSelectedMessages()">↗️ Переслать</button>';
-  document.querySelector('.chat-main').insertBefore(toolbar, document.querySelector('.chat-input'));
-};
-
-ChatApp.prototype.hideSelectionToolbar = function() {
-  var toolbar = document.getElementById('selection-toolbar');
-  if (toolbar) toolbar.remove();
-};
-
-ChatApp.prototype.toggleMessageSelection = function(messageId, event) {
-  if (event) event.stopPropagation();
-  
-  if (!this.selectionMode) {
-    // If not in selection mode, show context menu instead
-    if (event) this.showContextMenu(event, messageId);
-    return;
-  }
-  
-  if (this.selectedMessages.has(messageId)) {
-    this.selectedMessages.delete(messageId);
-  } else {
-    this.selectedMessages.add(messageId);
-  }
-  
-  this.updateSelectionUI();
-};
-
-ChatApp.prototype.updateSelectionUI = function() {
-  var self = this;
-  document.querySelectorAll('.message').forEach(function(el) {
-    var msgId = el.dataset.msgId;
-    if (!msgId || el.classList.contains('system-message')) return;
-    
-    if (self.selectionMode) {
-      el.classList.add('selectable');
-      if (self.selectedMessages.has(msgId)) {
-        el.classList.add('selected');
-      } else {
-        el.classList.remove('selected');
-      }
-    } else {
-      el.classList.remove('selectable', 'selected');
-    }
-  });
-  
-  var countEl = document.getElementById('selection-count');
-  if (countEl) countEl.textContent = this.selectedMessages.size;
-};
-
-ChatApp.prototype.deleteSelectedMessages = async function() {
-  if (this.selectedMessages.size === 0) return;
-  if (!confirm('Удалить выбранные сообщения (' + this.selectedMessages.size + ')?')) return;
-  
-  try {
-    var promises = Array.from(this.selectedMessages).map(function(msgId) {
-      return apiRequest('/messages/delete/' + msgId, { method: 'DELETE' });
-    });
-    await Promise.all(promises);
-    showToast('Сообщения удалены', 'success');
-    this.toggleSelectionMode();
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-};
-
-ChatApp.prototype.forwardSelectedMessages = function() {
-  if (this.selectedMessages.size === 0) return;
-  if (this.selectedMessages.size > 10) {
-    showToast('Можно переслать максимум 10 сообщений', 'error');
-    return;
-  }
-  
-  this.forwardMessageIds = Array.from(this.selectedMessages);
-  this.openForwardModalMultiple();
-};
-
-ChatApp.prototype.openForwardModalMultiple = function() {
-  var self = this;
-  var html = '<div class="forward-target" onclick="app.forwardMultipleTo(null)"><span>🌍</span> Общий чат</div>';
-  Object.keys(this.roomsCache).forEach(function(rid) {
-    var r = self.roomsCache[rid];
-    html += '<div class="forward-target" onclick="app.forwardMultipleTo(\'' + rid + '\')"><span style="color:' + (r.color || '#6c5ce7') + '">●</span> ' + escapeHTML(r.name) + '</div>';
-  });
-  document.getElementById('forward-targets').innerHTML = html;
-  document.getElementById('forward-modal').classList.remove('hidden');
-};
-
-ChatApp.prototype.forwardMultipleTo = async function(targetRoomId) {
-  try {
-    var promises = this.forwardMessageIds.map(function(msgId) {
-      return apiRequest('/messages/forward/' + msgId, { 
-        method: 'POST', 
-        body: JSON.stringify({ targetRoomId: targetRoomId }) 
-      });
-    });
-    await Promise.all(promises);
-    showToast('Сообщения пересланы!', 'success');
-    this.closeModal('forward-modal');
-    this.toggleSelectionMode();
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
 };
 
 // Emoji
@@ -559,55 +377,50 @@ ChatApp.prototype.toggleShoppingProduct = function(el, name, category) {
   else { this.selectedShoppingItems.push({ name: name, category: category }); el.classList.add('selected'); }
   this.renderSelectedItems();
 };
-ChatApp.prototype.addCustomItem = function() {
+ChatApp.prototype.addCustomShoppingItem = function() {
   var input = document.getElementById('custom-item-input');
-  var val = input.value.trim();
-  if (!val) return;
-  if (this.selectedShoppingItems.some(function(i) { return i.name === val; })) {
-    showToast('Уже добавлено', 'error');
-    return;
+  var name = input.value.trim();
+  if (!name) return;
+  if (!this.selectedShoppingItems.find(function(i) { return i.name === name; })) {
+    this.selectedShoppingItems.push({ name: name, category: 'Другое' });
+    this.renderSelectedItems();
   }
-  this.selectedShoppingItems.push({ name: val, category: 'Другое' });
-  this.renderSelectedItems();
   input.value = '';
 };
 ChatApp.prototype.renderSelectedItems = function() {
+  var preview = document.getElementById('selected-items-preview');
   var self = this;
-  var container = document.getElementById('selected-items-preview');
   if (this.selectedShoppingItems.length === 0) {
-    container.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;">Выберите товары</div>';
+    preview.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">Товары не выбраны</span>';
     return;
   }
-  container.innerHTML = this.selectedShoppingItems.map(function(item, idx) {
-    return '<div class="selected-item-tag">' + escapeHTML(item.name) + ' <span onclick="app.removeSelectedItem(' + idx + ')">✕</span></div>';
+  preview.innerHTML = this.selectedShoppingItems.map(function(item, i) {
+    return '<div class="selected-item-chip">' + escapeHTML(item.name) + '<span class="remove-chip" data-idx="' + i + '">✕</span></div>';
   }).join('');
+  preview.querySelectorAll('.remove-chip').forEach(function(el) {
+    el.addEventListener('click', function() { self.removeShoppingItem(parseInt(el.dataset.idx)); });
+  });
 };
-ChatApp.prototype.removeSelectedItem = function(idx) {
-  var item = this.selectedShoppingItems[idx];
-  this.selectedShoppingItems.splice(idx, 1);
-  var tag = document.querySelector('.shopping-product-tag[data-item="' + item.name + '"]');
-  if (tag) tag.classList.remove('selected');
+ChatApp.prototype.removeShoppingItem = function(index) {
+  var item = this.selectedShoppingItems[index];
+  this.selectedShoppingItems.splice(index, 1);
+  document.querySelectorAll('.shopping-product-tag').forEach(function(t) {
+    if (t.textContent === item.name) t.classList.remove('selected');
+  });
   this.renderSelectedItems();
 };
 ChatApp.prototype.sendShoppingList = function() {
-  var title = document.getElementById('shopping-title-input').value.trim() || 'Список покупок';
-  if (this.selectedShoppingItems.length === 0) {
-    showToast('Добавьте товары', 'error');
-    return;
-  }
+  if (this.selectedShoppingItems.length === 0) { showToast('Добавьте товары', 'error'); return; }
   this.socket.emit('shopping:create', {
-    title: title,
+    title: document.getElementById('shopping-title-input').value.trim() || 'Список покупок',
     items: this.selectedShoppingItems,
     roomId: this.currentView === 'general' ? null : this.currentView
   });
   this.closeModal('shopping-modal');
-  showToast('Список отправлен!', 'success');
 };
-
 ChatApp.prototype.toggleShoppingItem = async function(messageId, itemId) {
-  try {
-    await apiRequest('/messages/shopping/' + messageId + '/toggle/' + itemId, { method: 'POST' });
-  } catch (e) { console.error(e); }
+  try { await apiRequest('/messages/shopping/' + messageId + '/toggle/' + itemId, { method: 'POST' }); }
+  catch (e) { showToast('Ошибка', 'error'); }
 };
 
 // Messages
@@ -641,14 +454,9 @@ ChatApp.prototype.loadPinnedMessages = async function() {
       document.getElementById('pinned-text').textContent = '📌 ' + text + (data.messages.length > 1 ? ' (+' + (data.messages.length - 1) + ')' : '');
       bar.classList.remove('hidden');
     } else {
-      this.pinnedMessages[this.currentView] = [];
       bar.classList.add('hidden');
     }
-  } catch (e) {
-    // If error, assume no pinned messages
-    this.pinnedMessages[this.currentView] = [];
-    document.getElementById('pinned-bar').classList.add('hidden');
-  }
+  } catch (e) {}
 };
 
 ChatApp.prototype.scrollToPinnedMessage = function() {
@@ -671,7 +479,6 @@ ChatApp.prototype.renderMessages = function(messages) {
   }
   container.innerHTML = messages.map(function(msg) { return self.createMessageHTML(msg); }).join('');
   this.scrollToBottom();
-  this.updateSelectionUI(); // Update selection state after render
 };
 
 ChatApp.prototype.appendMessage = function(msg) {
@@ -716,78 +523,64 @@ ChatApp.prototype.createMessageHTML = function(msg) {
 
   var menuBtn = '<button class="msg-menu-btn" onclick="event.stopPropagation();app.showContextMenu(event,\'' + msg._id + '\')" title="Меню">⋮</button>';
 
-  // NEW: Add onclick for selection mode
-  var msgOnClick = 'app.toggleMessageSelection(\'' + msg._id + '\', event)';
-
-  return '<div class="message' + (isOwn ? ' own-message' : '') + adminMsgClass + '" data-msg-id="' + msg._id + '" onclick="' + msgOnClick + '" oncontextmenu="app.showContextMenu(event,\'' + msg._id + '\')">' +
+  return '<div class="message' + (isOwn ? ' own-message' : '') + adminMsgClass + '" data-msg-id="' + msg._id + '" oncontextmenu="app.showContextMenu(event,\'' + msg._id + '\')">' +
     '<div class="msg-avatar">' + avatar + '</div>' +
-    '<div class="msg-content">' +
-    '<div class="msg-header">' + pinnedIcon + '<span class="msg-sender" style="' + nameStyle + '">' + escapeHTML(dn) + adminBadge + '</span><span class="msg-time">' + formatTime(msg.createdAt) + '</span>' + menuBtn + '</div>' +
-    '<div class="msg-body">' + bodyContent + '</div>' +
-    '</div></div>';
+    '<div class="msg-content"><div class="msg-header">' + pinnedIcon +
+    '<span class="msg-username" style="' + nameStyle + '" onclick="app.showUserPopup(event,\'' + msg.sender._id + '\')">' + escapeHTML(dn) + '</span>' + adminBadge +
+    '<span class="msg-time">' + formatTime(msg.createdAt) + '</span>' +
+    menuBtn +
+    '</div><div class="msg-body">' + bodyContent + '</div></div></div>';
 };
 
+// Context menu
 ChatApp.prototype.showContextMenu = function(event, messageId) {
   event.preventDefault();
-  event.stopPropagation();
-  
-  // If in selection mode, just toggle selection
+  // Right-click enters selection mode
+  if ((event.button === 2 || event.which === 3) && !this.selectionMode) {
+    this.toggleSelectionMode();
+  }
   if (this.selectionMode) {
-    this.toggleMessageSelection(messageId, event);
+    this.toggleMessageSelection(messageId);
     return;
   }
-
-  var messages = this.messagesCache[this.currentView];
-  var msg = messages ? messages.find(function(m) { return m._id === messageId; }) : null;
+  event.stopPropagation();
+  var menu = document.getElementById('msg-context-menu');
+  var msg = null;
+  var cache = this.messagesCache[this.currentView] || [];
+  for (var i = 0; i < cache.length; i++) {
+    if (cache[i]._id === messageId) { msg = cache[i]; break; }
+  }
   if (!msg) return;
 
-  var menu = document.getElementById('msg-context-menu');
-  var menuContent = document.getElementById('msg-context-actions');
   var isOwn = msg.sender._id === this.currentUser._id;
-  var isAdminUser = isAdmin(this.currentUser);
+  var amAdmin = isAdmin(this.currentUser);
+  var canEdit = (isOwn || amAdmin) && (msg.type === 'text' || msg.type === 'image');
+  var canDelete = isOwn || amAdmin;
+  var canPin = amAdmin || (this.currentView !== 'general' && this.roomsCache[this.currentView] && this.roomsCache[this.currentView].owner._id === this.currentUser._id);
 
   var html = '';
-  if (isOwn || isAdminUser) {
-    if (msg.type === 'text' && isOwn) {
-      html += '<div class="context-item" onclick="app.editMessage(\'' + messageId + '\')">✏️ Редактировать</div>';
-    }
-    html += '<div class="context-item" onclick="app.deleteMessage(\'' + messageId + '\')">🗑️ Удалить</div>';
-  }
-  if (isAdminUser) {
-    // FIXED: Show correct text based on current pin state
-    var pinText = msg.pinned ? '📌 Открепить' : '📌 Закрепить';
-    html += '<div class="context-item" onclick="app.togglePin(\'' + messageId + '\')">' + pinText + '</div>';
-  }
-  if (msg.type !== 'system') {
-    html += '<div class="context-item" onclick="app.openForwardModal(\'' + messageId + '\')">↗️ Переслать</div>';
-  }
+  if (canEdit) html += '<div class="ctx-item" onclick="app.startEdit(\'' + messageId + '\')">✏️ Редактировать</div>';
+  html += '<div class="ctx-item" onclick="app.openForwardModal(\'' + messageId + '\')">↗️ Переслать</div>';
+  if (canPin) html += '<div class="ctx-item" onclick="app.togglePin(\'' + messageId + '\')">' + (msg.pinned ? '📌 Открепить' : '📌 Закрепить') + '</div>';
+  if (canDelete) html += '<div class="ctx-item ctx-danger" onclick="app.deleteMessage(\'' + messageId + '\')">🗑 Удалить</div>';
 
   if (!html) return;
-  menuContent.innerHTML = html;
-
-  var x = event.clientX || (event.touches && event.touches[0].clientX) || 0;
-  var y = event.clientY || (event.touches && event.touches[0].clientY) || 0;
-  menu.style.left = x + 'px';
-  menu.style.top = y + 'px';
+  menu.innerHTML = html;
+  menu.style.left = Math.min(event.clientX, window.innerWidth - 200) + 'px';
+  menu.style.top = Math.min(event.clientY, window.innerHeight - 200) + 'px';
   menu.classList.remove('hidden');
-
-  setTimeout(function() {
-    var rect = menu.getBoundingClientRect();
-    if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 10) + 'px';
-    if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 10) + 'px';
-  }, 0);
 };
 
 // Edit
-ChatApp.prototype.editMessage = function(messageId) {
-  var messages = this.messagesCache[this.currentView];
-  var msg = messages ? messages.find(function(m) { return m._id === messageId; }) : null;
-  if (!msg || msg.type !== 'text') return;
+ChatApp.prototype.startEdit = function(messageId) {
+  var cache = this.messagesCache[this.currentView] || [];
+  var msg = cache.find(function(m) { return m._id === messageId; });
+  if (!msg) return;
   this.editingMessageId = messageId;
-  document.getElementById('message-input').value = msg.content;
+  document.getElementById('message-input').value = msg.content || '';
   document.getElementById('edit-bar').classList.remove('hidden');
-  document.getElementById('msg-context-menu').classList.add('hidden');
   document.getElementById('message-input').focus();
+  document.getElementById('msg-context-menu').classList.add('hidden');
 };
 ChatApp.prototype.cancelEdit = function() {
   this.editingMessageId = null;
@@ -809,7 +602,6 @@ ChatApp.prototype.togglePin = async function(messageId) {
   try {
     var result = await apiRequest('/messages/pin/' + messageId, { method: 'POST' });
     document.getElementById('msg-context-menu').classList.add('hidden');
-    // FIXED: Show appropriate toast message
     if (result.message && result.message.pinned) {
       showToast('Закреплено', 'success');
     } else {
@@ -924,12 +716,6 @@ ChatApp.prototype.switchView = async function(viewId) {
   delete this.unreadCounts[viewId];
   this.updateUnreadBadges();
   saveCurrentView(viewId);
-  
-  // Exit selection mode when switching views
-  if (this.selectionMode) {
-    this.toggleSelectionMode();
-  }
-  
   document.querySelectorAll('.nav-item, .room-item').forEach(function(el) { el.classList.remove('active'); });
 
   if (viewId === 'general') {
@@ -954,15 +740,11 @@ ChatApp.prototype.switchView = async function(viewId) {
       document.getElementById('chat-title').textContent = '# ' + room.name;
       this.updateRoomHeaderActions(viewId, room);
     } catch (e) {
-      showToast('Ошибка загрузки комнаты', 'error');
+      showToast('Ошибка', 'error');
       this.switchView('general');
+      return;
     }
   }
-};
-
-// Rest of the file continues with rooms, profile, search, etc...
-// (keeping the rest as is since we only fixed the specific bugs)
-  // Finish switchView - already added above
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebar-overlay').classList.remove('show');
   document.getElementById('message-input').focus();
@@ -1186,42 +968,6 @@ ChatApp.prototype.deleteRoom = async function(rid) {
   } catch (e) { showToast(e.message, 'error'); }
 };
 
-// Search messages
-ChatApp.prototype.searchMessages = async function(query) {
-  if (!query || query.length < 2) {
-    document.getElementById('search-results').innerHTML = '';
-    return;
-  }
-  try {
-    var endpoint = this.currentView === 'general' ? '/messages/search?q=' + encodeURIComponent(query) : '/messages/search/' + this.currentView + '?q=' + encodeURIComponent(query);
-    var data = await apiRequest(endpoint);
-    var container = document.getElementById('search-results');
-    if (data.messages.length === 0) {
-      container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);">Ничего не найдено</div>';
-      return;
-    }
-    var self = this;
-    container.innerHTML = data.messages.map(function(msg) {
-      var senderName = getDisplayName(msg.sender);
-      var preview = msg.content ? msg.content.substring(0, 80) + (msg.content.length > 80 ? '...' : '') : '[Медиа]';
-      return '<div class="search-result-item" onclick="app.jumpToMessage(\'' + msg._id + '\')">' +
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' + createMiniAvatarHTML(msg.sender, 24) +
-        '<strong>' + escapeHTML(senderName) + '</strong><span style="color:var(--text-muted);font-size:11px;">' + formatTime(msg.createdAt) + '</span></div>' +
-        '<div style="font-size:13px;color:var(--text-secondary);">' + escapeHTML(preview) + '</div></div>';
-    }).join('');
-  } catch (e) {}
-};
-ChatApp.prototype.jumpToMessage = function(msgId) {
-  var el = document.querySelector('[data-msg-id="' + msgId + '"]');
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.style.background = 'rgba(108,92,231,0.2)';
-    setTimeout(function() { el.style.background = ''; }, 2000);
-  }
-  document.getElementById('search-results').innerHTML = '';
-  document.getElementById('search-input').value = '';
-};
-
 ChatApp.prototype.renderSidebarProfile = function() {
   var u = this.currentUser;
   var adminBadge = u.role === 'admin' ? ' 👑' : '';
@@ -1235,4 +981,143 @@ ChatApp.prototype.renderSidebarProfile = function() {
 ChatApp.prototype.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
 
 var app;
+
+// Multi-select functionality
+ChatApp.prototype.toggleSelectionMode = function() {
+  this.selectionMode = !this.selectionMode;
+  if (this.selectionMode) {
+    this.selectedMessages.clear();
+    this.showSelectionToolbar();
+    document.body.classList.add('selection-mode');
+  } else {
+    this.selectedMessages.clear();
+    this.hideSelectionToolbar();
+    document.body.classList.remove('selection-mode');
+  }
+  this.updateSelectionUI();
+};
+
+ChatApp.prototype.showSelectionToolbar = function() {
+  var existing = document.getElementById('selection-toolbar');
+  if (existing) return;
+  var toolbar = document.createElement('div');
+  toolbar.id = 'selection-toolbar';
+  toolbar.className = 'selection-toolbar';
+  toolbar.innerHTML = '<div class="selection-info"><span id="selection-count">0</span> выбрано</div>' +
+    '<button class="btn btn-danger btn-sm" onclick="app.deleteSelectedMessages()">🗑️ Удалить</button>' +
+    '<button class="btn btn-primary btn-sm" onclick="app.forwardSelectedMessages()">↗️ Переслать</button>' +
+    '<button class="btn btn-ghost btn-sm" onclick="app.toggleSelectionMode()">✖️ Отмена</button>';
+  document.querySelector('.chat-main').insertBefore(toolbar, document.querySelector('.chat-input'));
+};
+
+ChatApp.prototype.hideSelectionToolbar = function() {
+  var toolbar = document.getElementById('selection-toolbar');
+  if (toolbar) toolbar.remove();
+};
+
+ChatApp.prototype.toggleMessageSelection = function(messageId) {
+  if (this.selectedMessages.has(messageId)) {
+    this.selectedMessages.delete(messageId);
+  } else {
+    var messages = this.messagesCache[this.currentView];
+    var msg = messages ? messages.find(function(m) { return m._id === messageId; }) : null;
+    if (msg) this.selectedMessages.add(messageId);
+  }
+  this.updateSelectionUI();
+};
+
+ChatApp.prototype.updateSelectionUI = function() {
+  var self = this;
+  document.querySelectorAll('.message').forEach(function(el) {
+    var msgId = el.dataset.msgId;
+    if (!msgId || el.classList.contains('system-message')) return;
+    if (self.selectedMessages.has(msgId)) {
+      el.classList.add('selected');
+    } else {
+      el.classList.remove('selected');
+    }
+  });
+  var countEl = document.getElementById('selection-count');
+  if (countEl) countEl.textContent = this.selectedMessages.size;
+};
+
+ChatApp.prototype.deleteSelectedMessages = async function() {
+  if (this.selectedMessages.size === 0) return;
+  var messages = this.messagesCache[this.currentView] || [];
+  var self = this;
+  var toDelete = Array.from(this.selectedMessages).filter(function(msgId) {
+    var msg = messages.find(function(m) { return m._id === msgId; });
+    return msg && msg.sender._id === self.currentUser._id;
+  });
+  if (toDelete.length === 0) {
+    showToast('Можно удалять только свои сообщения', 'error');
+    return;
+  }
+  if (!confirm('Удалить выбранные сообщения (' + toDelete.length + ')?')) return;
+  try {
+    for (var i = 0; i < toDelete.length; i++) {
+      await apiRequest('/messages/delete/' + toDelete[i], { method: 'DELETE' });
+    }
+    showToast('Удалено!', 'success');
+    this.toggleSelectionMode();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+ChatApp.prototype.forwardSelectedMessages = function() {
+  if (this.selectedMessages.size === 0) return;
+  if (this.selectedMessages.size > 10) {
+    showToast('Максимум 10 сообщений', 'error');
+    return;
+  }
+  this.forwardMessageIds = Array.from(this.selectedMessages);
+  this.openForwardModalMultiple();
+};
+
+ChatApp.prototype.openForwardModalMultiple = function() {
+  var self = this;
+  var html = '<div class="forward-target" onclick="app.forwardMultipleTo(null)"><span>🌍</span> Общий чат</div>';
+  Object.keys(this.roomsCache).forEach(function(rid) {
+    var r = self.roomsCache[rid];
+    html += '<div class="forward-target" onclick="app.forwardMultipleTo(\'' + rid + '\'\)"><span style="color:' + (r.color || '#6c5ce7') + '">●</span> ' + escapeHTML(r.name) + '</div>';
+  });
+  document.getElementById('forward-targets').innerHTML = html;
+  document.getElementById('forward-modal').classList.remove('hidden');
+};
+
+ChatApp.prototype.forwardMultipleTo = async function(targetRoomId) {
+  try {
+    for (var i = 0; i < this.forwardMessageIds.length; i++) {
+      await apiRequest('/messages/forward/' + this.forwardMessageIds[i], {
+        method: 'POST',
+        body: JSON.stringify({ targetRoomId: targetRoomId })
+      });
+    }
+    showToast('Переслано!', 'success');
+    this.closeModal('forward-modal');
+    this.toggleSelectionMode();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+
 document.addEventListener('DOMContentLoaded', function() { app = new ChatApp(); });
+
+// Add at end - mobile tap support for messages
+(function() {
+  var lastTap = 0;
+  document.addEventListener('click', function(e) {
+    if (!app || !app.selectionMode) return;
+    var msgEl = e.target.closest('.message');
+    if (msgEl && !msgEl.classList.contains('system-message')) {
+      var msgId = msgEl.dataset.msgId;
+      if (msgId && !e.target.closest('.msg-menu-btn') && !e.target.closest('.context-item')) {
+        e.stopPropagation();
+        e.preventDefault();
+        app.toggleMessageSelection(msgId);
+      }
+    }
+  });
+})();
