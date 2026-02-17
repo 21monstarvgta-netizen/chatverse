@@ -134,18 +134,38 @@ ChatApp.prototype.initSocket = function() {
     }
   });
 
-  this.socket.on('message:pinned', function(data) {
+    this.socket.on('message:pinned', function(data) {
     var targetView = data.roomId || 'general';
     if (self.currentView === targetView) {
+      var msgIdStr = data.messageId.toString();
       if (self.messagesCache[self.currentView]) {
         self.messagesCache[self.currentView] = self.messagesCache[self.currentView].map(function(m) {
-          if (m._id === data.messageId) {
-            m.pinned = data.pinned;
+          if (m._id.toString() === msgIdStr) {
             if (data.message) return data.message;
+            m.pinned = data.pinned;
           }
           return m;
         });
       }
+      var el = document.querySelector('[data-msg-id="' + msgIdStr + '"]');
+      if (el) {
+        var pinInd = el.querySelector('.pin-indicator');
+        if (data.pinned && !pinInd) {
+          var header = el.querySelector('.msg-header');
+          if (header) {
+            var span = document.createElement('span');
+            span.className = 'pin-indicator';
+            span.title = 'Закреплено';
+            span.textContent = '📌';
+            header.insertBefore(span, header.firstChild);
+          }
+        } else if (!data.pinned && pinInd) {
+          pinInd.remove();
+        }
+      }
+      self.loadPinnedMessages();
+    }
+  });
       var el = document.querySelector('[data-msg-id="' + data.messageId + '"]');
       if (el) {
         var pinInd = el.querySelector('.pin-indicator');
@@ -345,8 +365,9 @@ ChatApp.prototype.setupEventListeners = function() {
 // Find message in cache
 ChatApp.prototype.findMessageInCache = function(msgId) {
   var cache = this.messagesCache[this.currentView] || [];
+  var idStr = msgId.toString();
   for (var i = 0; i < cache.length; i++) {
-    if (cache[i]._id === msgId) return cache[i];
+    if (cache[i]._id.toString() === idStr) return cache[i];
   }
   return null;
 };
@@ -807,9 +828,23 @@ ChatApp.prototype.deleteMessage = async function(messageId) {
 // Pin
 ChatApp.prototype.togglePin = async function(messageId) {
   try {
-    await apiRequest('/messages/pin/' + messageId, { method: 'POST' });
+    console.log('Toggle pin for:', messageId);
+    var result = await apiRequest('/messages/pin/' + messageId, { method: 'POST' });
+    console.log('Pin result:', result);
     document.getElementById('msg-context-menu').classList.add('hidden');
-  } catch (e) { showToast(e.message, 'error'); }
+    // Update cache immediately
+    if (this.messagesCache[this.currentView]) {
+      this.messagesCache[this.currentView] = this.messagesCache[this.currentView].map(function(m) {
+        if (m._id === messageId) {
+          return result.message || m;
+        }
+        return m;
+      });
+    }
+  } catch (e) {
+    console.error('Pin error:', e);
+    showToast(e.message, 'error');
+  }
 };
 
 // Forward (single)
