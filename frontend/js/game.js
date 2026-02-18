@@ -432,4 +432,102 @@ Game.prototype.unlockZone = async function() {
 Game.prototype.claimQuest = async function(questId) {
   try {
     var data = await apiRequest('/game/quest/claim/' + questId, { method: 'POST' });
-    
+    this.player = data.player;
+    this.updateRendererState();
+    this.ui.updateResources(this.player);
+    this.ui.renderBuildList(this.config.buildingTypes, this.player.level, this.player.resources);
+    this.ui.renderQuests(this.player.activeQuests);
+
+    var parts = [];
+    for (var r in data.reward) {
+      var icon = { coins: '🪙', food: '🍞', materials: '🪨', crystals: '💎', experience: '✨' }[r] || r;
+      parts.push(icon + '+' + data.reward[r]);
+    }
+    showToast('🎁 Награда: ' + parts.join(' '), 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+Game.prototype.renameCity = async function(name) {
+  try {
+    var data = await apiRequest('/game/rename', {
+      method: 'POST',
+      body: JSON.stringify({ name: name })
+    });
+    this.player.cityName = data.cityName;
+    var el = document.getElementById('city-name');
+    if (el) el.textContent = data.cityName;
+    showToast('Город переименован!', 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+Game.prototype.loadLeaderboard = async function() {
+  try {
+    var data = await apiRequest('/game/leaderboard');
+    this.ui.renderLeaderboard(data.leaderboard);
+  } catch (e) {
+    showToast('Ошибка загрузки', 'error');
+  }
+};
+
+Game.prototype.visitCity = async function(userId) {
+  try {
+    var data = await apiRequest('/game/visit/' + userId);
+    var city = data.city;
+
+    this.visitingUserId = userId;
+    this.renderer.setBuildings(city.buildings || [], this.config.buildingTypes);
+
+    var unlockedTiles = {};
+    var gs = this.config.gridSize;
+    var half = Math.floor(this.config.initialUnlocked / 2);
+    var center = Math.floor(gs / 2);
+    for (var x = center - half; x < center + half; x++) {
+      for (var y = center - half; y < center + half; y++) {
+        unlockedTiles[x + ',' + y] = true;
+      }
+    }
+    var zones = city.unlockedZones || [];
+    for (var i = 0; i < zones.length; i++) {
+      var z = zones[i];
+      for (var zx = z.x1; zx <= z.x2; zx++) {
+        for (var zy = z.y1; zy <= z.y2; zy++) {
+          unlockedTiles[zx + ',' + zy] = true;
+        }
+      }
+    }
+    this.renderer.setUnlockedTiles(unlockedTiles);
+    this.renderer.centerCamera();
+
+    var ownerName = city.owner ? city.owner.username : 'Неизвестный';
+    var bannerText = document.getElementById('visit-banner-text');
+    if (bannerText) bannerText.textContent = '👁 ' + escapeHTML(city.cityName) + ' — ' + escapeHTML(ownerName) + ' (Ур.' + city.level + ')';
+    var banner = document.getElementById('visit-banner');
+    if (banner) banner.classList.remove('hidden');
+
+    document.querySelectorAll('.game-panel').forEach(function(p) { p.classList.add('hidden'); });
+    var bottomBar = document.querySelector('.game-bottom-bar');
+    if (bottomBar) bottomBar.style.display = 'none';
+
+    showToast('Просмотр города: ' + city.cityName, 'info');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+Game.prototype.exitVisitMode = function() {
+  this.visitingUserId = null;
+  this.updateRendererState();
+  this.renderer.centerCamera();
+  var banner = document.getElementById('visit-banner');
+  if (banner) banner.classList.add('hidden');
+  var bottomBar = document.querySelector('.game-bottom-bar');
+  if (bottomBar) bottomBar.style.display = '';
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+  game = new Game();
+});
