@@ -61,31 +61,34 @@ Game.prototype.init = async function() {
 Game.prototype.setupEvents = function() {
   var self = this;
 
-  document.getElementById('game-back-btn').addEventListener('click', function() {
+  var backBtn = document.getElementById('game-back-btn');
+  if (backBtn) backBtn.addEventListener('click', function() {
     window.location.href = '/';
   });
 
-  document.getElementById('game-center-btn').addEventListener('click', function() {
+  var centerBtn = document.getElementById('game-center-btn');
+  if (centerBtn) centerBtn.addEventListener('click', function() {
+    self.renderer.resize();
     self.renderer.centerCamera();
   });
 
-  document.getElementById('city-rename-btn').addEventListener('click', function() {
+  var renameBtn = document.getElementById('city-rename-btn');
+  if (renameBtn) renameBtn.addEventListener('click', function() {
     var name = prompt('Название города:', self.player.cityName);
     if (name !== null && name.trim()) self.renameCity(name.trim());
   });
 
-  document.getElementById('cancel-placing').addEventListener('click', function() {
+  var cancelPlacing = document.getElementById('cancel-placing');
+  if (cancelPlacing) cancelPlacing.addEventListener('click', function() {
     self.cancelPlacing();
   });
 
-  // Bottom tabs
   document.querySelectorAll('.bottom-tab').forEach(function(tab) {
     tab.addEventListener('click', function() {
       self.ui.switchPanel(tab.dataset.tab);
     });
   });
 
-  // Build categories
   document.querySelectorAll('.build-cat-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       document.querySelectorAll('.build-cat-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -95,20 +98,45 @@ Game.prototype.setupEvents = function() {
     });
   });
 
-  // Panel close buttons
-  document.getElementById('close-build-panel').addEventListener('click', function() {
+  var closeBuild = document.getElementById('close-build-panel');
+  if (closeBuild) closeBuild.addEventListener('click', function() {
     document.getElementById('panel-build').classList.add('hidden');
   });
-  document.getElementById('close-quests-panel').addEventListener('click', function() {
+
+  var closeQuests = document.getElementById('close-quests-panel');
+  if (closeQuests) closeQuests.addEventListener('click', function() {
     document.getElementById('panel-quests').classList.add('hidden');
   });
-  document.getElementById('close-social-panel').addEventListener('click', function() {
+
+  var closeSocial = document.getElementById('close-social-panel');
+  if (closeSocial) closeSocial.addEventListener('click', function() {
     document.getElementById('panel-social').classList.add('hidden');
   });
-  document.getElementById('close-building-info').addEventListener('click', function() {
+
+  var closeInfo = document.getElementById('close-building-info');
+  if (closeInfo) closeInfo.addEventListener('click', function() {
     self.ui.hideBuildingInfo();
     self.renderer.selectedTile = null;
   });
+
+  var zoneCancel = document.getElementById('zone-cancel');
+  if (zoneCancel) zoneCancel.addEventListener('click', function() {
+    document.getElementById('zone-unlock-modal').classList.add('hidden');
+  });
+
+  var visitBack = document.getElementById('visit-back');
+  if (visitBack) visitBack.addEventListener('click', function() {
+    self.exitVisitMode();
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      self.cancelPlacing();
+      self.ui.hideBuildingInfo();
+      self.renderer.selectedTile = null;
+    }
+  });
+};
 
   // Zone unlock
   document.getElementById('zone-cancel').addEventListener('click', function() {
