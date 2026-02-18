@@ -313,3 +313,48 @@
   .game-resources-bar { gap: 2px; }
   .res-item { padding: 2px 4px; font-size: 10px; }
 }
+/* Center button */
+.game-center-btn {
+  width: 36px; height: 36px;
+  background: rgba(85, 239, 196, 0.15);
+  border: 1px solid rgba(85, 239, 196, 0.3);
+  border-radius: 10px; font-size: 16px;
+  cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.game-center-btn:hover {
+  background: rgba(85, 239, 196, 0.25);
+  border-color: rgba(85, 239, 196, 0.5);
+}
+.topbar-right {
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* Placing banner */
+.placing-banner {
+  position: absolute;
+  top: calc(90px + var(--safe-top));
+  left: 50%; transform: translateX(-50%);
+  z-index: 35;
+  background: rgba(85, 239, 196, 0.9);
+  color: #0a0a1a; padding: 8px 16px;
+  border-radius: 12px;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  animation: fadeInDown 0.3s ease;
+}
+.placing-banner .btn {
+  color: #0a0a1a; border-color: rgba(0,0,0,0.2);
+}
+
+@media (max-width: 768px) {
+  .game-center-btn { width: 32px; height: 32px; font-size: 14px; }
+  .placing-banner {
+    top: auto; bottom: 70px;
+    font-size: 12px; padding: 6px 12px;
+    width: calc(100% - 24px); max-width: 350px;
+  }
+}

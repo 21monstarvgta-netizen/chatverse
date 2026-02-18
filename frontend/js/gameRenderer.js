@@ -1,5 +1,3 @@
-// Canvas-based game renderer with touch support
-
 var GameRenderer = function(canvas, viewport) {
   this.canvas = canvas;
   this.ctx = canvas.getContext('2d');
@@ -15,40 +13,58 @@ var GameRenderer = function(canvas, viewport) {
   this.buildings = [];
   this.unlockedTiles = {};
   this.selectedTile = null;
-  this.hoverTile = null;
   this.placingBuilding = null;
+  this.hoverTile = null;
 
   this.isDragging = false;
+  this.wasDragging = false;
   this.dragStart = { x: 0, y: 0 };
   this.cameraStart = { x: 0, y: 0 };
 
-  // Touch
-  this.touches = {};
-  this.pinchStartDist = 0;
-  this.pinchStartZoom = 1;
+  // Touch pinch
+  this.lastTouchDist = 0;
+  this.lastTouchMid = { x: 0, y: 0 };
+  this.activeTouches = 0;
 
-  // Colors
+  // Colors — pre-generate once, never change
   this.grassColors = ['#2d5a27', '#2a5424', '#305e2a', '#28502a', '#336630'];
   this.lockedColor = '#1a1a2e';
   this.gridLineColor = 'rgba(85, 239, 196, 0.08)';
   this.selectedColor = 'rgba(85, 239, 196, 0.4)';
-  this.hoverColor = 'rgba(85, 239, 196, 0.2)';
-  this.unlockedBorderColor = 'rgba(85, 239, 196, 0.3)';
 
-  // Pre-generate grass pattern
-  this.grassPattern = {};
+  // Pre-generate grass pattern ONCE
+  this.grassMap = {};
+  this.grassDetailMap = {};
   for (var gx = 0; gx < this.gridSize; gx++) {
     for (var gy = 0; gy < this.gridSize; gy++) {
-      this.grassPattern[gx + ',' + gy] = this.grassColors[Math.floor(Math.random() * this.grassColors.length)];
+      var key = gx + ',' + gy;
+      this.grassMap[key] = this.grassColors[(gx * 7 + gy * 13 + gx * gy) % this.grassColors.length];
+      // Fixed grass detail positions
+      var hash = (gx * 31 + gy * 17) % 100;
+      if (hash < 8) {
+        this.grassDetailMap[key] = {
+          dx: 10 + (hash * 5) % 40,
+          dy: 15 + (hash * 3) % 35
+        };
+      }
     }
   }
 
-  this.buildingTypeConfig = {};
   this.readyBuildings = {};
+  this.buildingTypeConfig = {};
+  this.onTileClickCallback = null;
 
   this.resize();
   this.setupEvents();
   this.centerCamera();
+
+  // Start render loop
+  var self = this;
+  this._renderLoop = function() {
+    self.render();
+    self._rafId = requestAnimationFrame(self._renderLoop);
+  };
+  this._rafId = requestAnimationFrame(this._renderLoop);
 };
 
 GameRenderer.prototype.resize = function() {
@@ -72,45 +88,50 @@ GameRenderer.prototype.centerCamera = function() {
 GameRenderer.prototype.setupEvents = function() {
   var self = this;
 
-  // Mouse
-  this.viewport.addEventListener('mousedown', function(e) { self.onPointerDown(e.clientX, e.clientY, e); });
-  window.addEventListener('mousemove', function(e) { self.onPointerMove(e.clientX, e.clientY); });
-  window.addEventListener('mouseup', function() { self.onPointerUp(); });
-  this.viewport.addEventListener('wheel', function(e) {
-    e.preventDefault();
-    var delta = e.deltaY > 0 ? 0.9 : 1.1;
-    self.zoomAt(e.clientX, e.clientY, delta);
-  }, { passive: false });
-
-  // Touch
-  this.viewport.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      self.onPointerDown(e.touches[0].clientX, e.touches[0].clientY, e);
-    } else if (e.touches.length === 2) {
-      self.pinchStartDist = self.getTouchDist(e.touches);
-      self.pinchStartZoom = self.zoom;
-    }
-  }, { passive: false });
-
-  this.viewport.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      self.onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
-    } else if (e.touches.length === 2) {
-      var dist = self.getTouchDist(e.touches);
-      var scale = dist / self.pinchStartDist;
-      var midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      var midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      self.zoom = Math.max(self.minZoom, Math.min(self.maxZoom, self.pinchStartZoom * scale));
-    }
-  }, { passive: false });
-
-  this.viewport.addEventListener('touchend', function(e) {
-    self.onPointerUp();
+  // === MOUSE ===
+  this.viewport.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    self.isDragging = true;
+    self.wasDragging = false;
+    self.dragStart = { x: e.clientX, y: e.clientY };
+    self.cameraStart = { x: self.camera.x, y: self.camera.y };
   });
 
-  // Click
+  window.addEventListener('mousemove', function(e) {
+    if (!self.isDragging) return;
+    var dx = e.clientX - self.dragStart.x;
+    var dy = e.clientY - self.dragStart.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) self.wasDragging = true;
+    self.camera.x = self.cameraStart.x - dx / self.zoom;
+    self.camera.y = self.cameraStart.y - dy / self.zoom;
+  });
+
+  window.addEventListener('mouseup', function() {
+    self.isDragging = false;
+  });
+
+  // Mouse hover for placing preview
+  this.viewport.addEventListener('mousemove', function(e) {
+    if (!self.placingBuilding) return;
+    var rect = self.viewport.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    var worldX = mx / self.zoom + self.camera.x;
+    var worldY = my / self.zoom + self.camera.y;
+    self.hoverTile = {
+      x: Math.floor(worldX / self.tileSize),
+      y: Math.floor(worldY / self.tileSize)
+    };
+  });
+
+  // Mouse wheel zoom
+  this.viewport.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    var factor = e.deltaY > 0 ? 0.9 : 1.1;
+    self.zoomAt(e.clientX, e.clientY, factor);
+  }, { passive: false });
+
+  // Click (only if not dragging)
   this.viewport.addEventListener('click', function(e) {
     if (self.wasDragging) return;
     var rect = self.viewport.getBoundingClientRect();
@@ -121,37 +142,116 @@ GameRenderer.prototype.setupEvents = function() {
     var tileX = Math.floor(worldX / self.tileSize);
     var tileY = Math.floor(worldY / self.tileSize);
     if (tileX >= 0 && tileX < self.gridSize && tileY >= 0 && tileY < self.gridSize) {
-      self.onTileClick(tileX, tileY);
+      if (self.onTileClickCallback) self.onTileClickCallback(tileX, tileY);
     }
   });
 
+  // === TOUCH ===
+  this.viewport.addEventListener('touchstart', function(e) {
+    var touches = e.touches;
+    self.activeTouches = touches.length;
+
+    if (touches.length === 1) {
+      self.isDragging = true;
+      self.wasDragging = false;
+      self.dragStart = { x: touches[0].clientX, y: touches[0].clientY };
+      self.cameraStart = { x: self.camera.x, y: self.camera.y };
+    } else if (touches.length === 2) {
+      // Start pinch
+      self.isDragging = false;
+      self.lastTouchDist = self.getTouchDist(touches[0], touches[1]);
+      self.lastTouchMid = self.getTouchMid(touches[0], touches[1]);
+      self.cameraStart = { x: self.camera.x, y: self.camera.y };
+    }
+  }, { passive: true });
+
+  this.viewport.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    var touches = e.touches;
+
+    if (touches.length === 1 && self.activeTouches === 1) {
+      // Pan
+      var dx = touches[0].clientX - self.dragStart.x;
+      var dy = touches[0].clientY - self.dragStart.y;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) self.wasDragging = true;
+      self.camera.x = self.cameraStart.x - dx / self.zoom;
+      self.camera.y = self.cameraStart.y - dy / self.zoom;
+    } else if (touches.length === 2) {
+      // Pinch zoom
+      self.wasDragging = true;
+      var dist = self.getTouchDist(touches[0], touches[1]);
+      var mid = self.getTouchMid(touches[0], touches[1]);
+
+      if (self.lastTouchDist > 0) {
+        var scale = dist / self.lastTouchDist;
+        var newZoom = Math.max(self.minZoom, Math.min(self.maxZoom, self.zoom * scale));
+
+        // Zoom towards midpoint
+        var rect = self.viewport.getBoundingClientRect();
+        var mx = mid.x - rect.left;
+        var my = mid.y - rect.top;
+        var worldX = mx / self.zoom + self.camera.x;
+        var worldY = my / self.zoom + self.camera.y;
+
+        self.zoom = newZoom;
+        self.camera.x = worldX - mx / self.zoom;
+        self.camera.y = worldY - my / self.zoom;
+      }
+
+      self.lastTouchDist = dist;
+      self.lastTouchMid = mid;
+    }
+  }, { passive: false });
+
+  this.viewport.addEventListener('touchend', function(e) {
+    var wasDrag = self.wasDragging;
+    var touchCount = self.activeTouches;
+
+    if (e.touches.length === 0) {
+      self.isDragging = false;
+      self.activeTouches = 0;
+      self.lastTouchDist = 0;
+
+      // Tap detection — only if it was a single finger and not a drag
+      if (!wasDrag && touchCount === 1 && e.changedTouches.length === 1) {
+        var touch = e.changedTouches[0];
+        var rect = self.viewport.getBoundingClientRect();
+        var mx = touch.clientX - rect.left;
+        var my = touch.clientY - rect.top;
+        var worldX = mx / self.zoom + self.camera.x;
+        var worldY = my / self.zoom + self.camera.y;
+        var tileX = Math.floor(worldX / self.tileSize);
+        var tileY = Math.floor(worldY / self.tileSize);
+        if (tileX >= 0 && tileX < self.gridSize && tileY >= 0 && tileY < self.gridSize) {
+          if (self.onTileClickCallback) self.onTileClickCallback(tileX, tileY);
+        }
+      }
+    } else {
+      self.activeTouches = e.touches.length;
+      if (e.touches.length === 1) {
+        // Went from 2 fingers to 1 — restart drag
+        self.isDragging = true;
+        self.dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        self.cameraStart = { x: self.camera.x, y: self.camera.y };
+      }
+    }
+  }, { passive: true });
+
+  // Resize
   window.addEventListener('resize', function() { self.resize(); });
 };
 
-GameRenderer.prototype.getTouchDist = function(touches) {
-  var dx = touches[0].clientX - touches[1].clientX;
-  var dy = touches[0].clientY - touches[1].clientY;
+GameRenderer.prototype.getTouchDist = function(t1, t2) {
+  var dx = t1.clientX - t2.clientX;
+  var dy = t1.clientY - t2.clientY;
   return Math.sqrt(dx * dx + dy * dy);
 };
 
-GameRenderer.prototype.onPointerDown = function(x, y, e) {
-  this.isDragging = true;
-  this.wasDragging = false;
-  this.dragStart = { x: x, y: y };
-  this.cameraStart = { x: this.camera.x, y: this.camera.y };
-};
-
-GameRenderer.prototype.onPointerMove = function(x, y) {
-  if (!this.isDragging) return;
-  var dx = x - this.dragStart.x;
-  var dy = y - this.dragStart.y;
-  if (Math.abs(dx) > 5 || Math.abs(dy) > 5) this.wasDragging = true;
-  this.camera.x = this.cameraStart.x - dx / this.zoom;
-  this.camera.y = this.cameraStart.y - dy / this.zoom;
-};
-
-GameRenderer.prototype.onPointerUp = function() {
-  this.isDragging = false;
+GameRenderer.prototype.getTouchMid = function(t1, t2) {
+  return {
+    x: (t1.clientX + t2.clientX) / 2,
+    y: (t1.clientY + t2.clientY) / 2
+  };
 };
 
 GameRenderer.prototype.zoomAt = function(screenX, screenY, factor) {
@@ -165,19 +265,13 @@ GameRenderer.prototype.zoomAt = function(screenX, screenY, factor) {
   this.camera.y = worldY - my / this.zoom;
 };
 
-GameRenderer.prototype.onTileClick = function(x, y) {
-  if (this.onTileClickCallback) {
-    this.onTileClickCallback(x, y);
-  }
-};
-
 GameRenderer.prototype.setBuildings = function(buildings, config) {
   this.buildings = buildings || [];
   this.buildingTypeConfig = config || {};
 };
 
-GameRenderer.prototype.setUnlockedTiles = function(unlockedTiles) {
-  this.unlockedTiles = unlockedTiles || {};
+GameRenderer.prototype.setUnlockedTiles = function(tiles) {
+  this.unlockedTiles = tiles || {};
 };
 
 GameRenderer.prototype.setReadyBuildings = function(readyMap) {
@@ -189,146 +283,170 @@ GameRenderer.prototype.render = function() {
   var ts = this.tileSize;
   var cam = this.camera;
   var z = this.zoom;
+  var w = this.canvasWidth;
+  var h = this.canvasHeight;
 
-  ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+  // Clear
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, w, h);
+
   ctx.save();
   ctx.scale(z, z);
   ctx.translate(-cam.x, -cam.y);
 
-  // Visible range
+  // Visible tile range
   var startX = Math.max(0, Math.floor(cam.x / ts));
   var startY = Math.max(0, Math.floor(cam.y / ts));
-  var endX = Math.min(this.gridSize, Math.ceil((cam.x + this.canvasWidth / z) / ts) + 1);
-  var endY = Math.min(this.gridSize, Math.ceil((cam.y + this.canvasHeight / z) / ts) + 1);
+  var endX = Math.min(this.gridSize, Math.ceil((cam.x + w / z) / ts) + 1);
+  var endY = Math.min(this.gridSize, Math.ceil((cam.y + h / z) / ts) + 1);
 
-  // Draw tiles
+  // === Draw tiles ===
   for (var x = startX; x < endX; x++) {
     for (var y = startY; y < endY; y++) {
       var key = x + ',' + y;
-      var isUnlocked = this.unlockedTiles[key];
       var px = x * ts;
       var py = y * ts;
+      var isUnlocked = !!this.unlockedTiles[key];
 
       if (isUnlocked) {
-        ctx.fillStyle = this.grassPattern[key] || '#2d5a27';
+        // Grass
+        ctx.fillStyle = this.grassMap[key] || '#2d5a27';
         ctx.fillRect(px, py, ts, ts);
-        // Subtle grid
+
+        // Grid line
         ctx.strokeStyle = this.gridLineColor;
         ctx.lineWidth = 0.5;
         ctx.strokeRect(px, py, ts, ts);
-        // Grass detail
-        if (Math.random() > 0.97) {
-          ctx.fillStyle = 'rgba(85, 239, 196, 0.15)';
-          ctx.fillRect(px + 10, py + 20, 3, 8);
+
+        // Grass detail (fixed position, doesn't flicker)
+        var detail = this.grassDetailMap[key];
+        if (detail) {
+          ctx.fillStyle = 'rgba(85, 239, 196, 0.12)';
+          ctx.fillRect(px + detail.dx, py + detail.dy, 3, 7);
+          ctx.fillRect(px + detail.dx + 6, py + detail.dy + 3, 2, 5);
         }
       } else {
+        // Locked
         ctx.fillStyle = this.lockedColor;
         ctx.fillRect(px, py, ts, ts);
         ctx.strokeStyle = 'rgba(255,255,255,0.03)';
         ctx.lineWidth = 0.5;
         ctx.strokeRect(px, py, ts, ts);
-        // Lock icon for edge tiles
-        var adjacent = this.unlockedTiles[(x-1)+','+y] || this.unlockedTiles[(x+1)+','+y] ||
-                       this.unlockedTiles[x+','+(y-1)] || this.unlockedTiles[x+','+(y+1)];
-        if (adjacent) {
-          ctx.fillStyle = 'rgba(255,255,255,0.15)';
+
+        // Show lock on adjacent tiles
+        var hasAdj = this.unlockedTiles[(x-1)+','+y] ||
+                     this.unlockedTiles[(x+1)+','+y] ||
+                     this.unlockedTiles[x+','+(y-1)] ||
+                     this.unlockedTiles[x+','+(y+1)];
+        if (hasAdj) {
+          ctx.fillStyle = 'rgba(255,255,255,0.08)';
+          ctx.fillRect(px, py, ts, ts);
           ctx.font = Math.round(ts * 0.3) + 'px Arial';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
+          ctx.fillStyle = 'rgba(255,255,255,0.25)';
           ctx.fillText('🔒', px + ts / 2, py + ts / 2);
         }
       }
     }
   }
 
-  // Draw buildings
+  // === Draw buildings ===
   for (var i = 0; i < this.buildings.length; i++) {
     var b = this.buildings[i];
+    if (b.x < startX - 1 || b.x > endX || b.y < startY - 1 || b.y > endY) continue;
+
     var bx = b.x * ts;
     var by = b.y * ts;
     var bt = this.buildingTypeConfig[b.type];
     var emoji = bt ? bt.emoji : '❓';
-
-    // Building background
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.beginPath();
-    ctx.roundRect(bx + 4, by + 4, ts - 8, ts - 8, 8);
-    ctx.fill();
-
-    // Building shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath();
-    ctx.roundRect(bx + 6, by + 6, ts - 12, ts - 12, 6);
-    ctx.fill();
-
-    // Building body
     var readyKey = b.x + ',' + b.y;
-    var isReady = this.readyBuildings[readyKey];
-    ctx.fillStyle = isReady ? 'rgba(85, 239, 196, 0.25)' : 'rgba(40, 70, 40, 0.7)';
-    ctx.beginPath();
-    ctx.roundRect(bx + 4, by + 4, ts - 8, ts - 8, 8);
+    var isReady = !!this.readyBuildings[readyKey];
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    this.drawRoundRect(ctx, bx + 6, by + 8, ts - 12, ts - 12, 6);
     ctx.fill();
 
-    // Ready glow
+    // Body
+    ctx.fillStyle = isReady ? 'rgba(40, 120, 60, 0.8)' : 'rgba(30, 50, 30, 0.75)';
+    this.drawRoundRect(ctx, bx + 4, by + 4, ts - 8, ts - 8, 8);
+    ctx.fill();
+
+    // Ready glow border
     if (isReady) {
-      ctx.strokeStyle = 'rgba(85, 239, 196, 0.6)';
+      ctx.strokeStyle = 'rgba(85, 239, 196, 0.7)';
       ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(bx + 4, by + 4, ts - 8, ts - 8, 8);
+      this.drawRoundRect(ctx, bx + 4, by + 4, ts - 8, ts - 8, 8);
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      this.drawRoundRect(ctx, bx + 4, by + 4, ts - 8, ts - 8, 8);
       ctx.stroke();
     }
 
     // Emoji
-    var fontSize = Math.round(ts * 0.45);
-    ctx.font = fontSize + 'px Arial';
+    ctx.font = Math.round(ts * 0.42) + 'px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, bx + ts / 2, by + ts / 2 - 4);
+    ctx.fillText(emoji, bx + ts / 2, by + ts / 2 - 3);
 
     // Level badge
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.beginPath();
-    ctx.roundRect(bx + ts - 22, by + ts - 20, 18, 14, 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    this.drawRoundRect(ctx, bx + ts - 23, by + ts - 20, 19, 15, 4);
     ctx.fill();
     ctx.fillStyle = '#55efc4';
-    ctx.font = 'bold 9px Inter, Arial';
+    ctx.font = 'bold 9px Inter, Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(b.level, bx + ts - 13, by + ts - 11);
+    ctx.textBaseline = 'middle';
+    ctx.fillText('' + b.level, bx + ts - 13, by + ts - 12);
 
-    // Ready indicator
+    // Ready checkmark
     if (isReady) {
-      ctx.fillStyle = '#55efc4';
-      ctx.font = Math.round(ts * 0.22) + 'px Arial';
+      ctx.font = Math.round(ts * 0.2) + 'px Arial';
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       ctx.fillText('✅', bx + 14, by + 14);
     }
   }
 
-  // Placing building preview
+  // === Placing preview ===
   if (this.placingBuilding && this.hoverTile) {
-    var hx = this.hoverTile.x * ts;
-    var hy = this.hoverTile.y * ts;
-    var canPlace = this.unlockedTiles[this.hoverTile.x + ',' + this.hoverTile.y] &&
-                   !this.buildings.some(function(b) { return b.x === this.hoverTile.x && b.y === this.hoverTile.y; }.bind(this));
+    var hx = this.hoverTile.x;
+    var hy = this.hoverTile.y;
+    if (hx >= 0 && hx < this.gridSize && hy >= 0 && hy < this.gridSize) {
+      var hpx = hx * ts;
+      var hpy = hy * ts;
+      var hKey = hx + ',' + hy;
+      var canPlace = !!this.unlockedTiles[hKey];
+      // Check occupied
+      for (var bi = 0; bi < this.buildings.length; bi++) {
+        if (this.buildings[bi].x === hx && this.buildings[bi].y === hy) {
+          canPlace = false;
+          break;
+        }
+      }
 
-    ctx.fillStyle = canPlace ? 'rgba(85, 239, 196, 0.3)' : 'rgba(255, 107, 107, 0.3)';
-    ctx.fillRect(hx, hy, ts, ts);
-    ctx.strokeStyle = canPlace ? 'rgba(85, 239, 196, 0.8)' : 'rgba(255, 107, 107, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(hx, hy, ts, ts);
+      ctx.fillStyle = canPlace ? 'rgba(85, 239, 196, 0.3)' : 'rgba(255, 107, 107, 0.3)';
+      ctx.fillRect(hpx, hpy, ts, ts);
+      ctx.strokeStyle = canPlace ? 'rgba(85, 239, 196, 0.8)' : 'rgba(255, 107, 107, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(hpx + 1, hpy + 1, ts - 2, ts - 2);
 
-    var pbt = this.buildingTypeConfig[this.placingBuilding];
-    if (pbt) {
-      ctx.font = Math.round(ts * 0.5) + 'px Arial';
-      ctx.globalAlpha = 0.7;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(pbt.emoji, hx + ts / 2, hy + ts / 2);
-      ctx.globalAlpha = 1;
+      var pbt = this.buildingTypeConfig[this.placingBuilding];
+      if (pbt) {
+        ctx.globalAlpha = 0.6;
+        ctx.font = Math.round(ts * 0.45) + 'px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(pbt.emoji, hpx + ts / 2, hpy + ts / 2);
+        ctx.globalAlpha = 1;
+      }
     }
   }
 
-  // Selected tile highlight
+  // === Selected tile highlight ===
   if (this.selectedTile) {
     var sx = this.selectedTile.x * ts;
     var sy = this.selectedTile.y * ts;
@@ -338,24 +456,19 @@ GameRenderer.prototype.render = function() {
   }
 
   ctx.restore();
-
-  var self = this;
-  requestAnimationFrame(function() { self.render(); });
 };
 
-// Polyfill roundRect for older browsers
-if (!CanvasRenderingContext2D.prototype.roundRect) {
-  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
-    if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
-    this.moveTo(x + r.tl, y);
-    this.lineTo(x + w - r.tr, y);
-    this.quadraticCurveTo(x + w, y, x + w, y + r.tr);
-    this.lineTo(x + w, y + h - r.br);
-    this.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
-    this.lineTo(x + r.bl, y + h);
-    this.quadraticCurveTo(x, y + h, x, y + h - r.bl);
-    this.lineTo(x, y + r.tl);
-    this.quadraticCurveTo(x, y, x + r.tl, y);
-    this.closePath();
-  };
-}
+// Helper: draw rounded rectangle
+GameRenderer.prototype.drawRoundRect = function(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+};

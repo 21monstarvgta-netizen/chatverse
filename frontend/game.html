@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ChatVerse — Черемушки</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=4">
-  <link rel="stylesheet" href="/css/game.css?v=4">
+  <link rel="stylesheet" href="/css/style.css?v=5">
+  <link rel="stylesheet" href="/css/game.css?v=5">
 </head>
 <body>
   <div id="toast-container" class="toast-container"></div>
@@ -30,11 +30,14 @@
           <button class="city-rename-btn" id="city-rename-btn" title="Переименовать">✏️</button>
         </div>
       </div>
-      <div class="topbar-level">
-        <span class="level-badge" id="level-badge">Ур. 1</span>
-        <div class="xp-bar-mini">
-          <div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div>
+      <div class="topbar-right">
+        <div class="topbar-level">
+          <span class="level-badge" id="level-badge">Ур. 1</span>
+          <div class="xp-bar-mini">
+            <div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div>
+          </div>
         </div>
+        <button class="game-center-btn" id="game-center-btn" title="В центр">📍</button>
       </div>
     </div>
 
@@ -52,7 +55,13 @@
       <canvas id="game-canvas"></canvas>
     </div>
 
-    <!-- Building Info Panel (when selected) -->
+    <!-- Placing mode banner -->
+    <div class="placing-banner hidden" id="placing-banner">
+      <span>📍 Выберите клетку для строительства</span>
+      <button class="btn btn-secondary btn-sm" id="cancel-placing">✕ Отмена</button>
+    </div>
+
+    <!-- Building Info Panel -->
     <div class="building-info-panel hidden" id="building-info-panel">
       <div class="building-info-header">
         <span id="building-info-emoji" class="building-info-emoji">🏠</span>
@@ -113,7 +122,7 @@
       <div class="leaderboard-list" id="leaderboard-list"></div>
     </div>
 
-    <!-- Zone unlock overlay -->
+    <!-- Zone unlock modal -->
     <div class="zone-unlock-modal hidden" id="zone-unlock-modal">
       <div class="zone-unlock-content">
         <h3>🗺️ Открыть территорию</h3>
@@ -132,9 +141,9 @@
     </div>
   </div>
 
-  <script src="/js/utils.js?v=4"></script>
-  <script src="/js/gameRenderer.js?v=4"></script>
-  <script src="/js/gameUI.js?v=4"></script>
-  <script src="/js/game.js?v=4"></script>
+  <script src="/js/utils.js?v=5"></script>
+  <script src="/js/gameRenderer.js?v=5"></script>
+  <script src="/js/gameUI.js?v=5"></script>
+  <script src="/js/game.js?v=5"></script>
 </body>
 </html>

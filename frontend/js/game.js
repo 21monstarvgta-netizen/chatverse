@@ -1,5 +1,3 @@
-// Main game controller
-
 var game;
 
 var Game = function() {
@@ -27,7 +25,6 @@ Game.prototype.init = async function() {
     this.ui = new GameUI(this);
 
     this.updateRendererState();
-    this.renderer.render();
     this.ui.updateResources(this.player);
     this.ui.renderBuildList(this.config.buildingTypes, this.player.level, this.player.resources);
     this.ui.renderQuests(this.player.activeQuests);
@@ -57,7 +54,7 @@ Game.prototype.init = async function() {
     document.getElementById('game-app').classList.remove('hidden');
   } catch (error) {
     console.error('Game init error:', error);
-    showToast('Ошибка загрузки игры', 'error');
+    showToast('Ошибка загрузки игры: ' + error.message, 'error');
   }
 };
 
@@ -68,9 +65,17 @@ Game.prototype.setupEvents = function() {
     window.location.href = '/';
   });
 
+  document.getElementById('game-center-btn').addEventListener('click', function() {
+    self.renderer.centerCamera();
+  });
+
   document.getElementById('city-rename-btn').addEventListener('click', function() {
     var name = prompt('Название города:', self.player.cityName);
     if (name !== null && name.trim()) self.renameCity(name.trim());
+  });
+
+  document.getElementById('cancel-placing').addEventListener('click', function() {
+    self.cancelPlacing();
   });
 
   // Bottom tabs
@@ -115,7 +120,7 @@ Game.prototype.setupEvents = function() {
     self.exitVisitMode();
   });
 
-  // Escape to cancel placing
+  // Escape to cancel
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       self.cancelPlacing();
@@ -126,20 +131,17 @@ Game.prototype.setupEvents = function() {
 };
 
 Game.prototype.updateRendererState = function() {
-  // Build unlocked tiles map
   var unlockedTiles = {};
   var gs = this.config.gridSize;
   var half = Math.floor(this.config.initialUnlocked / 2);
   var center = Math.floor(gs / 2);
 
-  // Initial area
   for (var x = center - half; x < center + half; x++) {
     for (var y = center - half; y < center + half; y++) {
       unlockedTiles[x + ',' + y] = true;
     }
   }
 
-  // Unlocked zones
   var zones = this.player.unlockedZones || [];
   for (var i = 0; i < zones.length; i++) {
     var z = zones[i];
@@ -158,8 +160,9 @@ Game.prototype.updateRendererState = function() {
 Game.prototype.updateReadyState = function() {
   var readyMap = {};
   var now = Date.now();
-  for (var i = 0; i < this.player.buildings.length; i++) {
-    var b = this.player.buildings[i];
+  var buildings = this.player.buildings || [];
+  for (var i = 0; i < buildings.length; i++) {
+    var b = buildings[i];
     var bt = this.config.buildingTypes[b.type];
     if (!bt || bt.baseTime === 0) continue;
     var prodTime = Math.floor(bt.baseTime * (1 + (b.level - 1) * 0.03)) * 1000;
@@ -189,7 +192,11 @@ Game.prototype.onTileClick = function(x, y) {
       showToast('Территория не открыта', 'error');
       return;
     }
-    var occupied = this.player.buildings.some(function(b) { return b.x === x && b.y === y; });
+    var buildings = this.player.buildings || [];
+    var occupied = false;
+    for (var i = 0; i < buildings.length; i++) {
+      if (buildings[i].x === x && buildings[i].y === y) { occupied = true; break; }
+    }
     if (occupied) {
       showToast('Клетка занята', 'error');
       return;
@@ -198,18 +205,19 @@ Game.prototype.onTileClick = function(x, y) {
     return;
   }
 
-  // Check if there's a building
+  // Check building
   var buildingIndex = -1;
-  for (var i = 0; i < this.player.buildings.length; i++) {
-    if (this.player.buildings[i].x === x && this.player.buildings[i].y === y) {
-      buildingIndex = i;
+  var pBuildings = this.player.buildings || [];
+  for (var j = 0; j < pBuildings.length; j++) {
+    if (pBuildings[j].x === x && pBuildings[j].y === y) {
+      buildingIndex = j;
       break;
     }
   }
 
   if (buildingIndex >= 0) {
     this.renderer.selectedTile = { x: x, y: y };
-    this.ui.showBuildingInfo(this.player.buildings[buildingIndex], buildingIndex, this.config.buildingTypes);
+    this.ui.showBuildingInfo(pBuildings[buildingIndex], buildingIndex, this.config.buildingTypes);
   } else if (!isUnlocked) {
     this.showZoneUnlock(x, y);
   } else {
@@ -221,30 +229,16 @@ Game.prototype.onTileClick = function(x, y) {
 Game.prototype.startPlacing = function(type) {
   this.placingType = type;
   this.renderer.placingBuilding = type;
-  showToast('Нажмите на свободную клетку для строительства', 'info');
-
-  // Track mouse for preview
-  var self = this;
-  this.renderer.viewport.addEventListener('mousemove', function handler(e) {
-    if (!self.placingType) {
-      self.renderer.viewport.removeEventListener('mousemove', handler);
-      return;
-    }
-    var rect = self.renderer.viewport.getBoundingClientRect();
-    var mx = e.clientX - rect.left;
-    var my = e.clientY - rect.top;
-    var worldX = mx / self.renderer.zoom + self.renderer.camera.x;
-    var worldY = my / self.renderer.zoom + self.renderer.camera.y;
-    var tileX = Math.floor(worldX / self.renderer.tileSize);
-    var tileY = Math.floor(worldY / self.renderer.tileSize);
-    self.renderer.hoverTile = { x: tileX, y: tileY };
-  });
+  document.getElementById('placing-banner').classList.remove('hidden');
+  // Close panels
+  document.querySelectorAll('.game-panel').forEach(function(p) { p.classList.add('hidden'); });
 };
 
 Game.prototype.cancelPlacing = function() {
   this.placingType = null;
   this.renderer.placingBuilding = null;
   this.renderer.hoverTile = null;
+  document.getElementById('placing-banner').classList.add('hidden');
 };
 
 Game.prototype.placeBuilding = async function(type, x, y) {
@@ -305,7 +299,7 @@ Game.prototype.collectAll = async function() {
           parts.push(icon + '+' + data.collected[r]);
         }
       }
-      showToast('Собрано из ' + data.count + ' зданий: ' + parts.join(' '), 'success');
+      showToast('Собрано из ' + data.count + ': ' + parts.join(' '), 'success');
     }
   } catch (e) {
     showToast(e.message, 'error');
@@ -350,7 +344,6 @@ Game.prototype.showZoneUnlock = function(x, y) {
     return;
   }
 
-  // Find which zone this tile belongs to
   var targetZone = null;
   for (var i = 0; i < nextZones.length; i++) {
     var z = nextZones[i];
@@ -359,11 +352,7 @@ Game.prototype.showZoneUnlock = function(x, y) {
       break;
     }
   }
-
-  if (!targetZone) {
-    // Show first available zone info
-    targetZone = nextZones[0];
-  }
+  if (!targetZone) targetZone = nextZones[0];
 
   this.pendingZone = targetZone;
   var dirs = { north: 'Север', south: 'Юг', west: 'Запад', east: 'Восток' };
@@ -376,7 +365,6 @@ Game.prototype.showZoneUnlock = function(x, y) {
   document.getElementById('zone-confirm').onclick = function() {
     self.unlockZone();
   };
-
   document.getElementById('zone-unlock-modal').classList.remove('hidden');
 };
 
@@ -449,7 +437,6 @@ Game.prototype.visitCity = async function(userId) {
     this.visitingUserId = userId;
     this.renderer.setBuildings(city.buildings, this.config.buildingTypes);
 
-    // Build unlocked tiles for visited city
     var unlockedTiles = {};
     var gs = this.config.gridSize;
     var half = Math.floor(this.config.initialUnlocked / 2);
@@ -475,7 +462,6 @@ Game.prototype.visitCity = async function(userId) {
     document.getElementById('visit-banner-text').textContent = '👁 ' + escapeHTML(city.cityName) + ' — ' + escapeHTML(ownerName) + ' (Ур.' + city.level + ')';
     document.getElementById('visit-banner').classList.remove('hidden');
 
-    // Hide panels
     document.querySelectorAll('.game-panel').forEach(function(p) { p.classList.add('hidden'); });
     document.querySelector('.game-bottom-bar').style.display = 'none';
 
