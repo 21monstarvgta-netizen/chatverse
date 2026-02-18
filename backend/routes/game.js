@@ -1,56 +1,103 @@
-const express = require('express');
-const GamePlayer = require('../models/GamePlayer');
-const auth = require('../middleware/auth');
-const config = require('../game/gameConfig');
-const logic = require('../game/gameLogic');
+var express = require('express');
+var GamePlayer = require('../models/GamePlayer');
+var auth = require('../middleware/auth');
+var config = require('../game/gameConfig');
+var logic = require('../game/gameLogic');
 
-const router = express.Router();
+var router = express.Router();
+
+function getPlayerState(player) {
+  var buildings = player.buildings || [];
+  var maxStorage = logic.calculateMaxStorage(buildings);
+  var totalEnergy = logic.calculateTotalEnergy(buildings);
+  var usedEnergy = logic.calculateUsedEnergy(buildings);
+  var totalPopulation = logic.calculateTotalPopulation(buildings);
+  var nextZones = logic.getNextZones(player.unlockedZones || []);
+  var xpNeeded = config.LEVEL_XP(player.level + 1);
+
+  return {
+    level: player.level,
+    experience: player.experience,
+    xpNeeded: xpNeeded,
+    resources: player.resources,
+    buildings: buildings,
+    unlockedZones: player.unlockedZones || [],
+    activeQuests: player.activeQuests || [],
+    completedQuests: player.completedQuests || [],
+    stats: player.stats || {},
+    cityName: player.cityName,
+    maxStorage: maxStorage,
+    totalEnergy: totalEnergy,
+    usedEnergy: usedEnergy,
+    totalPopulation: totalPopulation,
+    nextZones: nextZones
+  };
+}
+
+function updateQuestProgress(player, type, target, value) {
+  if (!player.activeQuests) return;
+  for (var i = 0; i < player.activeQuests.length; i++) {
+    var q = player.activeQuests[i];
+    if (q.type === type) {
+      if (q.type === 'build' && q.target === target) {
+        q.progress = (q.progress || 0) + value;
+      } else if (q.type === 'build_count') {
+        q.progress = (q.progress || 0) + value;
+      } else if (q.type === 'collect' && q.target === target) {
+        q.progress = (q.progress || 0) + value;
+      } else if (q.type === 'upgrade' && q.target === target) {
+        q.progress = Math.max(q.progress || 0, value);
+      } else if (q.type === 'reach_population') {
+        q.progress = logic.calculateTotalPopulation(player.buildings || []);
+      } else if (q.type === 'unlock_zone') {
+        q.progress = value;
+      }
+    }
+  }
+}
+
+function checkLevelUp(player) {
+  var xpNeeded = config.LEVEL_XP(player.level + 1);
+  while (player.experience >= xpNeeded) {
+    player.experience -= xpNeeded;
+    player.level += 1;
+    xpNeeded = config.LEVEL_XP(player.level + 1);
+    var newQuests = logic.getQuestsForLevel(player.level, player.completedQuests || []);
+    for (var i = 0; i < newQuests.length; i++) {
+      var nq = newQuests[i];
+      var exists = false;
+      for (var j = 0; j < player.activeQuests.length; j++) {
+        if (player.activeQuests[j].questId === nq.questId) { exists = true; break; }
+      }
+      if (!exists) player.activeQuests.push(nq);
+    }
+  }
+}
 
 // Get or create game state
-router.get('/state', auth, async (req, res) => {
+router.get('/state', auth, async function(req, res) {
   try {
-    let player = await GamePlayer.findOne({ userId: req.userId });
+    var player = await GamePlayer.findOne({ userId: req.userId });
     if (!player) {
+      var initialQuests = logic.getQuestsForLevel(1, []);
       player = new GamePlayer({
         userId: req.userId,
-        activeQuests: logic.getQuestsForLevel(1, [])
+        activeQuests: initialQuests
       });
       await player.save();
     }
 
-    // Process offline progress
     var now = new Date();
-    var result = logic.processOfflineProgress(player, player.buildings, now);
+    var result = logic.processOfflineProgress(player, player.buildings || [], now);
     player.resources = result.resources;
     player.lastOnline = now;
     await player.save();
 
-    var maxStorage = logic.calculateMaxStorage(player.buildings);
-    var totalEnergy = logic.calculateTotalEnergy(player.buildings);
-    var usedEnergy = logic.calculateUsedEnergy(player.buildings);
-    var totalPopulation = logic.calculateTotalPopulation(player.buildings);
-    var nextZones = logic.getNextZones(player.unlockedZones);
-    var xpNeeded = config.LEVEL_XP(player.level + 1);
+    var state = getPlayerState(player);
+    state.offlineCollected = result.collected;
 
     res.json({
-      player: {
-        level: player.level,
-        experience: player.experience,
-        xpNeeded: xpNeeded,
-        resources: player.resources,
-        buildings: player.buildings,
-        unlockedZones: player.unlockedZones,
-        activeQuests: player.activeQuests,
-        completedQuests: player.completedQuests,
-        stats: player.stats,
-        cityName: player.cityName,
-        maxStorage: maxStorage,
-        totalEnergy: totalEnergy,
-        usedEnergy: usedEnergy,
-        totalPopulation: totalPopulation,
-        nextZones: nextZones,
-        offlineCollected: result.collected
-      },
+      player: state,
       config: {
         gridSize: config.GRID_SIZE,
         initialUnlocked: config.INITIAL_UNLOCKED,
@@ -58,15 +105,17 @@ router.get('/state', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Game state error:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Game state error:', error.message, error.stack);
+    res.status(500).json({ error: 'Ошибка сервера: ' + error.message });
   }
 });
 
 // Build
-router.post('/build', auth, async (req, res) => {
+router.post('/build', auth, async function(req, res) {
   try {
-    var { buildingType, x, y } = req.body;
+    var buildingType = req.body.buildingType;
+    var x = req.body.x;
+    var y = req.body.y;
     var player = await GamePlayer.findOne({ userId: req.userId });
     if (!player) return res.status(404).json({ error: 'Игрок не найден' });
 
@@ -77,23 +126,23 @@ router.post('/build', auth, async (req, res) => {
       return res.status(400).json({ error: 'Требуется уровень ' + bt.unlockLevel });
     }
 
-    // Check tile unlocked
     if (!logic.isTileUnlocked(x, y, player.unlockedZones)) {
       return res.status(400).json({ error: 'Территория не открыта' });
     }
 
-    // Check tile empty
-    var occupied = player.buildings.some(function(b) { return b.x === x && b.y === y; });
+    var buildings = player.buildings || [];
+    var occupied = false;
+    for (var i = 0; i < buildings.length; i++) {
+      if (buildings[i].x === x && buildings[i].y === y) { occupied = true; break; }
+    }
     if (occupied) return res.status(400).json({ error: 'Клетка занята' });
 
-    // Check energy
-    var totalEnergy = logic.calculateTotalEnergy(player.buildings);
-    var usedEnergy = logic.calculateUsedEnergy(player.buildings);
+    var totalEnergy = logic.calculateTotalEnergy(buildings);
+    var usedEnergy = logic.calculateUsedEnergy(buildings);
     if (usedEnergy + bt.energyCost > totalEnergy && buildingType !== 'powerplant') {
       return res.status(400).json({ error: 'Недостаточно энергии' });
     }
 
-    // Check cost
     var cost = logic.calculateBuildCost(buildingType);
     if (!logic.canAfford(player.resources, cost)) {
       return res.status(400).json({ error: 'Недостаточно ресурсов' });
@@ -110,26 +159,10 @@ router.post('/build', auth, async (req, res) => {
       isProducing: true
     });
 
-    // Stats and XP
     player.stats.totalBuilt += 1;
     player.experience += 10 + player.level * 2;
 
-    // Check level up
-    var xpNeeded = config.LEVEL_XP(player.level + 1);
-    while (player.experience >= xpNeeded) {
-      player.experience -= xpNeeded;
-      player.level += 1;
-      xpNeeded = config.LEVEL_XP(player.level + 1);
-      // Add new quests
-      var newQuests = logic.getQuestsForLevel(player.level, player.completedQuests);
-      newQuests.forEach(function(q) {
-        if (!player.activeQuests.some(function(aq) { return aq.questId === q.questId; })) {
-          player.activeQuests.push(q);
-        }
-      });
-    }
-
-    // Update quest progress
+    checkLevelUp(player);
     updateQuestProgress(player, 'build', buildingType, 1);
     updateQuestProgress(player, 'build_count', 'any', 1);
 
@@ -141,13 +174,13 @@ router.post('/build', auth, async (req, res) => {
 
     res.json({ success: true, player: getPlayerState(player) });
   } catch (error) {
-    console.error('Build error:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Build error:', error.message, error.stack);
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
 
-// Collect resources from building
-router.post('/collect/:buildingIndex', auth, async (req, res) => {
+// Collect from single building
+router.post('/collect/:buildingIndex', auth, async function(req, res) {
   try {
     var player = await GamePlayer.findOne({ userId: req.userId });
     if (!player) return res.status(404).json({ error: 'Игрок не найден' });
@@ -164,50 +197,35 @@ router.post('/collect/:buildingIndex', auth, async (req, res) => {
     }
 
     var now = new Date();
-    var elapsed = Math.floor((now - new Date(building.lastCollected)) / 1000);
+    var elapsed = Math.floor((now.getTime() - new Date(building.lastCollected).getTime()) / 1000);
     var prodTime = logic.calculateProductionTime(building.type, building.level);
 
     if (elapsed < prodTime) {
       return res.status(400).json({ error: 'Ещё не готово', remaining: prodTime - elapsed });
     }
 
-    var cycles = Math.floor(elapsed / prodTime);
-    // Cap to prevent abuse
-    cycles = Math.min(cycles, 10);
-
+    var cycles = Math.min(Math.floor(elapsed / prodTime), 10);
     var output = logic.calculateOutput(building.type, building.level);
     var maxStorage = logic.calculateMaxStorage(player.buildings);
     var collected = {};
 
-    for (var r in output) {
+    var outputKeys = Object.keys(output);
+    for (var i = 0; i < outputKeys.length; i++) {
+      var r = outputKeys[i];
       collected[r] = output[r] * cycles;
     }
 
     logic.addResources(player.resources, collected, maxStorage);
     building.lastCollected = now;
 
-    // Stats and XP
     player.stats.totalCollected += 1;
     if (collected.coins) player.stats.totalCoinsEarned += collected.coins;
     player.experience += 5 + player.level;
 
-    // Check level up
-    var xpNeeded = config.LEVEL_XP(player.level + 1);
-    while (player.experience >= xpNeeded) {
-      player.experience -= xpNeeded;
-      player.level += 1;
-      xpNeeded = config.LEVEL_XP(player.level + 1);
-      var newQuests = logic.getQuestsForLevel(player.level, player.completedQuests);
-      newQuests.forEach(function(q) {
-        if (!player.activeQuests.some(function(aq) { return aq.questId === q.questId; })) {
-          player.activeQuests.push(q);
-        }
-      });
-    }
-
-    // Update quest progress
-    for (var res in collected) {
-      updateQuestProgress(player, 'collect', res, collected[res]);
+    checkLevelUp(player);
+    var collectedKeys = Object.keys(collected);
+    for (var j = 0; j < collectedKeys.length; j++) {
+      updateQuestProgress(player, 'collect', collectedKeys[j], collected[collectedKeys[j]]);
     }
 
     player.markModified('resources');
@@ -218,13 +236,13 @@ router.post('/collect/:buildingIndex', auth, async (req, res) => {
 
     res.json({ success: true, collected: collected, player: getPlayerState(player) });
   } catch (error) {
-    console.error('Collect error:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Collect error:', error.message, error.stack);
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
 
-// Collect all ready buildings
-router.post('/collect-all', auth, async (req, res) => {
+// Collect all
+router.post('/collect-all', auth, async function(req, res) {
   try {
     var player = await GamePlayer.findOne({ userId: req.userId });
     if (!player) return res.status(404).json({ error: 'Игрок не найден' });
@@ -239,14 +257,16 @@ router.post('/collect-all', auth, async (req, res) => {
       var bt = config.BUILDING_TYPES[building.type];
       if (!bt || bt.baseTime === 0) continue;
 
-      var elapsed = Math.floor((now - new Date(building.lastCollected)) / 1000);
+      var elapsed = Math.floor((now.getTime() - new Date(building.lastCollected).getTime()) / 1000);
       var prodTime = logic.calculateProductionTime(building.type, building.level);
       if (elapsed < prodTime) continue;
 
       var cycles = Math.min(Math.floor(elapsed / prodTime), 10);
       var output = logic.calculateOutput(building.type, building.level);
 
-      for (var r in output) {
+      var outputKeys = Object.keys(output);
+      for (var j = 0; j < outputKeys.length; j++) {
+        var r = outputKeys[j];
         var amount = output[r] * cycles;
         totalCollected[r] = (totalCollected[r] || 0) + amount;
       }
@@ -263,21 +283,11 @@ router.post('/collect-all', auth, async (req, res) => {
     if (totalCollected.coins) player.stats.totalCoinsEarned += totalCollected.coins;
     player.experience += (5 + player.level) * count;
 
-    var xpNeeded = config.LEVEL_XP(player.level + 1);
-    while (player.experience >= xpNeeded) {
-      player.experience -= xpNeeded;
-      player.level += 1;
-      xpNeeded = config.LEVEL_XP(player.level + 1);
-      var newQuests = logic.getQuestsForLevel(player.level, player.completedQuests);
-      newQuests.forEach(function(q) {
-        if (!player.activeQuests.some(function(aq) { return aq.questId === q.questId; })) {
-          player.activeQuests.push(q);
-        }
-      });
-    }
+    checkLevelUp(player);
 
-    for (var res in totalCollected) {
-      updateQuestProgress(player, 'collect', res, totalCollected[res]);
+    var tcKeys = Object.keys(totalCollected);
+    for (var k = 0; k < tcKeys.length; k++) {
+      updateQuestProgress(player, 'collect', tcKeys[k], totalCollected[tcKeys[k]]);
     }
 
     player.markModified('resources');
@@ -288,13 +298,13 @@ router.post('/collect-all', auth, async (req, res) => {
 
     res.json({ success: true, collected: totalCollected, count: count, player: getPlayerState(player) });
   } catch (error) {
-    console.error('Collect all error:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Collect all error:', error.message, error.stack);
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
 
-// Upgrade building
-router.post('/upgrade/:buildingIndex', auth, async (req, res) => {
+// Upgrade
+router.post('/upgrade/:buildingIndex', auth, async function(req, res) {
   try {
     var player = await GamePlayer.findOne({ userId: req.userId });
     if (!player) return res.status(404).json({ error: 'Игрок не найден' });
@@ -323,19 +333,7 @@ router.post('/upgrade/:buildingIndex', auth, async (req, res) => {
     player.stats.totalUpgrades += 1;
     player.experience += 15 + player.level * 3;
 
-    var xpNeeded = config.LEVEL_XP(player.level + 1);
-    while (player.experience >= xpNeeded) {
-      player.experience -= xpNeeded;
-      player.level += 1;
-      xpNeeded = config.LEVEL_XP(player.level + 1);
-      var newQuests = logic.getQuestsForLevel(player.level, player.completedQuests);
-      newQuests.forEach(function(q) {
-        if (!player.activeQuests.some(function(aq) { return aq.questId === q.questId; })) {
-          player.activeQuests.push(q);
-        }
-      });
-    }
-
+    checkLevelUp(player);
     updateQuestProgress(player, 'upgrade', building.type, building.level);
 
     player.markModified('resources');
@@ -346,13 +344,13 @@ router.post('/upgrade/:buildingIndex', auth, async (req, res) => {
 
     res.json({ success: true, player: getPlayerState(player) });
   } catch (error) {
-    console.error('Upgrade error:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Upgrade error:', error.message, error.stack);
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
 
-// Demolish building
-router.post('/demolish/:buildingIndex', auth, async (req, res) => {
+// Demolish
+router.post('/demolish/:buildingIndex', auth, async function(req, res) {
   try {
     var player = await GamePlayer.findOne({ userId: req.userId });
     if (!player) return res.status(404).json({ error: 'Игрок не найден' });
@@ -363,12 +361,11 @@ router.post('/demolish/:buildingIndex', auth, async (req, res) => {
     }
 
     var building = player.buildings[idx];
-    var bt = config.BUILDING_TYPES[building.type];
-
-    // Refund 30%
     var cost = logic.calculateBuildCost(building.type);
     var refund = {};
-    for (var r in cost) {
+    var costKeys = Object.keys(cost);
+    for (var i = 0; i < costKeys.length; i++) {
+      var r = costKeys[i];
       refund[r] = Math.floor(cost[r] * 0.3);
     }
     logic.addResources(player.resources, refund, logic.calculateMaxStorage(player.buildings));
@@ -381,20 +378,23 @@ router.post('/demolish/:buildingIndex', auth, async (req, res) => {
 
     res.json({ success: true, refund: refund, player: getPlayerState(player) });
   } catch (error) {
-    console.error('Demolish error:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Demolish error:', error.message, error.stack);
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
 
 // Unlock zone
-router.post('/unlock-zone', auth, async (req, res) => {
+router.post('/unlock-zone', auth, async function(req, res) {
   try {
-    var { zone } = req.body;
+    var zone = req.body.zone;
     var player = await GamePlayer.findOne({ userId: req.userId });
     if (!player) return res.status(404).json({ error: 'Игрок не найден' });
 
-    var nextZones = logic.getNextZones(player.unlockedZones);
-    var target = nextZones.find(function(z) { return z.direction === zone.direction; });
+    var nextZones = logic.getNextZones(player.unlockedZones || []);
+    var target = null;
+    for (var i = 0; i < nextZones.length; i++) {
+      if (nextZones[i].direction === zone.direction) { target = nextZones[i]; break; }
+    }
     if (!target) return res.status(400).json({ error: 'Зона недоступна' });
 
     if ((player.resources.coins || 0) < target.cost) {
@@ -412,13 +412,7 @@ router.post('/unlock-zone', auth, async (req, res) => {
     player.experience += 50;
 
     updateQuestProgress(player, 'unlock_zone', 'zone', player.stats.zonesUnlocked);
-
-    var xpNeeded = config.LEVEL_XP(player.level + 1);
-    while (player.experience >= xpNeeded) {
-      player.experience -= xpNeeded;
-      player.level += 1;
-      xpNeeded = config.LEVEL_XP(player.level + 1);
-    }
+    checkLevelUp(player);
 
     player.markModified('resources');
     player.markModified('unlockedZones');
@@ -428,55 +422,52 @@ router.post('/unlock-zone', auth, async (req, res) => {
 
     res.json({ success: true, player: getPlayerState(player) });
   } catch (error) {
-    console.error('Unlock zone error:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Unlock zone error:', error.message, error.stack);
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
 
-// Claim quest reward
-router.post('/quest/claim/:questId', auth, async (req, res) => {
+// Claim quest
+router.post('/quest/claim/:questId', auth, async function(req, res) {
   try {
     var player = await GamePlayer.findOne({ userId: req.userId });
     if (!player) return res.status(404).json({ error: 'Игрок не найден' });
 
     var questId = parseInt(req.params.questId);
-    var questIdx = player.activeQuests.findIndex(function(q) { return q.questId === questId; });
+    var questIdx = -1;
+    for (var i = 0; i < player.activeQuests.length; i++) {
+      if (player.activeQuests[i].questId === questId) { questIdx = i; break; }
+    }
     if (questIdx === -1) return res.status(400).json({ error: 'Квест не найден' });
 
     var quest = player.activeQuests[questIdx];
-    if (quest.progress < quest.count) {
+    if ((quest.progress || 0) < quest.count) {
       return res.status(400).json({ error: 'Квест не выполнен' });
     }
 
-    // Give reward
     var maxStorage = logic.calculateMaxStorage(player.buildings);
     logic.addResources(player.resources, quest.reward, maxStorage);
 
-    // Mark completed
     player.completedQuests.push(questId);
     player.activeQuests.splice(questIdx, 1);
 
-    // Add new quests
     var newQuests = logic.getQuestsForLevel(player.level, player.completedQuests);
-    newQuests.forEach(function(q) {
-      if (!player.activeQuests.some(function(aq) { return aq.questId === q.questId; }) &&
-          player.completedQuests.indexOf(q.questId) === -1) {
-        player.activeQuests.push(q);
+    for (var j = 0; j < newQuests.length; j++) {
+      var nq = newQuests[j];
+      var exists = false;
+      for (var k = 0; k < player.activeQuests.length; k++) {
+        if (player.activeQuests[k].questId === nq.questId) { exists = true; break; }
       }
-    });
+      var alreadyDone = player.completedQuests.indexOf(nq.questId) >= 0;
+      if (!exists && !alreadyDone) player.activeQuests.push(nq);
+    }
 
-    // Keep max 5 active
     if (player.activeQuests.length > 5) {
       player.activeQuests = player.activeQuests.slice(0, 5);
     }
 
     player.experience += 20 + player.level * 5;
-    var xpNeeded = config.LEVEL_XP(player.level + 1);
-    while (player.experience >= xpNeeded) {
-      player.experience -= xpNeeded;
-      player.level += 1;
-      xpNeeded = config.LEVEL_XP(player.level + 1);
-    }
+    checkLevelUp(player);
 
     player.markModified('resources');
     player.markModified('activeQuests');
@@ -485,15 +476,15 @@ router.post('/quest/claim/:questId', auth, async (req, res) => {
 
     res.json({ success: true, reward: quest.reward, player: getPlayerState(player) });
   } catch (error) {
-    console.error('Quest claim error:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Quest claim error:', error.message, error.stack);
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
 
 // Rename city
-router.post('/rename', auth, async (req, res) => {
+router.post('/rename', auth, async function(req, res) {
   try {
-    var { name } = req.body;
+    var name = req.body.name;
     if (!name || name.trim().length < 1 || name.trim().length > 30) {
       return res.status(400).json({ error: 'Название от 1 до 30 символов' });
     }
@@ -505,12 +496,12 @@ router.post('/rename', auth, async (req, res) => {
 
     res.json({ success: true, cityName: player.cityName });
   } catch (error) {
-    res.status(500).json({ error: 'Ошибка сервера' });
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
 
-// View other player's city
-router.get('/visit/:userId', auth, async (req, res) => {
+// Visit another player's city
+router.get('/visit/:userId', auth, async function(req, res) {
   try {
     var player = await GamePlayer.findOne({ userId: req.params.userId })
       .populate('userId', 'username profile');
@@ -521,19 +512,19 @@ router.get('/visit/:userId', auth, async (req, res) => {
         owner: player.userId,
         cityName: player.cityName,
         level: player.level,
-        buildings: player.buildings,
-        unlockedZones: player.unlockedZones,
-        stats: player.stats,
-        totalPopulation: logic.calculateTotalPopulation(player.buildings)
+        buildings: player.buildings || [],
+        unlockedZones: player.unlockedZones || [],
+        stats: player.stats || {},
+        totalPopulation: logic.calculateTotalPopulation(player.buildings || [])
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Ошибка сервера' });
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
 
 // Leaderboard
-router.get('/leaderboard', auth, async (req, res) => {
+router.get('/leaderboard', auth, async function(req, res) {
   try {
     var players = await GamePlayer.find()
       .populate('userId', 'username profile')
@@ -541,71 +532,25 @@ router.get('/leaderboard', auth, async (req, res) => {
       .limit(50)
       .select('userId level cityName stats buildings');
 
-    var leaderboard = players.map(function(p) {
-      return {
-        userId: p.userId ? p.userId._id : null,
-        username: p.userId ? p.userId.username : 'Unknown',
-        profile: p.userId ? p.userId.profile : {},
+    var leaderboard = [];
+    for (var i = 0; i < players.length; i++) {
+      var p = players[i];
+      if (!p.userId) continue;
+      leaderboard.push({
+        userId: p.userId._id,
+        username: p.userId.username,
+        profile: p.userId.profile || {},
         level: p.level,
         cityName: p.cityName,
-        buildingCount: p.buildings.length,
-        population: logic.calculateTotalPopulation(p.buildings)
-      };
-    }).filter(function(p) { return p.userId; });
+        buildingCount: (p.buildings || []).length,
+        population: logic.calculateTotalPopulation(p.buildings || [])
+      });
+    }
 
     res.json({ leaderboard: leaderboard });
   } catch (error) {
-    res.status(500).json({ error: 'Ошибка сервера' });
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });
-
-// Helper functions
-function getPlayerState(player) {
-  var maxStorage = logic.calculateMaxStorage(player.buildings);
-  var totalEnergy = logic.calculateTotalEnergy(player.buildings);
-  var usedEnergy = logic.calculateUsedEnergy(player.buildings);
-  var totalPopulation = logic.calculateTotalPopulation(player.buildings);
-  var nextZones = logic.getNextZones(player.unlockedZones);
-  var xpNeeded = config.LEVEL_XP(player.level + 1);
-
-  return {
-    level: player.level,
-    experience: player.experience,
-    xpNeeded: xpNeeded,
-    resources: player.resources,
-    buildings: player.buildings,
-    unlockedZones: player.unlockedZones,
-    activeQuests: player.activeQuests,
-    completedQuests: player.completedQuests,
-    stats: player.stats,
-    cityName: player.cityName,
-    maxStorage: maxStorage,
-    totalEnergy: totalEnergy,
-    usedEnergy: usedEnergy,
-    totalPopulation: totalPopulation,
-    nextZones: nextZones
-  };
-}
-
-function updateQuestProgress(player, type, target, value) {
-  for (var i = 0; i < player.activeQuests.length; i++) {
-    var q = player.activeQuests[i];
-    if (q.type === type) {
-      if (q.type === 'build' && q.target === target) {
-        q.progress += value;
-      } else if (q.type === 'build_count') {
-        q.progress += value;
-      } else if (q.type === 'collect' && q.target === target) {
-        q.progress += value;
-      } else if (q.type === 'upgrade' && q.target === target) {
-        q.progress = Math.max(q.progress, value);
-      } else if (q.type === 'reach_population') {
-        q.progress = logic.calculateTotalPopulation(player.buildings);
-      } else if (q.type === 'unlock_zone') {
-        q.progress = value;
-      }
-    }
-  }
-}
 
 module.exports = router;

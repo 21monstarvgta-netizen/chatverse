@@ -1,16 +1,14 @@
-// Game configuration - all balance constants
+var GRID_SIZE = 25;
+var INITIAL_UNLOCKED = 8;
 
-const GRID_SIZE = 25;
-const INITIAL_UNLOCKED = 8;
-
-const BUILDING_TYPES = {
+var BUILDING_TYPES = {
   farm: {
     name: 'Ферма',
     emoji: '🌾',
     description: 'Производит еду',
     baseCost: { coins: 100, materials: 50 },
     baseOutput: { food: 10 },
-    baseTime: 300, // 5 minutes in seconds
+    baseTime: 300,
     maxLevel: 50,
     category: 'production',
     unlockLevel: 1,
@@ -22,7 +20,7 @@ const BUILDING_TYPES = {
     description: 'Добывает материалы',
     baseCost: { coins: 200, food: 100 },
     baseOutput: { materials: 8 },
-    baseTime: 900, // 15 minutes
+    baseTime: 900,
     maxLevel: 50,
     category: 'production',
     unlockLevel: 2,
@@ -34,7 +32,7 @@ const BUILDING_TYPES = {
     description: 'Конвертирует ресурсы в монеты',
     baseCost: { coins: 500, materials: 200, food: 100 },
     baseOutput: { coins: 25 },
-    baseTime: 1800, // 30 minutes
+    baseTime: 1800,
     maxLevel: 50,
     category: 'production',
     unlockLevel: 4,
@@ -46,7 +44,7 @@ const BUILDING_TYPES = {
     description: 'Производит энергию',
     baseCost: { coins: 800, materials: 300 },
     baseOutput: { energy: 5 },
-    baseTime: 1200, // 20 minutes
+    baseTime: 1200,
     maxLevel: 30,
     category: 'infrastructure',
     unlockLevel: 3,
@@ -58,7 +56,7 @@ const BUILDING_TYPES = {
     description: 'Увеличивает население',
     baseCost: { coins: 150, materials: 80 },
     baseOutput: { population: 5 },
-    baseTime: 600, // 10 minutes
+    baseTime: 600,
     maxLevel: 50,
     category: 'residential',
     unlockLevel: 1,
@@ -70,7 +68,7 @@ const BUILDING_TYPES = {
     description: 'Увеличивает хранилище',
     baseCost: { coins: 300, materials: 150 },
     baseOutput: { storage: 100 },
-    baseTime: 0, // instant passive
+    baseTime: 0,
     maxLevel: 30,
     category: 'infrastructure',
     unlockLevel: 2,
@@ -186,7 +184,7 @@ const BUILDING_TYPES = {
   }
 };
 
-const RESOURCE_DEFAULTS = {
+var RESOURCE_DEFAULTS = {
   coins: 500,
   food: 200,
   materials: 100,
@@ -197,29 +195,7 @@ const RESOURCE_DEFAULTS = {
   maxStorage: 500
 };
 
-const ZONE_UNLOCK_COST = function(zoneNumber) {
-  return Math.floor(500 * Math.pow(zoneNumber, 2));
-};
-
-const LEVEL_XP = function(level) {
-  return Math.floor(100 * Math.pow(level, 2));
-};
-
-const INCOME_FORMULA = function(base, level) {
-  return Math.floor(base * Math.pow(1.18, level - 1));
-};
-
-const UPGRADE_COST_FORMULA = function(base, level) {
-  return Math.floor(base * Math.pow(1.32, level));
-};
-
-const PRODUCTION_TIME_FORMULA = function(baseTime, level) {
-  return Math.floor(baseTime * (1 + (level - 1) * 0.03));
-};
-
-// Quest templates
-const QUEST_TEMPLATES = [
-  // Level 1-5
+var QUEST_TEMPLATES = [
   { type: 'build', target: 'farm', count: 1, reward: { coins: 200 }, minLevel: 1, description: 'Построй ферму' },
   { type: 'build', target: 'house', count: 1, reward: { coins: 150 }, minLevel: 1, description: 'Построй дом' },
   { type: 'collect', target: 'food', count: 50, reward: { coins: 100 }, minLevel: 1, description: 'Собери 50 еды' },
@@ -232,8 +208,6 @@ const QUEST_TEMPLATES = [
   { type: 'build', target: 'garden', count: 1, reward: { coins: 200 }, minLevel: 3, description: 'Построй сад' },
   { type: 'upgrade', target: 'house', count: 3, reward: { coins: 400 }, minLevel: 3, description: 'Улучши дом до 3 уровня' },
   { type: 'collect', target: 'food', count: 200, reward: { coins: 300, crystals: 1 }, minLevel: 3, description: 'Собери 200 еды' },
-
-  // Level 4-7
   { type: 'build', target: 'factory', count: 1, reward: { coins: 600, crystals: 2 }, minLevel: 4, description: 'Построй фабрику' },
   { type: 'build', target: 'bakery', count: 1, reward: { coins: 400 }, minLevel: 4, description: 'Построй пекарню' },
   { type: 'upgrade', target: 'quarry', count: 3, reward: { coins: 500, materials: 200 }, minLevel: 4, description: 'Улучши каменоломню до 3 ур.' },
@@ -246,8 +220,6 @@ const QUEST_TEMPLATES = [
   { type: 'build', target: 'park', count: 1, reward: { coins: 500, crystals: 2 }, minLevel: 7, description: 'Построй парк' },
   { type: 'collect', target: 'materials', count: 500, reward: { coins: 600, crystals: 2 }, minLevel: 6, description: 'Собери 500 материалов' },
   { type: 'upgrade', target: 'factory', count: 5, reward: { coins: 1000, crystals: 3 }, minLevel: 6, description: 'Улучши фабрику до 5 ур.' },
-
-  // Level 8-12
   { type: 'build', target: 'hospital', count: 1, reward: { coins: 1200, crystals: 4 }, minLevel: 8, description: 'Построй больницу' },
   { type: 'reach_population', target: 'population', count: 50, reward: { coins: 1000, crystals: 3 }, minLevel: 8, description: 'Достигни 50 населения' },
   { type: 'build', target: 'library', count: 1, reward: { coins: 1000, crystals: 3 }, minLevel: 9, description: 'Построй библиотеку' },
@@ -258,8 +230,6 @@ const QUEST_TEMPLATES = [
   { type: 'unlock_zone', target: 'zone', count: 3, reward: { coins: 3000, crystals: 5 }, minLevel: 10, description: 'Открой 3 зоны' },
   { type: 'reach_population', target: 'population', count: 100, reward: { coins: 2000, crystals: 5 }, minLevel: 11, description: 'Достигни 100 населения' },
   { type: 'collect', target: 'food', count: 2000, reward: { coins: 1500, crystals: 3 }, minLevel: 11, description: 'Собери 2000 еды' },
-
-  // Level 13+
   { type: 'upgrade', target: 'bank', count: 5, reward: { coins: 3000, crystals: 5 }, minLevel: 13, description: 'Улучши банк до 5 ур.' },
   { type: 'build', target: 'stadium', count: 1, reward: { coins: 5000, crystals: 10 }, minLevel: 15, description: 'Построй стадион' },
   { type: 'build_count', target: 'any', count: 50, reward: { coins: 5000, crystals: 8 }, minLevel: 15, description: 'Построй 50 зданий' },
@@ -272,15 +242,35 @@ const QUEST_TEMPLATES = [
   { type: 'collect', target: 'coins', count: 100000, reward: { crystals: 25 }, minLevel: 25, description: 'Заработай 100000 монет' }
 ];
 
+function ZONE_UNLOCK_COST(zoneNumber) {
+  return Math.floor(500 * Math.pow(zoneNumber, 2));
+}
+
+function LEVEL_XP(level) {
+  return Math.floor(100 * Math.pow(level, 2));
+}
+
+function INCOME_FORMULA(base, level) {
+  return Math.floor(base * Math.pow(1.18, level - 1));
+}
+
+function UPGRADE_COST_FORMULA(base, level) {
+  return Math.floor(base * Math.pow(1.32, level));
+}
+
+function PRODUCTION_TIME_FORMULA(baseTime, level) {
+  return Math.floor(baseTime * (1 + (level - 1) * 0.03));
+}
+
 module.exports = {
-  GRID_SIZE,
-  INITIAL_UNLOCKED,
-  BUILDING_TYPES,
-  RESOURCE_DEFAULTS,
-  ZONE_UNLOCK_COST,
-  LEVEL_XP,
-  INCOME_FORMULA,
-  UPGRADE_COST_FORMULA,
-  PRODUCTION_TIME_FORMULA,
-  QUEST_TEMPLATES
+  GRID_SIZE: GRID_SIZE,
+  INITIAL_UNLOCKED: INITIAL_UNLOCKED,
+  BUILDING_TYPES: BUILDING_TYPES,
+  RESOURCE_DEFAULTS: RESOURCE_DEFAULTS,
+  ZONE_UNLOCK_COST: ZONE_UNLOCK_COST,
+  LEVEL_XP: LEVEL_XP,
+  INCOME_FORMULA: INCOME_FORMULA,
+  UPGRADE_COST_FORMULA: UPGRADE_COST_FORMULA,
+  PRODUCTION_TIME_FORMULA: PRODUCTION_TIME_FORMULA,
+  QUEST_TEMPLATES: QUEST_TEMPLATES
 };

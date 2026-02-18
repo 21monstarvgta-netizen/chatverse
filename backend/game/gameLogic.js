@@ -1,10 +1,12 @@
-const config = require('./gameConfig');
+var config = require('./gameConfig');
 
 function calculateOutput(buildingType, level) {
   var bt = config.BUILDING_TYPES[buildingType];
   if (!bt) return {};
   var result = {};
-  for (var res in bt.baseOutput) {
+  var keys = Object.keys(bt.baseOutput);
+  for (var i = 0; i < keys.length; i++) {
+    var res = keys[i];
     result[res] = config.INCOME_FORMULA(bt.baseOutput[res], level);
   }
   return result;
@@ -14,7 +16,9 @@ function calculateUpgradeCost(buildingType, currentLevel) {
   var bt = config.BUILDING_TYPES[buildingType];
   if (!bt) return {};
   var result = {};
-  for (var res in bt.baseCost) {
+  var keys = Object.keys(bt.baseCost);
+  for (var i = 0; i < keys.length; i++) {
+    var res = keys[i];
     result[res] = config.UPGRADE_COST_FORMULA(bt.baseCost[res], currentLevel);
   }
   return result;
@@ -24,7 +28,9 @@ function calculateBuildCost(buildingType) {
   var bt = config.BUILDING_TYPES[buildingType];
   if (!bt) return {};
   var result = {};
-  for (var res in bt.baseCost) {
+  var keys = Object.keys(bt.baseCost);
+  for (var i = 0; i < keys.length; i++) {
+    var res = keys[i];
     result[res] = bt.baseCost[res];
   }
   return result;
@@ -37,14 +43,18 @@ function calculateProductionTime(buildingType, level) {
 }
 
 function canAfford(resources, cost) {
-  for (var res in cost) {
+  var keys = Object.keys(cost);
+  for (var i = 0; i < keys.length; i++) {
+    var res = keys[i];
     if ((resources[res] || 0) < cost[res]) return false;
   }
   return true;
 }
 
 function subtractResources(resources, cost) {
-  for (var res in cost) {
+  var keys = Object.keys(cost);
+  for (var i = 0; i < keys.length; i++) {
+    var res = keys[i];
     resources[res] = (resources[res] || 0) - cost[res];
   }
   return resources;
@@ -52,7 +62,9 @@ function subtractResources(resources, cost) {
 
 function addResources(resources, reward, maxStorage) {
   maxStorage = maxStorage || 999999;
-  for (var res in reward) {
+  var keys = Object.keys(reward);
+  for (var i = 0; i < keys.length; i++) {
+    var res = keys[i];
     if (res === 'energy' || res === 'population' || res === 'experience' || res === 'crystals') {
       resources[res] = (resources[res] || 0) + reward[res];
     } else {
@@ -66,39 +78,33 @@ function isTileUnlocked(x, y, unlockedZones) {
   var centerX = Math.floor(config.GRID_SIZE / 2);
   var centerY = Math.floor(config.GRID_SIZE / 2);
   var halfInit = Math.floor(config.INITIAL_UNLOCKED / 2);
-  // Initial area
   if (x >= centerX - halfInit && x < centerX + halfInit &&
       y >= centerY - halfInit && y < centerY + halfInit) {
     return true;
   }
-  // Check unlocked zones
-  for (var i = 0; i < unlockedZones.length; i++) {
-    var zone = unlockedZones[i];
-    if (x >= zone.x1 && x <= zone.x2 && y >= zone.y1 && y <= zone.y2) {
-      return true;
+  if (unlockedZones) {
+    for (var i = 0; i < unlockedZones.length; i++) {
+      var zone = unlockedZones[i];
+      if (x >= zone.x1 && x <= zone.x2 && y >= zone.y1 && y <= zone.y2) {
+        return true;
+      }
     }
   }
   return false;
 }
 
 function getNextZones(unlockedZones) {
+  unlockedZones = unlockedZones || [];
   var centerX = Math.floor(config.GRID_SIZE / 2);
   var centerY = Math.floor(config.GRID_SIZE / 2);
   var halfInit = Math.floor(config.INITIAL_UNLOCKED / 2);
   var zoneNum = unlockedZones.length + 1;
-  var zones = [];
-
-  // Expand outward from initial area
-  var ring = Math.ceil(zoneNum / 4);
-  var side = zoneNum % 4;
-  var size = 4; // zone size
 
   var baseX1 = centerX - halfInit;
   var baseY1 = centerY - halfInit;
   var baseX2 = centerX + halfInit - 1;
   var baseY2 = centerY + halfInit - 1;
 
-  // Calculate expanded bounds based on already unlocked zones
   var expandedX1 = baseX1;
   var expandedY1 = baseY1;
   var expandedX2 = baseX2;
@@ -111,10 +117,9 @@ function getNextZones(unlockedZones) {
     expandedY2 = Math.max(expandedY2, unlockedZones[i].y2);
   }
 
-  // Offer zones on each side
+  var size = 4;
   var candidates = [];
 
-  // Top
   if (expandedY1 - size >= 0) {
     candidates.push({
       x1: expandedX1, y1: expandedY1 - size,
@@ -122,7 +127,6 @@ function getNextZones(unlockedZones) {
       direction: 'north'
     });
   }
-  // Bottom
   if (expandedY2 + size < config.GRID_SIZE) {
     candidates.push({
       x1: expandedX1, y1: expandedY2 + 1,
@@ -130,7 +134,6 @@ function getNextZones(unlockedZones) {
       direction: 'south'
     });
   }
-  // Left
   if (expandedX1 - size >= 0) {
     candidates.push({
       x1: expandedX1 - size, y1: expandedY1,
@@ -138,7 +141,6 @@ function getNextZones(unlockedZones) {
       direction: 'west'
     });
   }
-  // Right
   if (expandedX2 + size < config.GRID_SIZE) {
     candidates.push({
       x1: expandedX2 + 1, y1: expandedY1,
@@ -147,10 +149,12 @@ function getNextZones(unlockedZones) {
     });
   }
 
-  // Filter out already unlocked
   candidates = candidates.filter(function(c) {
     for (var j = 0; j < unlockedZones.length; j++) {
-      if (c.x1 === unlockedZones[j].x1 && c.y1 === unlockedZones[j].y1) return false;
+      if (c.x1 === unlockedZones[j].x1 && c.y1 === unlockedZones[j].y1 &&
+          c.x2 === unlockedZones[j].x2 && c.y2 === unlockedZones[j].y2) {
+        return false;
+      }
     }
     return true;
   });
@@ -164,9 +168,13 @@ function getNextZones(unlockedZones) {
 
 function calculateTotalEnergy(buildings) {
   var total = config.RESOURCE_DEFAULTS.energy;
+  if (!buildings) return total;
   for (var i = 0; i < buildings.length; i++) {
     if (buildings[i].type === 'powerplant') {
-      total += config.INCOME_FORMULA(config.BUILDING_TYPES.powerplant.baseOutput.energy, buildings[i].level);
+      var bt = config.BUILDING_TYPES.powerplant;
+      if (bt && bt.baseOutput && bt.baseOutput.energy) {
+        total += config.INCOME_FORMULA(bt.baseOutput.energy, buildings[i].level);
+      }
     }
   }
   return total;
@@ -174,18 +182,23 @@ function calculateTotalEnergy(buildings) {
 
 function calculateUsedEnergy(buildings) {
   var used = 0;
+  if (!buildings) return used;
   for (var i = 0; i < buildings.length; i++) {
     var bt = config.BUILDING_TYPES[buildings[i].type];
-    if (bt) used += bt.energyCost;
+    if (bt) used += (bt.energyCost || 0);
   }
   return used;
 }
 
 function calculateMaxStorage(buildings) {
   var base = config.RESOURCE_DEFAULTS.maxStorage;
+  if (!buildings) return base;
   for (var i = 0; i < buildings.length; i++) {
     if (buildings[i].type === 'warehouse') {
-      base += config.INCOME_FORMULA(config.BUILDING_TYPES.warehouse.baseOutput.storage, buildings[i].level);
+      var bt = config.BUILDING_TYPES.warehouse;
+      if (bt && bt.baseOutput && bt.baseOutput.storage) {
+        base += config.INCOME_FORMULA(bt.baseOutput.storage, buildings[i].level);
+      }
     }
   }
   return base;
@@ -193,9 +206,10 @@ function calculateMaxStorage(buildings) {
 
 function calculateTotalPopulation(buildings) {
   var pop = 0;
+  if (!buildings) return pop;
   for (var i = 0; i < buildings.length; i++) {
     var bt = config.BUILDING_TYPES[buildings[i].type];
-    if (bt && bt.baseOutput.population) {
+    if (bt && bt.baseOutput && bt.baseOutput.population) {
       pop += config.INCOME_FORMULA(bt.baseOutput.population, buildings[i].level);
     }
   }
@@ -203,29 +217,35 @@ function calculateTotalPopulation(buildings) {
 }
 
 function processOfflineProgress(player, buildings, now) {
-  var lastOnline = new Date(player.lastOnline || now);
-  var elapsed = Math.floor((now - lastOnline) / 1000);
+  var lastOnline = player.lastOnline ? new Date(player.lastOnline) : new Date(now);
+  var nowDate = new Date(now);
+  var elapsed = Math.floor((nowDate.getTime() - lastOnline.getTime()) / 1000);
   if (elapsed <= 0) return { resources: player.resources, collected: {} };
 
-  // Cap offline at 8 hours
   elapsed = Math.min(elapsed, 8 * 3600);
 
   var maxStorage = calculateMaxStorage(buildings);
   var collected = {};
 
-  for (var i = 0; i < buildings.length; i++) {
-    var b = buildings[i];
-    var bt = config.BUILDING_TYPES[b.type];
-    if (!bt || bt.baseTime === 0) continue;
+  if (buildings) {
+    for (var i = 0; i < buildings.length; i++) {
+      var b = buildings[i];
+      var bt = config.BUILDING_TYPES[b.type];
+      if (!bt || bt.baseTime === 0) continue;
 
-    var prodTime = calculateProductionTime(b.type, b.level);
-    var cycles = Math.floor(elapsed / prodTime);
-    if (cycles <= 0) continue;
+      var prodTime = calculateProductionTime(b.type, b.level);
+      if (prodTime <= 0) continue;
+      var cycles = Math.floor(elapsed / prodTime);
+      if (cycles <= 0) continue;
+      cycles = Math.min(cycles, 10);
 
-    var output = calculateOutput(b.type, b.level);
-    for (var res in output) {
-      var amount = output[res] * cycles;
-      collected[res] = (collected[res] || 0) + amount;
+      var output = calculateOutput(b.type, b.level);
+      var outputKeys = Object.keys(output);
+      for (var j = 0; j < outputKeys.length; j++) {
+        var res = outputKeys[j];
+        var amount = output[res] * cycles;
+        collected[res] = (collected[res] || 0) + amount;
+      }
     }
   }
 
@@ -235,38 +255,38 @@ function processOfflineProgress(player, buildings, now) {
 
 function getQuestsForLevel(level, completedQuestIds) {
   completedQuestIds = completedQuestIds || [];
-  var available = config.QUEST_TEMPLATES.filter(function(q, idx) {
-    return q.minLevel <= level && completedQuestIds.indexOf(idx) === -1;
-  });
-  // Return first 5 available
-  return available.slice(0, 5).map(function(q, idx) {
-    var originalIdx = config.QUEST_TEMPLATES.indexOf(q);
-    return {
-      questId: originalIdx,
-      type: q.type,
-      target: q.target,
-      count: q.count,
-      reward: q.reward,
-      description: q.description,
-      progress: 0
-    };
-  });
+  var available = [];
+  for (var i = 0; i < config.QUEST_TEMPLATES.length; i++) {
+    var q = config.QUEST_TEMPLATES[i];
+    if (q.minLevel <= level && completedQuestIds.indexOf(i) === -1) {
+      available.push({
+        questId: i,
+        type: q.type,
+        target: q.target,
+        count: q.count,
+        reward: q.reward,
+        description: q.description,
+        progress: 0
+      });
+    }
+  }
+  return available.slice(0, 5);
 }
 
 module.exports = {
-  calculateOutput,
-  calculateUpgradeCost,
-  calculateBuildCost,
-  calculateProductionTime,
-  canAfford,
-  subtractResources,
-  addResources,
-  isTileUnlocked,
-  getNextZones,
-  calculateTotalEnergy,
-  calculateUsedEnergy,
-  calculateMaxStorage,
-  calculateTotalPopulation,
-  processOfflineProgress,
-  getQuestsForLevel
+  calculateOutput: calculateOutput,
+  calculateUpgradeCost: calculateUpgradeCost,
+  calculateBuildCost: calculateBuildCost,
+  calculateProductionTime: calculateProductionTime,
+  canAfford: canAfford,
+  subtractResources: subtractResources,
+  addResources: addResources,
+  isTileUnlocked: isTileUnlocked,
+  getNextZones: getNextZones,
+  calculateTotalEnergy: calculateTotalEnergy,
+  calculateUsedEnergy: calculateUsedEnergy,
+  calculateMaxStorage: calculateMaxStorage,
+  calculateTotalPopulation: calculateTotalPopulation,
+  processOfflineProgress: processOfflineProgress,
+  getQuestsForLevel: getQuestsForLevel
 };
