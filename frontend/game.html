@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ChatVerse — Черемушки</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css?v=4">
+  <link rel="stylesheet" href="/css/game.css?v=4">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div id="game-loading" class="game-loading">
+    <div class="game-loading-content">
+      <div class="game-loading-icon">🏘️</div>
+      <h2>Черемушки</h2>
+      <p>Загрузка вашего города...</p>
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <div id="game-app" class="game-app hidden">
+    <!-- Top Resource Bar -->
+    <div class="game-topbar">
+      <div class="topbar-left">
+        <button class="game-back-btn" id="game-back-btn">← Чат</button>
+        <div class="city-name-wrapper">
+          <span id="city-name" class="city-name">Мой город</span>
+          <button class="city-rename-btn" id="city-rename-btn" title="Переименовать">✏️</button>
+        </div>
+      </div>
+      <div class="topbar-level">
+        <span class="level-badge" id="level-badge">Ур. 1</span>
+        <div class="xp-bar-mini">
+          <div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-resources-bar" id="resources-bar">
+      <div class="res-item" title="Монеты"><span class="res-icon">🪙</span><span id="res-coins">0</span></div>
+      <div class="res-item" title="Еда"><span class="res-icon">🍞</span><span id="res-food">0</span></div>
+      <div class="res-item" title="Материалы"><span class="res-icon">🪨</span><span id="res-materials">0</span></div>
+      <div class="res-item" title="Энергия"><span class="res-icon">⚡</span><span id="res-energy">0/0</span></div>
+      <div class="res-item" title="Население"><span class="res-icon">👥</span><span id="res-population">0</span></div>
+      <div class="res-item" title="Кристаллы"><span class="res-icon">💎</span><span id="res-crystals">0</span></div>
+    </div>
+
+    <!-- Main Game Area -->
+    <div class="game-viewport" id="game-viewport">
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- Building Info Panel (when selected) -->
+    <div class="building-info-panel hidden" id="building-info-panel">
+      <div class="building-info-header">
+        <span id="building-info-emoji" class="building-info-emoji">🏠</span>
+        <div>
+          <h3 id="building-info-name">Здание</h3>
+          <span id="building-info-level" class="building-info-level">Ур. 1</span>
+        </div>
+        <button class="panel-close" id="close-building-info">✕</button>
+      </div>
+      <div class="building-info-body">
+        <div id="building-info-output" class="building-info-row"></div>
+        <div id="building-info-timer" class="building-info-row"></div>
+        <div class="building-info-actions" id="building-info-actions"></div>
+      </div>
+    </div>
+
+    <!-- Bottom Build Menu -->
+    <div class="game-bottom-bar">
+      <button class="bottom-tab active" data-tab="build" id="tab-build">🏗️ Строить</button>
+      <button class="bottom-tab" data-tab="quests" id="tab-quests">📋 Квесты<span class="quest-badge hidden" id="quest-badge">0</span></button>
+      <button class="bottom-tab" data-tab="social" id="tab-social">🌍 Города</button>
+      <button class="bottom-tab" data-tab="collect" id="tab-collect">💰 Собрать</button>
+    </div>
+
+    <!-- Build Panel -->
+    <div class="game-panel" id="panel-build">
+      <div class="panel-header">
+        <h3>🏗️ Построить</h3>
+        <button class="panel-close" id="close-build-panel">✕</button>
+      </div>
+      <div class="build-categories" id="build-categories">
+        <button class="build-cat-btn active" data-cat="all">Все</button>
+        <button class="build-cat-btn" data-cat="production">Ресурсы</button>
+        <button class="build-cat-btn" data-cat="residential">Жильё</button>
+        <button class="build-cat-btn" data-cat="commercial">Бизнес</button>
+        <button class="build-cat-btn" data-cat="infrastructure">Инфра</button>
+        <button class="build-cat-btn" data-cat="special">Особые</button>
+        <button class="build-cat-btn" data-cat="decoration">Декор</button>
+      </div>
+      <div class="build-list" id="build-list"></div>
+    </div>
+
+    <!-- Quests Panel -->
+    <div class="game-panel hidden" id="panel-quests">
+      <div class="panel-header">
+        <h3>📋 Квесты</h3>
+        <button class="panel-close" id="close-quests-panel">✕</button>
+      </div>
+      <div class="quests-list" id="quests-list"></div>
+    </div>
+
+    <!-- Social Panel -->
+    <div class="game-panel hidden" id="panel-social">
+      <div class="panel-header">
+        <h3>🌍 Города игроков</h3>
+        <button class="panel-close" id="close-social-panel">✕</button>
+      </div>
+      <div class="leaderboard-list" id="leaderboard-list"></div>
+    </div>
+
+    <!-- Zone unlock overlay -->
+    <div class="zone-unlock-modal hidden" id="zone-unlock-modal">
+      <div class="zone-unlock-content">
+        <h3>🗺️ Открыть территорию</h3>
+        <p id="zone-unlock-info"></p>
+        <div class="zone-unlock-actions">
+          <button class="btn btn-secondary btn-sm" id="zone-cancel">Отмена</button>
+          <button class="btn btn-primary btn-sm" id="zone-confirm" style="width:auto;">Открыть</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visit mode banner -->
+    <div class="visit-banner hidden" id="visit-banner">
+      <span id="visit-banner-text">Просмотр города</span>
+      <button class="btn btn-secondary btn-sm" id="visit-back">← Мой город</button>
+    </div>
+  </div>
+
+  <script src="/js/utils.js?v=4"></script>
+  <script src="/js/gameRenderer.js?v=4"></script>
+  <script src="/js/gameUI.js?v=4"></script>
+  <script src="/js/game.js?v=4"></script>
+</body>
+</html>
