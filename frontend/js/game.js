@@ -91,6 +91,15 @@ Game.prototype.setupEvents = function() {
     });
   }
 
+  var resetBtn = document.getElementById('game-reset-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function() {
+      if (!confirm('Сбросить весь прогресс? Это нельзя отменить!')) return;
+      if (!confirm('Вы уверены? Все здания, ресурсы и квесты будут удалены!')) return;
+      self.resetProgress();
+    });
+  }
+
   var cancelPlacingBtn = document.getElementById('cancel-placing');
   if (cancelPlacingBtn) {
     cancelPlacingBtn.addEventListener('click', function() {
@@ -526,6 +535,21 @@ Game.prototype.exitVisitMode = function() {
   if (banner) banner.classList.add('hidden');
   var bottomBar = document.querySelector('.game-bottom-bar');
   if (bottomBar) bottomBar.style.display = '';
+};
+
+Game.prototype.resetProgress = async function() {
+  try {
+    var data = await apiRequest('/game/reset', { method: 'POST' });
+    this.player = data.player;
+    this.updateRendererState();
+    this.renderer.centerCamera();
+    this.ui.updateResources(this.player);
+    this.ui.renderBuildList(this.config.buildingTypes, this.player.level, this.player.resources);
+    this.ui.renderQuests(this.player.activeQuests);
+    showToast('🔄 Прогресс сброшен!', 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
 };
 
 document.addEventListener('DOMContentLoaded', function() {

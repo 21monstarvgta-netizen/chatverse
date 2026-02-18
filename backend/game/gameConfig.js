@@ -23,7 +23,7 @@ var BUILDING_TYPES = {
     baseTime: 900,
     maxLevel: 50,
     category: 'production',
-    unlockLevel: 2,
+    unlockLevel: 1,
     energyCost: 2
   },
   factory: {
@@ -35,7 +35,7 @@ var BUILDING_TYPES = {
     baseTime: 1800,
     maxLevel: 50,
     category: 'production',
-    unlockLevel: 4,
+    unlockLevel: 3,
     energyCost: 3
   },
   powerplant: {
@@ -47,7 +47,7 @@ var BUILDING_TYPES = {
     baseTime: 1200,
     maxLevel: 30,
     category: 'infrastructure',
-    unlockLevel: 3,
+    unlockLevel: 2,
     energyCost: 0
   },
   house: {
@@ -83,7 +83,7 @@ var BUILDING_TYPES = {
     baseTime: 600,
     maxLevel: 40,
     category: 'commercial',
-    unlockLevel: 5,
+    unlockLevel: 4,
     energyCost: 2
   },
   garden: {
@@ -95,7 +95,7 @@ var BUILDING_TYPES = {
     baseTime: 480,
     maxLevel: 40,
     category: 'decoration',
-    unlockLevel: 3,
+    unlockLevel: 2,
     energyCost: 1
   },
   school: {
@@ -107,7 +107,7 @@ var BUILDING_TYPES = {
     baseTime: 900,
     maxLevel: 30,
     category: 'special',
-    unlockLevel: 6,
+    unlockLevel: 5,
     energyCost: 2
   },
   bakery: {
@@ -119,7 +119,7 @@ var BUILDING_TYPES = {
     baseTime: 720,
     maxLevel: 40,
     category: 'commercial',
-    unlockLevel: 4,
+    unlockLevel: 3,
     energyCost: 1
   },
   park: {
@@ -131,7 +131,7 @@ var BUILDING_TYPES = {
     baseTime: 900,
     maxLevel: 30,
     category: 'decoration',
-    unlockLevel: 7,
+    unlockLevel: 5,
     energyCost: 1
   },
   bank: {
@@ -143,7 +143,7 @@ var BUILDING_TYPES = {
     baseTime: 3600,
     maxLevel: 25,
     category: 'commercial',
-    unlockLevel: 10,
+    unlockLevel: 8,
     energyCost: 4
   },
   hospital: {
@@ -155,7 +155,7 @@ var BUILDING_TYPES = {
     baseTime: 1200,
     maxLevel: 20,
     category: 'special',
-    unlockLevel: 8,
+    unlockLevel: 6,
     energyCost: 3
   },
   library: {
@@ -167,7 +167,7 @@ var BUILDING_TYPES = {
     baseTime: 1500,
     maxLevel: 25,
     category: 'special',
-    unlockLevel: 9,
+    unlockLevel: 7,
     energyCost: 2
   },
   stadium: {
@@ -179,75 +179,100 @@ var BUILDING_TYPES = {
     baseTime: 3600,
     maxLevel: 15,
     category: 'special',
-    unlockLevel: 15,
+    unlockLevel: 12,
     energyCost: 5
   }
 };
 
 var RESOURCE_DEFAULTS = {
-  coins: 500,
-  food: 200,
-  materials: 100,
+  coins: 5000,
+  food: 2000,
+  materials: 1000,
   energy: 10,
   population: 0,
   experience: 0,
-  crystals: 5,
-  maxStorage: 500
+  crystals: 50,
+  maxStorage: 5000
 };
 
+// Fixed story quests
 var QUEST_TEMPLATES = [
-  { type: 'build', target: 'farm', count: 1, reward: { coins: 200 }, minLevel: 1, description: 'Построй ферму' },
-  { type: 'build', target: 'house', count: 1, reward: { coins: 150 }, minLevel: 1, description: 'Построй дом' },
-  { type: 'collect', target: 'food', count: 50, reward: { coins: 100 }, minLevel: 1, description: 'Собери 50 еды' },
-  { type: 'collect', target: 'coins', count: 200, reward: { food: 100, materials: 50 }, minLevel: 1, description: 'Заработай 200 монет' },
-  { type: 'upgrade', target: 'farm', count: 2, reward: { coins: 300, crystals: 1 }, minLevel: 2, description: 'Улучши ферму до 2 уровня' },
-  { type: 'build', target: 'quarry', count: 1, reward: { coins: 400 }, minLevel: 2, description: 'Построй каменоломню' },
-  { type: 'build', target: 'warehouse', count: 1, reward: { coins: 300 }, minLevel: 2, description: 'Построй склад' },
-  { type: 'collect', target: 'materials', count: 100, reward: { coins: 200 }, minLevel: 2, description: 'Собери 100 материалов' },
-  { type: 'build', target: 'powerplant', count: 1, reward: { coins: 500, crystals: 2 }, minLevel: 3, description: 'Построй электростанцию' },
-  { type: 'build', target: 'garden', count: 1, reward: { coins: 200 }, minLevel: 3, description: 'Построй сад' },
-  { type: 'upgrade', target: 'house', count: 3, reward: { coins: 400 }, minLevel: 3, description: 'Улучши дом до 3 уровня' },
-  { type: 'collect', target: 'food', count: 200, reward: { coins: 300, crystals: 1 }, minLevel: 3, description: 'Собери 200 еды' },
-  { type: 'build', target: 'factory', count: 1, reward: { coins: 600, crystals: 2 }, minLevel: 4, description: 'Построй фабрику' },
-  { type: 'build', target: 'bakery', count: 1, reward: { coins: 400 }, minLevel: 4, description: 'Построй пекарню' },
-  { type: 'upgrade', target: 'quarry', count: 3, reward: { coins: 500, materials: 200 }, minLevel: 4, description: 'Улучши каменоломню до 3 ур.' },
-  { type: 'collect', target: 'coins', count: 1000, reward: { crystals: 3 }, minLevel: 4, description: 'Заработай 1000 монет' },
-  { type: 'build', target: 'market', count: 1, reward: { coins: 500, crystals: 2 }, minLevel: 5, description: 'Построй рынок' },
-  { type: 'upgrade', target: 'farm', count: 5, reward: { coins: 800, crystals: 2 }, minLevel: 5, description: 'Улучши ферму до 5 ур.' },
-  { type: 'reach_population', target: 'population', count: 20, reward: { coins: 600 }, minLevel: 5, description: 'Достигни 20 населения' },
-  { type: 'build_count', target: 'any', count: 10, reward: { coins: 1000, crystals: 3 }, minLevel: 5, description: 'Построй 10 зданий' },
-  { type: 'build', target: 'school', count: 1, reward: { coins: 800, crystals: 3 }, minLevel: 6, description: 'Построй школу' },
-  { type: 'build', target: 'park', count: 1, reward: { coins: 500, crystals: 2 }, minLevel: 7, description: 'Построй парк' },
-  { type: 'collect', target: 'materials', count: 500, reward: { coins: 600, crystals: 2 }, minLevel: 6, description: 'Собери 500 материалов' },
-  { type: 'upgrade', target: 'factory', count: 5, reward: { coins: 1000, crystals: 3 }, minLevel: 6, description: 'Улучши фабрику до 5 ур.' },
-  { type: 'build', target: 'hospital', count: 1, reward: { coins: 1200, crystals: 4 }, minLevel: 8, description: 'Построй больницу' },
-  { type: 'reach_population', target: 'population', count: 50, reward: { coins: 1000, crystals: 3 }, minLevel: 8, description: 'Достигни 50 населения' },
-  { type: 'build', target: 'library', count: 1, reward: { coins: 1000, crystals: 3 }, minLevel: 9, description: 'Построй библиотеку' },
-  { type: 'collect', target: 'coins', count: 5000, reward: { crystals: 5 }, minLevel: 9, description: 'Заработай 5000 монет' },
-  { type: 'build', target: 'bank', count: 1, reward: { coins: 2000, crystals: 5 }, minLevel: 10, description: 'Построй банк' },
-  { type: 'upgrade', target: 'house', count: 10, reward: { coins: 1500, crystals: 4 }, minLevel: 10, description: 'Улучши дом до 10 ур.' },
-  { type: 'build_count', target: 'any', count: 25, reward: { coins: 2000, crystals: 5 }, minLevel: 10, description: 'Построй 25 зданий' },
-  { type: 'unlock_zone', target: 'zone', count: 3, reward: { coins: 3000, crystals: 5 }, minLevel: 10, description: 'Открой 3 зоны' },
-  { type: 'reach_population', target: 'population', count: 100, reward: { coins: 2000, crystals: 5 }, minLevel: 11, description: 'Достигни 100 населения' },
-  { type: 'collect', target: 'food', count: 2000, reward: { coins: 1500, crystals: 3 }, minLevel: 11, description: 'Собери 2000 еды' },
-  { type: 'upgrade', target: 'bank', count: 5, reward: { coins: 3000, crystals: 5 }, minLevel: 13, description: 'Улучши банк до 5 ур.' },
-  { type: 'build', target: 'stadium', count: 1, reward: { coins: 5000, crystals: 10 }, minLevel: 15, description: 'Построй стадион' },
-  { type: 'build_count', target: 'any', count: 50, reward: { coins: 5000, crystals: 8 }, minLevel: 15, description: 'Построй 50 зданий' },
-  { type: 'reach_population', target: 'population', count: 200, reward: { coins: 3000, crystals: 6 }, minLevel: 15, description: 'Достигни 200 населения' },
-  { type: 'collect', target: 'coins', count: 20000, reward: { crystals: 10 }, minLevel: 15, description: 'Заработай 20000 монет' },
-  { type: 'upgrade', target: 'stadium', count: 5, reward: { coins: 8000, crystals: 10 }, minLevel: 18, description: 'Улучши стадион до 5 ур.' },
-  { type: 'unlock_zone', target: 'zone', count: 8, reward: { coins: 10000, crystals: 15 }, minLevel: 20, description: 'Открой 8 зон' },
-  { type: 'reach_population', target: 'population', count: 500, reward: { coins: 10000, crystals: 15 }, minLevel: 20, description: 'Достигни 500 населения' },
-  { type: 'build_count', target: 'any', count: 100, reward: { coins: 15000, crystals: 20 }, minLevel: 25, description: 'Построй 100 зданий' },
-  { type: 'collect', target: 'coins', count: 100000, reward: { crystals: 25 }, minLevel: 25, description: 'Заработай 100000 монет' }
+  { id: 's1', type: 'build', target: 'farm', count: 1, reward: { coins: 300, materials: 200 }, minLevel: 1, description: 'Построй первую ферму' },
+  { id: 's2', type: 'build', target: 'house', count: 1, reward: { coins: 300, food: 200 }, minLevel: 1, description: 'Построй первый дом' },
+  { id: 's3', type: 'build', target: 'quarry', count: 1, reward: { coins: 400, crystals: 5 }, minLevel: 1, description: 'Построй каменоломню' },
+  { id: 's4', type: 'collect', target: 'food', count: 50, reward: { coins: 300 }, minLevel: 1, description: 'Собери 50 еды' },
+  { id: 's5', type: 'collect', target: 'materials', count: 50, reward: { coins: 300 }, minLevel: 1, description: 'Собери 50 материалов' },
+  { id: 's6', type: 'build', target: 'powerplant', count: 1, reward: { coins: 500, crystals: 5 }, minLevel: 2, description: 'Построй электростанцию' },
+  { id: 's7', type: 'build', target: 'garden', count: 1, reward: { coins: 300 }, minLevel: 2, description: 'Построй сад' },
+  { id: 's8', type: 'build', target: 'warehouse', count: 1, reward: { coins: 400 }, minLevel: 2, description: 'Построй склад' },
+  { id: 's9', type: 'upgrade', target: 'farm', count: 3, reward: { coins: 500, crystals: 3 }, minLevel: 2, description: 'Улучши ферму до 3 ур.' },
+  { id: 's10', type: 'upgrade', target: 'house', count: 3, reward: { coins: 500 }, minLevel: 2, description: 'Улучши дом до 3 ур.' },
+  { id: 's11', type: 'build', target: 'factory', count: 1, reward: { coins: 600, crystals: 5 }, minLevel: 3, description: 'Построй фабрику' },
+  { id: 's12', type: 'build', target: 'bakery', count: 1, reward: { coins: 500 }, minLevel: 3, description: 'Построй пекарню' },
+  { id: 's13', type: 'build_count', target: 'any', count: 5, reward: { coins: 800, crystals: 5 }, minLevel: 2, description: 'Построй 5 зданий' },
+  { id: 's14', type: 'build_count', target: 'any', count: 10, reward: { coins: 1500, crystals: 8 }, minLevel: 3, description: 'Построй 10 зданий' },
+  { id: 's15', type: 'collect', target: 'coins', count: 1000, reward: { crystals: 10 }, minLevel: 3, description: 'Заработай 1000 монет' },
+  { id: 's16', type: 'build', target: 'market', count: 1, reward: { coins: 800, crystals: 5 }, minLevel: 4, description: 'Построй рынок' },
+  { id: 's17', type: 'upgrade', target: 'quarry', count: 5, reward: { coins: 800, materials: 500 }, minLevel: 4, description: 'Улучши каменоломню до 5 ур.' },
+  { id: 's18', type: 'reach_population', target: 'population', count: 20, reward: { coins: 1000 }, minLevel: 4, description: 'Достигни 20 населения' },
+  { id: 's19', type: 'build', target: 'school', count: 1, reward: { coins: 1000, crystals: 8 }, minLevel: 5, description: 'Построй школу' },
+  { id: 's20', type: 'build', target: 'park', count: 1, reward: { coins: 800, crystals: 5 }, minLevel: 5, description: 'Построй парк' },
+  { id: 's21', type: 'build_count', target: 'any', count: 20, reward: { coins: 2000, crystals: 10 }, minLevel: 5, description: 'Построй 20 зданий' },
+  { id: 's22', type: 'collect', target: 'food', count: 1000, reward: { coins: 1000, crystals: 5 }, minLevel: 5, description: 'Собери 1000 еды' },
+  { id: 's23', type: 'build', target: 'hospital', count: 1, reward: { coins: 1500, crystals: 8 }, minLevel: 6, description: 'Построй больницу' },
+  { id: 's24', type: 'build', target: 'library', count: 1, reward: { coins: 1200, crystals: 8 }, minLevel: 7, description: 'Построй библиотеку' },
+  { id: 's25', type: 'reach_population', target: 'population', count: 50, reward: { coins: 2000, crystals: 10 }, minLevel: 7, description: 'Достигни 50 населения' },
+  { id: 's26', type: 'build', target: 'bank', count: 1, reward: { coins: 3000, crystals: 10 }, minLevel: 8, description: 'Построй банк' },
+  { id: 's27', type: 'collect', target: 'coins', count: 10000, reward: { crystals: 15 }, minLevel: 8, description: 'Заработай 10000 монет' },
+  { id: 's28', type: 'build_count', target: 'any', count: 40, reward: { coins: 5000, crystals: 15 }, minLevel: 9, description: 'Построй 40 зданий' },
+  { id: 's29', type: 'unlock_zone', target: 'zone', count: 3, reward: { coins: 5000, crystals: 10 }, minLevel: 8, description: 'Открой 3 зоны' },
+  { id: 's30', type: 'reach_population', target: 'population', count: 100, reward: { coins: 5000, crystals: 15 }, minLevel: 10, description: 'Достигни 100 населения' },
+  { id: 's31', type: 'build', target: 'stadium', count: 1, reward: { coins: 8000, crystals: 20 }, minLevel: 12, description: 'Построй стадион' },
+  { id: 's32', type: 'build_count', target: 'any', count: 70, reward: { coins: 10000, crystals: 20 }, minLevel: 15, description: 'Построй 70 зданий' },
+  { id: 's33', type: 'collect', target: 'coins', count: 50000, reward: { crystals: 30 }, minLevel: 15, description: 'Заработай 50000 монет' },
+  { id: 's34', type: 'reach_population', target: 'population', count: 300, reward: { coins: 15000, crystals: 25 }, minLevel: 18, description: 'Достигни 300 населения' },
+  { id: 's35', type: 'unlock_zone', target: 'zone', count: 8, reward: { coins: 20000, crystals: 30 }, minLevel: 20, description: 'Открой 8 зон' }
 ];
+
+// Random quest generators
+var RANDOM_QUEST_POOLS = {
+  build: [
+    { target: 'farm', desc: 'Построй ферму', base_reward: 200 },
+    { target: 'house', desc: 'Построй дом', base_reward: 200 },
+    { target: 'quarry', desc: 'Построй каменоломню', base_reward: 300 },
+    { target: 'garden', desc: 'Построй сад', base_reward: 200 },
+    { target: 'factory', desc: 'Построй фабрику', base_reward: 400 },
+    { target: 'bakery', desc: 'Построй пекарню', base_reward: 300 },
+    { target: 'market', desc: 'Построй рынок', base_reward: 400 },
+    { target: 'powerplant', desc: 'Построй электростанцию', base_reward: 500 },
+    { target: 'warehouse', desc: 'Построй склад', base_reward: 300 },
+    { target: 'school', desc: 'Построй школу', base_reward: 500 },
+    { target: 'park', desc: 'Построй парк', base_reward: 400 }
+  ],
+  collect: [
+    { target: 'coins', desc: 'Заработай {n} монет', multiplier: 500 },
+    { target: 'food', desc: 'Собери {n} еды', multiplier: 200 },
+    { target: 'materials', desc: 'Собери {n} материалов', multiplier: 150 }
+  ],
+  upgrade: [
+    { target: 'farm', desc: 'Улучши ферму до {n} ур.' },
+    { target: 'house', desc: 'Улучши дом до {n} ур.' },
+    { target: 'quarry', desc: 'Улучши каменоломню до {n} ур.' },
+    { target: 'factory', desc: 'Улучши фабрику до {n} ур.' }
+  ],
+  spend: [
+    { target: 'coins', desc: 'Потрать {n} монет', multiplier: 300 },
+    { target: 'food', desc: 'Потрать {n} еды', multiplier: 100 },
+    { target: 'materials', desc: 'Потрать {n} материалов', multiplier: 80 }
+  ]
+};
 
 function ZONE_UNLOCK_COST(zoneNumber) {
   return Math.floor(500 * Math.pow(zoneNumber, 2));
 }
 
 function LEVEL_XP(level) {
-  return Math.floor(100 * Math.pow(level, 2));
+  return Math.floor(50 * level + 20);
 }
 
 function INCOME_FORMULA(base, level) {
@@ -272,5 +297,6 @@ module.exports = {
   INCOME_FORMULA: INCOME_FORMULA,
   UPGRADE_COST_FORMULA: UPGRADE_COST_FORMULA,
   PRODUCTION_TIME_FORMULA: PRODUCTION_TIME_FORMULA,
-  QUEST_TEMPLATES: QUEST_TEMPLATES
+  QUEST_TEMPLATES: QUEST_TEMPLATES,
+  RANDOM_QUEST_POOLS: RANDOM_QUEST_POOLS
 };
