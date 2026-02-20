@@ -119,4 +119,45 @@ router.post('/chat-image', auth, chatImageUpload.single('image'), async (req, re
   }
 });
 
+
+// Upload any file to chat (via Cloudinary raw)
+const chatFileUpload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+});
+
+router.post('/chat-file', auth, chatFileUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Выберите файл' });
+
+    const timestamp = Date.now();
+    const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'chatverse/files',
+          public_id: 'file_' + req.userId + '_' + timestamp,
+          resource_type: 'auto',
+          use_filename: false,
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      stream.end(req.file.buffer);
+    });
+
+    res.json({
+      fileUrl: result.secure_url,
+      fileName: originalName,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype
+    });
+  } catch (error) {
+    console.error('Chat file upload error:', error);
+    res.status(500).json({ error: 'Ошибка загрузки файла' });
+  }
+});
+
 module.exports = router;

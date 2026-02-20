@@ -25,12 +25,18 @@ const messageSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['text', 'system', 'image', 'shopping', 'dice', 'forwarded'],
+    enum: ['text', 'system', 'image', 'shopping', 'dice', 'forwarded', 'file'],
     default: 'text'
   },
   imageUrl: {
     type: String,
     default: ''
+  },
+  fileData: {
+    url: { type: String, default: '' },
+    name: { type: String, default: '' },
+    size: { type: Number, default: 0 },
+    mimeType: { type: String, default: '' }
   },
   shoppingList: {
     title: { type: String, default: 'Список покупок' },

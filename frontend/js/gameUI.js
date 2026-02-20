@@ -97,7 +97,7 @@ GameUI.prototype.renderQuests = function(quests) {
 
   list.querySelectorAll('.quest-claim-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      self.game.claimQuest(parseInt(btn.dataset.questId));
+      self.game.claimQuest(btn.dataset.questId);
     });
   });
 

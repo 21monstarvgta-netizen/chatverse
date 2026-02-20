@@ -572,3 +572,46 @@ textarea.form-input{min-height:80px;resize:vertical;padding:12px 14px}
     min-height: 36px;
   }
 }
+/* File message */
+.msg-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-decoration: none;
+  color: inherit;
+  max-width: 300px;
+  transition: background 0.2s;
+}
+.msg-file:hover {
+  background: rgba(255,255,255,0.12);
+}
+.msg-file-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.msg-file-info {
+  flex: 1;
+  min-width: 0;
+}
+.msg-file-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+.msg-file-size {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.msg-file-dl {
+  font-size: 18px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}

@@ -250,6 +250,7 @@ ChatApp.prototype.setupEventListeners = function() {
     document.getElementById('dice-picker').classList.add('hidden');
   });
   document.getElementById('image-upload-input').addEventListener('change', function(e) { self.handleImageUpload(e); });
+  document.getElementById('file-upload-input').addEventListener('change', function(e) { self.handleFileUpload(e); });
   document.getElementById('btn-shopping').addEventListener('click', function() { self.openShoppingModal(); });
   document.getElementById('close-shopping').addEventListener('click', function() { self.closeModal('shopping-modal'); });
   document.getElementById('cancel-shopping').addEventListener('click', function() { self.closeModal('shopping-modal'); });
@@ -410,6 +411,35 @@ ChatApp.prototype.handleImageUpload = async function(e) {
   } catch (err) { showToast(err.message || 'Ошибка', 'error'); }
   e.target.value = '';
 };
+
+ChatApp.prototype.handleFileUpload = async function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 50 * 1024 * 1024) { showToast('Макс. 50MB', 'error'); return; }
+  showToast('Загрузка файла...', 'info');
+  try {
+    var formData = new FormData();
+    formData.append('file', file);
+    var response = await fetch(API_URL + '/upload/chat-file', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + getToken() },
+      body: formData
+    });
+    var data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    this.socket.emit('file:message', {
+      fileUrl: data.fileUrl,
+      fileName: data.fileName,
+      fileSize: data.fileSize,
+      mimeType: data.mimeType,
+      content: '',
+      roomId: this.currentView === 'general' ? null : this.currentView
+    });
+    showToast('Файл отправлен!', 'success');
+  } catch (err) { showToast(err.message || 'Ошибка', 'error'); }
+  e.target.value = '';
+};
+
 
 ChatApp.prototype.buildShoppingModal = function() {
   var html = '';

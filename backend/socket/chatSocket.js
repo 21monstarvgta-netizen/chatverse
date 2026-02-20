@@ -109,6 +109,34 @@ function setupChatSocket(io) {
       }
     });
 
+
+    socket.on('file:message', async (data) => {
+      try {
+        if (!data.fileUrl || !data.fileName) return;
+        const message = new Message({
+          content: data.content || '',
+          sender: userId,
+          room: data.roomId || null,
+          type: 'file',
+          fileData: {
+            url: data.fileUrl,
+            name: data.fileName,
+            size: data.fileSize || 0,
+            mimeType: data.mimeType || ''
+          }
+        });
+        await message.save();
+        const populated = await Message.findById(message._id).populate(populateMsg);
+        if (data.roomId) {
+          io.to('room:' + data.roomId).emit('room:message', { roomId: data.roomId, message: populated });
+        } else {
+          io.to('general').emit('general:message', populated);
+        }
+      } catch (error) {
+        console.error('File message error:', error);
+      }
+    });
+
     socket.on('shopping:create', async (data) => {
       try {
         if (!data.items || !data.items.length) return;
