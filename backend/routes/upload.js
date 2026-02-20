@@ -132,13 +132,18 @@ router.post('/chat-file', auth, chatFileUpload.single('file'), async (req, res) 
 
     const timestamp = Date.now();
     const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    // Preserve original extension in public_id so download keeps the filename
+    const ext = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.') + 1) : '';
+    const safeBase = 'file_' + req.userId + '_' + timestamp;
+    const publicId = ext ? safeBase + '.' + ext : safeBase;
     const result = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'chatverse/files',
-          public_id: 'file_' + req.userId + '_' + timestamp,
+          public_id: publicId,
           resource_type: 'auto',
           use_filename: false,
+          format: ext || undefined,
         },
         (error, result) => {
           if (error) reject(error);
