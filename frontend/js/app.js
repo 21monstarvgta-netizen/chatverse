@@ -415,7 +415,7 @@ ChatApp.prototype.handleImageUpload = async function(e) {
 ChatApp.prototype.handleFileUpload = async function(e) {
   var file = e.target.files[0];
   if (!file) return;
-  if (file.size > 50 * 1024 * 1024) { showToast('Макс. 50MB', 'error'); return; }
+  if (file.size > 100 * 1024 * 1024) { showToast('Макс. 100MB', 'error'); return; }
   showToast('Загрузка файла...', 'info');
   try {
     var formData = new FormData();
@@ -612,6 +612,27 @@ ChatApp.prototype.createMessageHTML = function(msg) {
     bodyContent = createDiceHTML(msg);
   } else if (msg.type === 'forwarded') {
     bodyContent = createForwardedHTML(msg);
+  } else if (msg.type === 'file') {
+    var fd = msg.fileData || {};
+    var fsize = '';
+    if (fd.size) {
+      fsize = fd.size < 1024*1024 ? Math.round(fd.size/1024) + ' KB' : (fd.size/(1024*1024)).toFixed(1) + ' MB';
+    }
+    var ficon = '📄';
+    if (fd.mimeType) {
+      if (fd.mimeType.startsWith('image/')) ficon = '🖼️';
+      else if (fd.mimeType.startsWith('video/')) ficon = '🎬';
+      else if (fd.mimeType.startsWith('audio/')) ficon = '🎵';
+      else if (fd.mimeType.indexOf('pdf') >= 0) ficon = '📕';
+      else if (fd.mimeType.indexOf('zip') >= 0 || fd.mimeType.indexOf('rar') >= 0) ficon = '🗜️';
+      else if (fd.mimeType.indexOf('word') >= 0 || fd.mimeType.indexOf('document') >= 0) ficon = '📝';
+      else if (fd.mimeType.indexOf('excel') >= 0 || fd.mimeType.indexOf('spreadsheet') >= 0) ficon = '📊';
+    }
+    bodyContent = '<a class="msg-file" href="' + escapeHTML(fd.url || '') + '" target="_blank" rel="noopener noreferrer">' +
+      '<span class="msg-file-icon">' + ficon + '</span>' +
+      '<div class="msg-file-info"><div class="msg-file-name">' + escapeHTML(fd.name || 'Файл') + '</div>' +
+      (fsize ? '<div class="msg-file-size">' + fsize + '</div>' : '') +
+      '</div><span class="msg-file-dl">⬇️</span></a>' + editedMark;
   } else if (msg.type === 'system') {
     return '<div class="message system-message"><div class="msg-content"><div class="msg-text">' + escapeHTML(msg.content) + '</div></div></div>';
   }

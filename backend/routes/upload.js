@@ -123,7 +123,7 @@ router.post('/chat-image', auth, chatImageUpload.single('image'), async (req, re
 // Upload any file to chat (via Cloudinary raw)
 const chatFileUpload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
 });
 
 router.post('/chat-file', auth, chatFileUpload.single('file'), async (req, res) => {
