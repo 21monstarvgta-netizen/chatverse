@@ -196,6 +196,7 @@ GameUI.prototype.showBuildingInfo = function(building, buildingIndex, config) {
     actionsHTML += '<button class="btn btn-secondary btn-sm" onclick="game.upgradeBuilding(' + buildingIndex + ')">⬆️ ' + upgStr + '</button>';
   }
   actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#ff6b6b;" onclick="game.demolishBuilding(' + buildingIndex + ')">🗑️</button>';
+  actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#fdcb6e;" onclick="game.startMovingBuilding(' + buildingIndex + ')">🏗️ Переставить</button>';
 
   document.getElementById('building-info-actions').innerHTML = actionsHTML;
   panel.classList.remove('hidden');

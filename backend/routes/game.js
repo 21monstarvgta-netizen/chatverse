@@ -466,6 +466,63 @@ router.post('/reset', auth, async function(req, res) {
   }
 });
 
+// Move building
+router.post('/move', auth, async function(req, res) {
+  try {
+    var idx = parseInt(req.body.buildingIndex);
+    var x = req.body.x;
+    var y = req.body.y;
+    var player = await getOrCreatePlayer(req.userId);
+
+    if (idx < 0 || idx >= player.buildings.length) return res.status(400).json({ error: 'Здание не найдено' });
+    if (!logic.isTileUnlocked(x, y, player.unlockedZones)) return res.status(400).json({ error: 'Территория не открыта' });
+
+    for (var i = 0; i < player.buildings.length; i++) {
+      if (i !== idx && player.buildings[i].x === x && player.buildings[i].y === y) {
+        return res.status(400).json({ error: 'Клетка занята' });
+      }
+    }
+
+    player.buildings[idx].x = x;
+    player.buildings[idx].y = y;
+
+    player.markModified('buildings');
+    await player.save();
+
+    res.json({ success: true, player: getPlayerState(player) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+// Crystal exchange (1 crystal = 100 of any resource)
+router.post('/crystal-exchange', auth, async function(req, res) {
+  try {
+    var crystals = parseInt(req.body.crystals);
+    var resource = req.body.resource;
+    var allowed = ['coins', 'food', 'materials'];
+    if (!crystals || crystals <= 0) return res.status(400).json({ error: 'Неверное количество' });
+    if (allowed.indexOf(resource) === -1) return res.status(400).json({ error: 'Неверный ресурс' });
+
+    var player = await getOrCreatePlayer(req.userId);
+    if ((player.resources.crystals || 0) < crystals) return res.status(400).json({ error: 'Недостаточно кристаллов' });
+
+    var amount = crystals * 100;
+    player.resources.crystals -= crystals;
+    var maxStorage = logic.calculateMaxStorage(player.buildings);
+    var reward = {};
+    reward[resource] = amount;
+    logic.addResources(player.resources, reward, maxStorage);
+
+    player.markModified('resources');
+    await player.save();
+
+    res.json({ success: true, received: amount, resource: resource, player: getPlayerState(player) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
 // Rename
 router.post('/rename', auth, async function(req, res) {
   try {

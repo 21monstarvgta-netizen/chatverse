@@ -48,7 +48,7 @@
       <div class="res-item" title="Материалы"><span class="res-icon">🪨</span><span id="res-materials">0</span></div>
       <div class="res-item" title="Энергия"><span class="res-icon">⚡</span><span id="res-energy">0/0</span></div>
       <div class="res-item" title="Население"><span class="res-icon">👥</span><span id="res-population">0</span></div>
-      <div class="res-item" title="Кристаллы"><span class="res-icon">💎</span><span id="res-crystals">0</span></div>
+      <div class="res-item" title="Кристаллы (нажми для обмена)" onclick="game && game.showCrystalExchange()" style="cursor:pointer;" ><span class="res-icon">💎</span><span id="res-crystals">0</span><span style="font-size:10px;opacity:0.6;">↔</span></div>
     </div>
 
     <!-- Main Game Area -->
@@ -62,6 +62,12 @@
       <button class="btn btn-secondary btn-sm" id="cancel-placing">✕ Отмена</button>
     </div>
 
+
+    <!-- Move building banner -->
+    <div class="placing-banner hidden" id="move-banner" style="background: linear-gradient(135deg, #fdcb6e, #e17055);">
+      <span>🏗️ Выберите новое место для здания</span>
+      <button class="btn btn-secondary btn-sm" onclick="game.cancelMoving()">✕ Отмена</button>
+    </div>
     <!-- Building Info Panel -->
     <div class="building-info-panel hidden" id="building-info-panel">
       <div class="building-info-header">
@@ -135,6 +141,32 @@
       </div>
     </div>
 
+
+    <!-- Crystal Exchange Modal -->
+    <div class="zone-unlock-modal hidden" id="crystal-exchange-modal">
+      <div class="zone-unlock-content">
+        <h3>💎 Обмен кристаллов</h3>
+        <p style="color:#a29bfe;">1 💎 кристалл = 100 любого ресурса</p>
+        <p>Ваши кристаллы: <strong id="crystal-exchange-have">0</strong> 💎</p>
+        <div style="margin:10px 0;">
+          <label style="color:var(--text-muted);font-size:13px;">Количество кристаллов:</label><br>
+          <input type="number" id="crystal-amount" min="1" value="1" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);margin-top:4px;" oninput="game.updateCrystalExchangePreview()">
+        </div>
+        <div style="margin:10px 0;">
+          <label style="color:var(--text-muted);font-size:13px;">Получить ресурс:</label><br>
+          <select id="crystal-resource" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);margin-top:4px;" onchange="game.updateCrystalExchangePreview()">
+            <option value="coins">🪙 Монеты</option>
+            <option value="food">🍞 Еда</option>
+            <option value="materials">🪨 Материалы</option>
+          </select>
+        </div>
+        <div id="crystal-exchange-preview" style="text-align:center;font-size:16px;font-weight:bold;color:#55efc4;margin:12px 0;">1 💎 → 100 🪙</div>
+        <div class="zone-unlock-actions">
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('crystal-exchange-modal').classList.add('hidden')">Отмена</button>
+          <button class="btn btn-primary btn-sm" style="width:auto;" onclick="game.confirmCrystalExchange()">💎 Обменять</button>
+        </div>
+      </div>
+    </div>
     <!-- Visit mode banner -->
     <div class="visit-banner hidden" id="visit-banner">
       <span id="visit-banner-text">Просмотр города</span>
@@ -142,9 +174,9 @@
     </div>
   </div>
 
-  <script src="/js/utils.js?v=5"></script>
-  <script src="/js/gameRenderer.js?v=5"></script>
-  <script src="/js/gameUI.js?v=5"></script>
-  <script src="/js/game.js?v=5"></script>
+  <script src="/js/utils.js?v=6"></script>
+  <script src="/js/gameRenderer.js?v=6"></script>
+  <script src="/js/gameUI.js?v=6"></script>
+  <script src="/js/game.js?v=6"></script>
 </body>
 </html>

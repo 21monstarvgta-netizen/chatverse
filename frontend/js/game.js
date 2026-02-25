@@ -552,6 +552,114 @@ Game.prototype.resetProgress = async function() {
   }
 };
 
+// ===== MOVE BUILDING =====
+Game.prototype.startMovingBuilding = function(buildingIndex) {
+  this.movingBuildingIndex = buildingIndex;
+  this.ui.hideBuildingInfo();
+  this.renderer.selectedTile = null;
+  var moveBanner = document.getElementById('move-banner');
+  if (moveBanner) moveBanner.classList.remove('hidden');
+  var self = this;
+  // Temporary override: next tile click will move the building
+  this._prevOnTileClick = this.renderer.onTileClickCallback;
+  this.renderer.onTileClickCallback = function(x, y) {
+    self.finishMovingBuilding(x, y);
+  };
+  showToast('🏗️ Выберите новое место для здания', 'info');
+};
+
+Game.prototype.finishMovingBuilding = async function(x, y) {
+  var idx = this.movingBuildingIndex;
+  // Restore callback
+  this.renderer.onTileClickCallback = this._prevOnTileClick;
+  this._prevOnTileClick = null;
+  this.movingBuildingIndex = null;
+  var moveBanner = document.getElementById('move-banner');
+  if (moveBanner) moveBanner.classList.add('hidden');
+
+  if (idx === undefined || idx === null) return;
+
+  // Check tile is unlocked
+  var key = x + ',' + y;
+  if (!this.renderer.unlockedTiles[key]) {
+    showToast('Территория не открыта', 'error');
+    return;
+  }
+  // Check not occupied by another building (not self)
+  var buildings = this.player.buildings || [];
+  for (var i = 0; i < buildings.length; i++) {
+    if (i !== idx && buildings[i].x === x && buildings[i].y === y) {
+      showToast('Клетка занята', 'error');
+      return;
+    }
+  }
+
+  try {
+    var data = await apiRequest('/game/move', {
+      method: 'POST',
+      body: JSON.stringify({ buildingIndex: idx, x: x, y: y })
+    });
+    this.player = data.player;
+    this.updateRendererState();
+    this.ui.updateResources(this.player);
+    showToast('✅ Здание перемещено!', 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+Game.prototype.cancelMoving = function() {
+  if (this._prevOnTileClick) {
+    this.renderer.onTileClickCallback = this._prevOnTileClick;
+    this._prevOnTileClick = null;
+  }
+  this.movingBuildingIndex = null;
+  var moveBanner = document.getElementById('move-banner');
+  if (moveBanner) moveBanner.classList.add('hidden');
+};
+
+// ===== CRYSTAL EXCHANGE =====
+Game.prototype.showCrystalExchange = function() {
+  var modal = document.getElementById('crystal-exchange-modal');
+  if (modal) {
+    document.getElementById('crystal-exchange-have').textContent = this.player.resources.crystals || 0;
+    document.getElementById('crystal-amount').value = 1;
+    this.updateCrystalExchangePreview();
+    modal.classList.remove('hidden');
+  }
+};
+
+Game.prototype.updateCrystalExchangePreview = function() {
+  var amount = parseInt(document.getElementById('crystal-amount').value) || 0;
+  var resource = document.getElementById('crystal-resource').value;
+  var icons = { coins: '🪙', food: '🍞', materials: '🪨' };
+  var preview = document.getElementById('crystal-exchange-preview');
+  if (preview) {
+    preview.textContent = amount + ' 💎 → ' + (amount * 100) + ' ' + (icons[resource] || '') + resource;
+  }
+};
+
+Game.prototype.confirmCrystalExchange = async function() {
+  var amount = parseInt(document.getElementById('crystal-amount').value) || 0;
+  var resource = document.getElementById('crystal-resource').value;
+  if (amount <= 0) { showToast('Укажите количество кристаллов', 'error'); return; }
+  if ((this.player.resources.crystals || 0) < amount) { showToast('Недостаточно кристаллов', 'error'); return; }
+  try {
+    var data = await apiRequest('/game/crystal-exchange', {
+      method: 'POST',
+      body: JSON.stringify({ crystals: amount, resource: resource })
+    });
+    this.player = data.player;
+    this.ui.updateResources(this.player);
+    var modal = document.getElementById('crystal-exchange-modal');
+    if (modal) modal.classList.add('hidden');
+    var icons = { coins: '🪙', food: '🍞', materials: '🪨' };
+    showToast('💎 Обмен выполнен! +' + (amount * 100) + ' ' + (icons[resource] || '') + resource, 'success');
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
   game = new Game();
 });

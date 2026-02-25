@@ -181,6 +181,30 @@ var BUILDING_TYPES = {
     category: 'special',
     unlockLevel: 12,
     energyCost: 5
+  },
+  crystalmine: {
+    name: 'Кристальная шахта',
+    emoji: '💎',
+    description: 'Добывает кристаллы (~1 в час). Донат-валюта для обмена!',
+    baseCost: { coins: 50000, materials: 20000, food: 10000 },
+    baseOutput: { crystals: 1 },
+    baseTime: 3600,
+    maxLevel: 10,
+    category: 'special',
+    unlockLevel: 15,
+    energyCost: 8
+  },
+  arcanetower: {
+    name: 'Магическая башня',
+    emoji: '🗼',
+    description: 'Усиливает производство опыта и монет',
+    baseCost: { coins: 30000, materials: 15000, food: 8000 },
+    baseOutput: { experience: 100, coins: 200 },
+    baseTime: 7200,
+    maxLevel: 10,
+    category: 'special',
+    unlockLevel: 13,
+    energyCost: 6
   }
 };
 
@@ -231,7 +255,9 @@ var QUEST_TEMPLATES = [
   { id: 's32', type: 'build_count', target: 'any', count: 70, reward: { coins: 10000, crystals: 20 }, minLevel: 15, description: 'Построй 70 зданий' },
   { id: 's33', type: 'collect', target: 'coins', count: 50000, reward: { crystals: 30 }, minLevel: 15, description: 'Заработай 50000 монет' },
   { id: 's34', type: 'reach_population', target: 'population', count: 300, reward: { coins: 15000, crystals: 25 }, minLevel: 18, description: 'Достигни 300 населения' },
-  { id: 's35', type: 'unlock_zone', target: 'zone', count: 8, reward: { coins: 20000, crystals: 30 }, minLevel: 20, description: 'Открой 8 зон' }
+  { id: 's35', type: 'unlock_zone', target: 'zone', count: 8, reward: { coins: 20000, crystals: 30 }, minLevel: 20, description: 'Открой 8 зон' },
+  { id: 's36', type: 'build', target: 'arcanetower', count: 1, reward: { coins: 20000, crystals: 15 }, minLevel: 13, description: 'Построй Магическую башню' },
+  { id: 's37', type: 'build', target: 'crystalmine', count: 1, reward: { coins: 50000, crystals: 25 }, minLevel: 15, description: 'Построй Кристальную шахту' }
 ];
 
 // Random quest generators
@@ -247,7 +273,9 @@ var RANDOM_QUEST_POOLS = {
     { target: 'powerplant', desc: 'Построй электростанцию', base_reward: 500 },
     { target: 'warehouse', desc: 'Построй склад', base_reward: 300 },
     { target: 'school', desc: 'Построй школу', base_reward: 500 },
-    { target: 'park', desc: 'Построй парк', base_reward: 400 }
+    { target: 'park', desc: 'Построй парк', base_reward: 400 },
+    { target: 'arcanetower', desc: 'Построй Магическую башню', base_reward: 5000 },
+    { target: 'crystalmine', desc: 'Построй Кристальную шахту', base_reward: 10000 }
   ],
   collect: [
     { target: 'coins', desc: 'Заработай {n} монет', multiplier: 500 },
