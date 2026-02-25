@@ -40,6 +40,8 @@ Game.prototype.init = async function() {
     self.ui.renderQuests(self.player.activeQuests);
 
     self.renderer.onTileClickCallback = function(x, y) { self.onTileClick(x, y); };
+    // Hover zone preview
+    self.renderer.onTileHoverCallback = function(x, y) { self.updateHoverZonePreview(x, y); };
 
     self.setupEvents();
     self.startTimerUpdates();
@@ -400,6 +402,7 @@ Game.prototype.showZoneUnlock = function(x, y) {
   }
 
   var targetZone = null;
+  // First try exact match
   for (var i = 0; i < nextZones.length; i++) {
     var z = nextZones[i];
     if (x >= z.x1 && x <= z.x2 && y >= z.y1 && y <= z.y2) {
@@ -407,10 +410,22 @@ Game.prototype.showZoneUnlock = function(x, y) {
       break;
     }
   }
-  if (!targetZone) targetZone = nextZones[0];
+  // If no exact match (gap tile between diagonal zones), find nearest zone by distance
+  if (!targetZone && nextZones.length > 0) {
+    var bestDist = Infinity;
+    for (var ni = 0; ni < nextZones.length; ni++) {
+      var nz = nextZones[ni];
+      var ncx = (nz.x1 + nz.x2) / 2;
+      var ncy = (nz.y1 + nz.y2) / 2;
+      var d = Math.sqrt((x - ncx) * (x - ncx) + (y - ncy) * (y - ncy));
+      if (d < bestDist) { bestDist = d; targetZone = nz; }
+    }
+  }
 
   this.pendingZone = targetZone;
-  var dirs = { north: 'Север', south: 'Юг', west: 'Запад', east: 'Восток' };
+  // Highlight zone on map
+  if (this.renderer) this.renderer.previewZone = targetZone;
+  var dirs = { north: '⬆ Север', south: '⬇ Юг', west: '⬅ Запад', east: '➡ Восток' };
   var infoEl = document.getElementById('zone-unlock-info');
   if (infoEl) {
     infoEl.innerHTML =
@@ -432,6 +447,7 @@ Game.prototype.showZoneUnlock = function(x, y) {
 
 Game.prototype.unlockZone = async function() {
   if (!this.pendingZone) return;
+  if (this.renderer) this.renderer.previewZone = null;
   try {
     var data = await apiRequest('/game/unlock-zone', {
       method: 'POST',
@@ -443,6 +459,7 @@ Game.prototype.unlockZone = async function() {
     this.ui.renderQuests(this.player.activeQuests);
     var modal = document.getElementById('zone-unlock-modal');
     if (modal) modal.classList.add('hidden');
+    if (self.renderer) self.renderer.previewZone = null;
     showToast('🗺️ Территория открыта!', 'success');
   } catch (e) {
     showToast(e.message, 'error');
@@ -670,6 +687,28 @@ Game.prototype.confirmCrystalExchange = async function() {
     showToast(e.message, 'error');
   }
 };
+
+Game.prototype.updateHoverZonePreview = function(x, y) {
+  if (!this.renderer || !this.player) return;
+  var key = x + ',' + y;
+  var isUnlocked = this.renderer.unlockedTiles[key];
+  // If modal is open, don't change preview
+  var modal = document.getElementById('zone-unlock-modal');
+  if (modal && !modal.classList.contains('hidden')) return;
+
+  if (!isUnlocked) {
+    var nextZones = this.player.nextZones || [];
+    var found = null;
+    for (var i = 0; i < nextZones.length; i++) {
+      var z = nextZones[i];
+      if (x >= z.x1 && x <= z.x2 && y >= z.y1 && y <= z.y2) { found = z; break; }
+    }
+    this.renderer.previewZone = found;
+  } else {
+    this.renderer.previewZone = null;
+  }
+};
+
 
 document.addEventListener('DOMContentLoaded', function() {
   game = new Game();

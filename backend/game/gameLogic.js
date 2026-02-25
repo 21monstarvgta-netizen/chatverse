@@ -107,15 +107,25 @@ function getNextZones(unlockedZones) {
 
   var size = 4;
   var candidates = [];
+  var gs = config.GRID_SIZE;
 
-  if (expandedY1 - size >= 0)
-    candidates.push({ x1: expandedX1, y1: expandedY1 - size, x2: expandedX2, y2: expandedY1 - 1, direction: 'north' });
-  if (expandedY2 + size < config.GRID_SIZE)
-    candidates.push({ x1: expandedX1, y1: expandedY2 + 1, x2: expandedX2, y2: expandedY2 + size, direction: 'south' });
-  if (expandedX1 - size >= 0)
-    candidates.push({ x1: expandedX1 - size, y1: expandedY1, x2: expandedX1 - 1, y2: expandedY2, direction: 'west' });
-  if (expandedX2 + size < config.GRID_SIZE)
-    candidates.push({ x1: expandedX2 + 1, y1: expandedY1, x2: expandedX2 + size, y2: expandedY2, direction: 'east' });
+  // Zones expand DIAGONALLY so they match visual screen directions in isometric view:
+  // In iso projection: screen-right = x++,y--  screen-left = x--,y++
+  //                    screen-up    = x--,y--   screen-down  = x++,y++
+  //
+  // East  (screen right): new tiles have x > expandedX2 AND y < expandedY1
+  // West  (screen left):  new tiles have x < expandedX1 AND y > expandedY2
+  // North (screen up):    new tiles have x < expandedX1 AND y < expandedY1
+  // South (screen down):  new tiles have x > expandedX2 AND y > expandedY2
+
+  if (expandedX2 + size < gs && expandedY1 - size >= 0)
+    candidates.push({ x1: expandedX2 + 1, y1: expandedY1 - size, x2: expandedX2 + size, y2: expandedY1 - 1, direction: 'east' });
+  if (expandedX1 - size >= 0 && expandedY2 + size < gs)
+    candidates.push({ x1: expandedX1 - size, y1: expandedY2 + 1, x2: expandedX1 - 1, y2: expandedY2 + size, direction: 'west' });
+  if (expandedX1 - size >= 0 && expandedY1 - size >= 0)
+    candidates.push({ x1: expandedX1 - size, y1: expandedY1 - size, x2: expandedX1 - 1, y2: expandedY1 - 1, direction: 'north' });
+  if (expandedX2 + size < gs && expandedY2 + size < gs)
+    candidates.push({ x1: expandedX2 + 1, y1: expandedY2 + 1, x2: expandedX2 + size, y2: expandedY2 + size, direction: 'south' });
 
   candidates = candidates.filter(function(c) {
     for (var j = 0; j < unlockedZones.length; j++) {

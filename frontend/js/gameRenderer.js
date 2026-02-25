@@ -405,6 +405,23 @@ GameRenderer.prototype.render = function() {
     this._drawSelectionRing(ctx, ssc.x, ssc.y, tick);
   }
 
+  // Zone preview highlight
+  if (this.previewZone) {
+    var pz = this.previewZone;
+    var pulse = 0.4 + 0.4 * Math.sin(tick * 0.1);
+    for (var pzx = pz.x1; pzx <= pz.x2; pzx++) {
+      for (var pzy = pz.y1; pzy <= pz.y2; pzy++) {
+        var psc = this.gridToScreen(pzx, pzy);
+        this._isoPath(ctx, psc.x, psc.y);
+        ctx.fillStyle = 'rgba(250,204,21,' + (0.18 + pulse * 0.2) + ')';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(250,204,21,' + (0.7 + pulse * 0.3) + ')';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+  }
+
   ctx.restore();
 };
 
