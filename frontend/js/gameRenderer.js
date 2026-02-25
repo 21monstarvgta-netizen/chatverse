@@ -134,10 +134,12 @@ GameRenderer.prototype.resize = function() {
 };
 
 GameRenderer.prototype.centerCamera = function() {
-  var c  = Math.floor(this.gridSize / 2);
-  var sc = this.gridToScreen(c, c);
-  // We want tile centre on screen centre.
-  // Tile centre is at (sc.x, sc.y + tileH/2)
+  // Centre on the middle of the initial unlocked zone (15-24 with GRID_SIZE=40, INITIAL_UNLOCKED=10)
+  // Zone spans center-half .. center+half-1, visual centre ≈ center-1
+  var gs   = this.gridSize;
+  var half = 5; // Math.floor(INITIAL_UNLOCKED / 2)
+  var c    = Math.floor(gs / 2) - 1; // 19 for gs=40
+  var sc   = this.gridToScreen(c, c);
   this.camera.x = sc.x - this.canvasWidth  / 2 / this.zoom;
   this.camera.y = (sc.y + this.tileH / 2) - this.canvasHeight / 2 / this.zoom;
 };

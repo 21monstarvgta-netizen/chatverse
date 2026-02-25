@@ -99,6 +99,48 @@ async function getOrCreatePlayer(userId) {
   return player;
 }
 
+
+// ── One-time coordinate migration (GRID_SIZE 25→40, offset +8) ──────────────
+// Runs once on startup; skips players already migrated.
+(async function runCoordMigration() {
+  try {
+    var players = await GamePlayer.find({});
+    var migrated = 0;
+    for (var i = 0; i < players.length; i++) {
+      var p = players[i];
+      // Skip if already migrated (buildings in new range 15-39)
+      // A building at x>=12 with old grid would be at the edge; 
+      // safe heuristic: if any building is at x<12 or y<12, needs migration.
+      var needsMigration = false;
+      if (p.buildings && p.buildings.length > 0) {
+        for (var j = 0; j < p.buildings.length; j++) {
+          if (p.buildings[j].x < 12 || p.buildings[j].y < 12) { needsMigration = true; break; }
+        }
+      } else if (p.unlockedZones && p.unlockedZones.length > 0) {
+        if (p.unlockedZones[0].x1 < 12) needsMigration = true;
+      }
+      if (!needsMigration) continue;
+
+      var OFFSET = 8;
+      // Shift buildings
+      for (var b = 0; b < (p.buildings || []).length; b++) {
+        p.buildings[b].x += OFFSET;
+        p.buildings[b].y += OFFSET;
+      }
+      // Shift unlocked zones
+      for (var z = 0; z < (p.unlockedZones || []).length; z++) {
+        p.unlockedZones[z].x1 += OFFSET; p.unlockedZones[z].y1 += OFFSET;
+        p.unlockedZones[z].x2 += OFFSET; p.unlockedZones[z].y2 += OFFSET;
+      }
+      p.markModified('buildings');
+      p.markModified('unlockedZones');
+      await p.save();
+      migrated++;
+    }
+    if (migrated > 0) console.log('[Migration] Shifted coords for', migrated, 'players (+8 offset)');
+  } catch(e) { console.error('[Migration] Error:', e.message); }
+})();
+
 // Fix duplicate key: drop null entries on startup
 (async function() {
   try {
