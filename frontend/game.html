@@ -167,6 +167,39 @@
         </div>
       </div>
     </div>
+
+    <!-- Threat Alert Banner -->
+    <div id="threat-alert-panel" class="threat-alert-panel hidden">
+      <span id="threat-alert-emoji" style="font-size:24px;">🐻</span>
+      <div>
+        <div id="threat-alert-name" style="font-weight:700;color:#fca5a5;">Враг нападает!</div>
+        <div id="threat-alert-desc" style="font-size:12px;color:#fef2f2;">Нажми на врага на карте!</div>
+      </div>
+    </div>
+
+    <!-- Threat Combat Panel -->
+    <div id="threat-combat-panel" class="threat-combat-panel hidden">
+      <div class="threat-combat-header">
+        <span id="threat-combat-emoji" style="font-size:32px;">🐻</span>
+        <div>
+          <div id="threat-combat-name" style="font-size:16px;font-weight:700;color:#fca5a5;">Медведь</div>
+          <div style="font-size:11px;color:var(--text-muted);">Атакует твой город!</div>
+        </div>
+        <button id="threat-combat-close" class="btn btn-ghost btn-sm" style="margin-left:auto;">✕</button>
+      </div>
+      <div style="margin:10px 0;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+          <span>❤️ Здоровье</span>
+          <span id="threat-hp-text">3/3 HP</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.1);border-radius:8px;height:10px;overflow:hidden;">
+          <div id="threat-hp-bar" style="height:100%;width:100%;background:#22c55e;border-radius:8px;transition:width 0.3s;"></div>
+        </div>
+      </div>
+      <button id="threat-attack-btn" class="btn btn-primary" style="width:100%;background:linear-gradient(135deg,#ef4444,#dc2626);">
+        ⚔️ Атаковать!
+      </button>
+    </div>
     <!-- Visit mode banner -->
     <div class="visit-banner hidden" id="visit-banner">
       <span id="visit-banner-text">Просмотр города</span>
@@ -174,9 +207,10 @@
     </div>
   </div>
 
-  <script src="/js/utils.js?v=6"></script>
-  <script src="/js/gameRenderer.js?v=6"></script>
-  <script src="/js/gameUI.js?v=6"></script>
-  <script src="/js/game.js?v=6"></script>
+  <script src="/js/utils.js?v=7"></script>
+  <script src="/js/gameRenderer.js?v=7"></script>
+  <script src="/js/gameUI.js?v=7"></script>
+  <script src="/js/threatManager.js?v=7"></script>
+  <script src="/js/game.js?v=7"></script>
 </body>
 </html>

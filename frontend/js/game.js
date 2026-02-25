@@ -7,6 +7,7 @@ var Game = function() {
   this.ui = null;
   this.placingType = null;
   this.visitingUserId = null;
+  this.threatManager = null;
   this.timerInterval = null;
   this.init();
 };
@@ -42,6 +43,13 @@ Game.prototype.init = async function() {
 
     self.setupEvents();
     self.startTimerUpdates();
+    // Init threat manager
+    self.threatManager = new ThreatManager(self);
+    self.threatManager.start();
+    // Sync initial threats to renderer
+    if (self.player.activeThreats && self.player.activeThreats.length > 0) {
+      self.renderer.setThreats(self.player.activeThreats);
+    }
 
     console.log('Game loaded. Tiles:', Object.keys(self.renderer.unlockedTiles).length,
       'Canvas:', self.renderer.canvasWidth, 'x', self.renderer.canvasHeight);
@@ -198,6 +206,7 @@ Game.prototype.updateRendererState = function() {
 
   this.renderer.setUnlockedTiles(unlockedTiles);
   this.renderer.setBuildings(this.player.buildings || [], this.config.buildingTypes);
+  this.renderer.setThreats(this.player.activeThreats || []);
   this.updateReadyState();
 };
 
@@ -227,6 +236,8 @@ Game.prototype.startTimerUpdates = function() {
 
 Game.prototype.onTileClick = function(x, y) {
   if (this.visitingUserId) return;
+  // Check threat click first
+  if (this.threatManager && this.threatManager.handleTileClick(x, y)) return;
 
   var key = x + ',' + y;
   var isUnlocked = this.renderer.unlockedTiles[key];

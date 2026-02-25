@@ -47,6 +47,17 @@ var gamePlayerSchema = new mongoose.Schema({
   unlockedZones: [zoneSchema],
   completedQuests: [{ type: String }],
   activeQuests: [activeQuestSchema],
+  activeThreats: [{
+    id: String,
+    type: String,
+    name: String,
+    emoji: String,
+    hp: { type: Number, default: 1 },
+    maxHp: { type: Number, default: 1 },
+    x: Number,
+    y: Number,
+    spawnedAt: { type: Date, default: Date.now }
+  }],
   stats: {
     totalBuilt: { type: Number, default: 0 },
     totalCollected: { type: Number, default: 0 },

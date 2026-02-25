@@ -4,6 +4,7 @@ var GamePlayer = require('../models/GamePlayer');
 var auth = require('../middleware/auth');
 var config = require('../game/gameConfig');
 var logic = require('../game/gameLogic');
+var threats = require('../game/threats');
 
 var router = express.Router();
 
@@ -24,7 +25,10 @@ function getPlayerState(player) {
     totalEnergy: logic.calculateTotalEnergy(buildings),
     usedEnergy: logic.calculateUsedEnergy(buildings),
     totalPopulation: logic.calculateTotalPopulation(buildings),
-    nextZones: logic.getNextZones(player.unlockedZones || [])
+    nextZones: logic.getNextZones(player.unlockedZones || []),
+    activeThreats: (player.activeThreats || []).map(function(t) {
+      return { id: t.id, type: t.type, name: t.name, emoji: t.emoji, hp: t.hp, maxHp: t.maxHp, x: t.x, y: t.y };
+    })
   };
 }
 
@@ -518,6 +522,143 @@ router.post('/crystal-exchange', auth, async function(req, res) {
     await player.save();
 
     res.json({ success: true, received: amount, resource: resource, player: getPlayerState(player) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+
+// ===== THREATS =====
+
+// Spawn a threat (called periodically by frontend or can be triggered manually)
+router.post('/threat/spawn', auth, async function(req, res) {
+  try {
+    var player = await getOrCreatePlayer(req.userId);
+    if (!player.activeThreats) player.activeThreats = [];
+
+    // Max 3 threats at a time
+    if (player.activeThreats.length >= 3) {
+      return res.json({ success: false, message: 'Слишком много угроз уже', player: getPlayerState(player) });
+    }
+
+    var threatType = threats.rollThreatType(player.level);
+    var tt = threats.THREAT_TYPES[threatType];
+
+    // Pick a tile near the edge of unlocked area
+    var buildings = player.buildings || [];
+    var zones = player.unlockedZones || [];
+    var gs = config.GRID_SIZE;
+    var half = Math.floor(config.INITIAL_UNLOCKED / 2);
+    var center = Math.floor(gs / 2);
+    // spawn near random edge of initial area
+    var edge = Math.floor(Math.random() * 4);
+    var sx, sy;
+    if (edge === 0) { sx = center - half + Math.floor(Math.random()*2); sy = center + Math.floor(Math.random()*config.INITIAL_UNLOCKED) - half; }
+    else if (edge === 1) { sx = center + half - Math.floor(Math.random()*2) - 1; sy = center + Math.floor(Math.random()*config.INITIAL_UNLOCKED) - half; }
+    else if (edge === 2) { sy = center - half + Math.floor(Math.random()*2); sx = center + Math.floor(Math.random()*config.INITIAL_UNLOCKED) - half; }
+    else { sy = center + half - Math.floor(Math.random()*2) - 1; sx = center + Math.floor(Math.random()*config.INITIAL_UNLOCKED) - half; }
+
+    var threat = {
+      id: 't_' + Date.now() + '_' + Math.floor(Math.random()*10000),
+      type: threatType,
+      name: tt.name,
+      emoji: tt.emoji,
+      hp: tt.hp,
+      maxHp: tt.hp,
+      x: sx,
+      y: sy,
+      spawnedAt: new Date()
+    };
+
+    player.activeThreats.push(threat);
+    player.markModified('activeThreats');
+    await player.save();
+
+    res.json({ success: true, threat: threat, player: getPlayerState(player) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+// Attack a threat
+router.post('/threat/attack/:threatId', auth, async function(req, res) {
+  try {
+    var player = await getOrCreatePlayer(req.userId);
+    var threatId = req.params.threatId;
+    var damage = parseInt(req.body.damage) || 1;
+    if (damage > 3) damage = 3; // max damage per click
+
+    if (!player.activeThreats) player.activeThreats = [];
+    var idx = -1;
+    for (var i = 0; i < player.activeThreats.length; i++) {
+      if (player.activeThreats[i].id === threatId) { idx = i; break; }
+    }
+    if (idx === -1) return res.status(404).json({ error: 'Угроза не найдена' });
+
+    var threat = player.activeThreats[idx];
+    threat.hp = Math.max(0, threat.hp - damage);
+
+    var killed = threat.hp <= 0;
+    if (killed) {
+      // Give reward
+      var tt = threats.THREAT_TYPES[threat.type];
+      var reward = tt ? tt.reward : { coins: 50 };
+      var maxStorage = logic.calculateMaxStorage(player.buildings);
+      logic.addResources(player.resources, reward, maxStorage);
+      player.activeThreats.splice(idx, 1);
+      player.experience += 25 + player.level * 3;
+      checkLevelUp(player);
+
+      player.markModified('resources');
+      player.markModified('activeQuests');
+    } else {
+      player.activeThreats[idx] = threat;
+    }
+
+    player.markModified('activeThreats');
+    await player.save();
+
+    res.json({ success: true, killed: killed, reward: killed ? threats.THREAT_TYPES[threat.type].reward : null, player: getPlayerState(player) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+// Threat attacks resources (called when timer runs out — frontend triggers this)
+router.post('/threat/damage/:threatId', auth, async function(req, res) {
+  try {
+    var player = await getOrCreatePlayer(req.userId);
+    var threatId = req.params.threatId;
+
+    if (!player.activeThreats) player.activeThreats = [];
+    var idx = -1;
+    for (var i = 0; i < player.activeThreats.length; i++) {
+      if (player.activeThreats[i].id === threatId) { idx = i; break; }
+    }
+    if (idx === -1) return res.json({ success: false, player: getPlayerState(player) });
+
+    var threat = player.activeThreats[idx];
+    var tt = threats.THREAT_TYPES[threat.type];
+    var damage = tt ? tt.damage : {};
+
+    // Apply damage to resources
+    var keys = Object.keys(damage);
+    for (var k = 0; k < keys.length; k++) {
+      var resKey = keys[k];
+      if (resKey === 'population_fear') continue; // cosmetic only for now
+      if (player.resources[resKey] !== undefined) {
+        player.resources[resKey] = Math.max(0, (player.resources[resKey] || 0) - damage[resKey]);
+      }
+    }
+
+    // Threat leaves after attacking
+    player.activeThreats.splice(idx, 1);
+
+    player.markModified('activeThreats');
+    player.markModified('resources');
+    await player.save();
+
+    res.json({ success: true, damage: damage, player: getPlayerState(player) });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка: ' + error.message });
   }

@@ -1,5 +1,5 @@
-var GRID_SIZE = 25;
-var INITIAL_UNLOCKED = 8;
+var GRID_SIZE = 40;
+var INITIAL_UNLOCKED = 10;
 
 var BUILDING_TYPES = {
   farm: {

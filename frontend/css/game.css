@@ -358,3 +358,39 @@
     width: calc(100% - 24px); max-width: 350px;
   }
 }
+/* ===== THREAT SYSTEM ===== */
+.threat-alert-panel {
+  position: absolute;
+  top: 80px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(127,0,0,0.95), rgba(60,0,0,0.95));
+  border: 2px solid #ef4444;
+  border-radius: 14px;
+  padding: 12px 18px;
+  display: flex; align-items: center; gap: 12px;
+  z-index: 30;
+  box-shadow: 0 0 24px rgba(239,68,68,0.5);
+  animation: fadeInDown 0.3s ease;
+  max-width: 320px;
+}
+.threat-alert-panel.hidden { display: none; }
+@keyframes threatPulse {
+  0%,100% { box-shadow: 0 0 16px rgba(239,68,68,0.5); }
+  50% { box-shadow: 0 0 36px rgba(239,68,68,0.9); }
+}
+.threat-pulse { animation: threatPulse 0.6s ease infinite; }
+
+.threat-combat-panel {
+  position: absolute;
+  bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: rgba(15,5,5,0.97);
+  border: 2px solid #ef4444;
+  border-radius: 16px;
+  padding: 16px;
+  width: 280px;
+  z-index: 30;
+  box-shadow: 0 0 32px rgba(239,68,68,0.4);
+}
+.threat-combat-panel.hidden { display: none; }
+.threat-combat-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 4px;
+}
