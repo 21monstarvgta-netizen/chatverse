@@ -292,7 +292,27 @@ GameRenderer.prototype.zoomAt = function(sx, sy, f) {
 };
 
 // ─── Setters ─────────────────────────────────────────────────
-GameRenderer.prototype.setBuildings     = function(b, c) { this.buildings = b || []; this.buildingTypeConfig = c || {}; };
+GameRenderer.prototype.setBuildings = function(b, c) {
+  this.buildings = b || [];
+  this.buildingTypeConfig = c || {};
+  // Build fast coordinate→type lookup for neighbor detection
+  this.buildingMap = {};
+  for (var i = 0; i < this.buildings.length; i++) {
+    var bld = this.buildings[i];
+    this.buildingMap[bld.x + ',' + bld.y] = bld.type;
+  }
+};
+// Helper: get neighbor bitmask for a building at (bx,by) of given type
+// Bits: 1=NW(x-1,y)  2=NE(x,y-1)  4=SE(x+1,y)  8=SW(x,y+1)
+GameRenderer.prototype._neighborMask = function(bx, by, type) {
+  var m = this.buildingMap || {};
+  return (
+    (m[(bx-1)+','+by]    === type ? 1 : 0) |
+    (m[bx+','+(by-1)]    === type ? 2 : 0) |
+    (m[(bx+1)+','+by]    === type ? 4 : 0) |
+    (m[bx+','+(by+1)]    === type ? 8 : 0)
+  );
+};
 GameRenderer.prototype.setUnlockedTiles = function(t)    { this.unlockedTiles = t || {}; };
 GameRenderer.prototype.setReadyBuildings= function(r)    { this.readyBuildings = r || {}; };
 GameRenderer.prototype.setThreats       = function(t)    { this.threats = t || []; };
@@ -585,10 +605,13 @@ GameRenderer.prototype._drawBuilding = function(ctx, b, tx, ty, tick) {
     ctx.stroke();
   }
 
+  // Compute neighbor bitmask for connector drawing
+  var neighbors = this._neighborMask(b.x, b.y, b.type);
+
   // Draw the sprite centred on (cx, cy)
   ctx.save();
   ctx.translate(cx, cy);
-  this._drawBuildingSprite(ctx, b.type, b.level, tw, th, tick);
+  this._drawBuildingSprite(ctx, b.type, b.level, tw, th, tick, neighbors);
   ctx.restore();
 
   // Level badge — bottom-right of tile
@@ -622,28 +645,29 @@ GameRenderer.prototype._drawBuilding = function(ctx, b, tx, ty, tick) {
 //  Origin = tile visual centre (cx, cy).
 //  All sprites draw around (0, 0), going UPWARD (negative y).
 //
-GameRenderer.prototype._drawBuildingSprite = function(ctx, type, level, tw, th, tick) {
+GameRenderer.prototype._drawBuildingSprite = function(ctx, type, level, tw, th, tick, neighbors) {
   // Scale: fit within ~70% of tile width, grow slightly with level
   var s = (tw * 0.70) * Math.min(1 + (level - 1) * 0.04, 1.55);
+  var nb = neighbors || 0;
   ctx.save();
   switch (type) {
-    case 'farm':        this._sFarm(ctx, s, level, tick);       break;
-    case 'house':       this._sHouse(ctx, s, level, tick);      break;
-    case 'quarry':      this._sQuarry(ctx, s, level, tick);     break;
-    case 'factory':     this._sFactory(ctx, s, level, tick);    break;
-    case 'powerplant':  this._sPowerplant(ctx, s, level, tick); break;
-    case 'warehouse':   this._sWarehouse(ctx, s, level, tick);  break;
-    case 'market':      this._sMarket(ctx, s, level, tick);     break;
-    case 'garden':      this._sGarden(ctx, s, level, tick);     break;
-    case 'school':      this._sSchool(ctx, s, level, tick);     break;
-    case 'bakery':      this._sBakery(ctx, s, level, tick);     break;
-    case 'park':        this._sPark(ctx, s, level, tick);       break;
-    case 'bank':        this._sBank(ctx, s, level, tick);       break;
-    case 'hospital':    this._sHospital(ctx, s, level, tick);   break;
-    case 'library':     this._sLibrary(ctx, s, level, tick);    break;
-    case 'stadium':     this._sStadium(ctx, s, level, tick);    break;
-    case 'crystalmine': this._sCrystalMine(ctx, s, level, tick);break;
-    case 'arcanetower': this._sArcaneTower(ctx, s, level, tick);break;
+    case 'farm':        this._sFarm(ctx, s, level, tick, nb);       break;
+    case 'house':       this._sHouse(ctx, s, level, tick, nb);      break;
+    case 'quarry':      this._sQuarry(ctx, s, level, tick, nb);     break;
+    case 'factory':     this._sFactory(ctx, s, level, tick, nb);    break;
+    case 'powerplant':  this._sPowerplant(ctx, s, level, tick, nb); break;
+    case 'warehouse':   this._sWarehouse(ctx, s, level, tick, nb);  break;
+    case 'market':      this._sMarket(ctx, s, level, tick, nb);     break;
+    case 'garden':      this._sGarden(ctx, s, level, tick, nb);     break;
+    case 'school':      this._sSchool(ctx, s, level, tick, nb);     break;
+    case 'bakery':      this._sBakery(ctx, s, level, tick, nb);     break;
+    case 'park':        this._sPark(ctx, s, level, tick, nb);       break;
+    case 'bank':        this._sBank(ctx, s, level, tick, nb);       break;
+    case 'hospital':    this._sHospital(ctx, s, level, tick, nb);   break;
+    case 'library':     this._sLibrary(ctx, s, level, tick, nb);    break;
+    case 'stadium':     this._sStadium(ctx, s, level, tick, nb);    break;
+    case 'crystalmine': this._sCrystalMine(ctx, s, level, tick, nb);break;
+    case 'arcanetower': this._sArcaneTower(ctx, s, level, tick, nb);break;
     default:
       ctx.font = Math.round(s * 0.5) + 'px Arial';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -754,14 +778,438 @@ GameRenderer.prototype._roof = function(ctx, x, y, w, h, col1, col2) {
   ctx.stroke();
 };
 
-// ── FARM ─────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  NEIGHBOR-CONNECTOR SYSTEM
+//
+//  Each building type gets connector elements drawn OVER the tile edges
+//  so that adjacent same-type buildings visually merge into a larger whole.
+//
+//  Neighbor bitmask (nb):
+//    1 = NW neighbor (gx-1, gy)   → in iso: left side
+//    2 = NE neighbor (gx, gy-1)   → in iso: top-right side
+//    4 = SE neighbor (gx+1, gy)   → in iso: right side
+//    8 = SW neighbor (gx, gy+1)   → in iso: bottom-left side
+//
+//  ctx origin is at tile visual centre (cx, cy).
+//  Tile goes: left edge at -tileW/2, right edge at +tileW/2.
+//  In sprite coords, the tile half-width = s/0.7 * 0.5 (approx tw/2).
+//  We use 'reach' = tile half-width + margin so connectors cross the seam.
+// ══════════════════════════════════════════════════════════════
+
+// Generic connector helper — draws a bridge strip between two tiles
+// dir: 'NW'|'NE'|'SE'|'SW', reach is how far past tile edge we draw
+GameRenderer.prototype._drawConnectorBridge = function(ctx, s, nb, type, tick) {
+  // tileW in sprite-space: s = tw*0.7, so tw = s/0.7, half = s/1.4
+  var hw = s / 1.4;   // half tile width in sprite coords
+  var hh = hw * 0.5;  // half tile height (isometric ratio is 2:1)
+  var reach = hw * 0.52; // how far past the edge to extend connectors
+
+  switch (type) {
+    // ── FARM connectors: extend crop rows and fence across tile edges ──
+    case 'farm':
+      ctx.save();
+      // NW neighbor (left side): extend fence and soil row leftward
+      if (nb & 1) {
+        // Soil strip going left-down (isometric: left direction = negative x, slight positive y)
+        var soilG = ctx.createLinearGradient(-hw, hh*0.5, -hw-reach, hh*0.5+reach*0.4);
+        soilG.addColorStop(0, '#3d2008'); soilG.addColorStop(1, '#5c3317');
+        ctx.fillStyle = soilG;
+        ctx.fillRect(-hw - reach*0.9, hh*0.3, reach*1.0, hh*0.4);
+        // Crop row continuing
+        ctx.strokeStyle = '#4a7a1a'; ctx.lineWidth = 1.5;
+        for (var cr = -2; cr <= 2; cr++) {
+          var cry = cr * s*0.06;
+          ctx.beginPath(); ctx.moveTo(-hw, cry-s*0.06); ctx.lineTo(-hw-reach*0.85, cry-s*0.06+reach*0.3); ctx.stroke();
+        }
+        // Fence rail continuing
+        ctx.strokeStyle = '#8B5E3C'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-hw, -s*0.1); ctx.lineTo(-hw-reach*0.8, -s*0.1+reach*0.35); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-hw, -s*0.04); ctx.lineTo(-hw-reach*0.8, -s*0.04+reach*0.35); ctx.stroke();
+      }
+      // NE neighbor (top-right): extend fence and crop row right-upward
+      if (nb & 2) {
+        ctx.fillStyle = '#3d2008';
+        ctx.fillRect(hw*0.0, -hh*1.1, reach*0.9, hh*0.4);
+        ctx.strokeStyle = '#4a7a1a'; ctx.lineWidth = 1.5;
+        for (var cr2 = -2; cr2 <= 2; cr2++) {
+          ctx.beginPath(); ctx.moveTo(cr2*s*0.06, -hh); ctx.lineTo(cr2*s*0.06+reach*0.2, -hh-reach*0.5); ctx.stroke();
+        }
+        ctx.strokeStyle = '#8B5E3C'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-s*0.2, -hh*0.8); ctx.lineTo(-s*0.2+reach*0.3, -hh*0.8-reach*0.5); ctx.stroke();
+      }
+      // SE neighbor (right side): mirror of NW
+      if (nb & 4) {
+        var soilG2 = ctx.createLinearGradient(hw, hh*0.5, hw+reach, hh*0.5-reach*0.4);
+        soilG2.addColorStop(0, '#3d2008'); soilG2.addColorStop(1, '#5c3317');
+        ctx.fillStyle = soilG2;
+        ctx.fillRect(hw, hh*0.1, reach*0.9, hh*0.4);
+        ctx.strokeStyle = '#4a7a1a'; ctx.lineWidth = 1.5;
+        for (var cr3 = -2; cr3 <= 2; cr3++) {
+          var cry3 = cr3 * s*0.06;
+          ctx.beginPath(); ctx.moveTo(hw, cry3-s*0.06); ctx.lineTo(hw+reach*0.85, cry3-s*0.06-reach*0.3); ctx.stroke();
+        }
+        ctx.strokeStyle = '#8B5E3C'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(hw, -s*0.1); ctx.lineTo(hw+reach*0.8, -s*0.1-reach*0.35); ctx.stroke();
+      }
+      // SW neighbor (bottom): extend soil downward
+      if (nb & 8) {
+        ctx.fillStyle = '#3d2008';
+        ctx.fillRect(-s*0.3, hh*0.8, s*0.6, reach*0.5);
+        ctx.strokeStyle = '#4a7a1a'; ctx.lineWidth = 1.5;
+        for (var cr4 = -2; cr4 <= 2; cr4++) {
+          ctx.beginPath(); ctx.moveTo(cr4*s*0.06, hh*0.6); ctx.lineTo(cr4*s*0.06, hh*0.6+reach*0.5); ctx.stroke();
+        }
+      }
+      ctx.restore();
+      break;
+
+    // ── HOUSE connectors: shared garden path, fence, sidewalk ──
+    case 'house':
+      ctx.save();
+      // NW: shared sidewalk / garden path going left
+      if (nb & 1) {
+        // Paved sidewalk strip
+        ctx.fillStyle = '#c4b89e';
+        ctx.fillRect(-hw-reach*0.8, -s*0.05, reach*0.85, s*0.1);
+        // Grass strip
+        ctx.fillStyle = '#2d7a22';
+        ctx.fillRect(-hw-reach*0.8, s*0.0, reach*0.85, s*0.06);
+        // Lamp post connection wire
+        ctx.strokeStyle = 'rgba(80,80,80,0.5)'; ctx.lineWidth = 0.8; ctx.setLineDash([3,4]);
+        ctx.beginPath(); ctx.moveTo(-hw, -s*0.52); ctx.lineTo(-hw-reach*0.7, -s*0.52+reach*0.3); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      // NE: garden and path going top-right
+      if (nb & 2) {
+        ctx.fillStyle = '#c4b89e';
+        ctx.fillRect(s*0.0, -hh-reach*0.6, s*0.15, reach*0.65);
+        ctx.fillStyle = '#2d7a22';
+        ctx.fillRect(-s*0.1, -hh-reach*0.6, s*0.1, reach*0.65);
+      }
+      // SE: mirror sidewalk right
+      if (nb & 4) {
+        ctx.fillStyle = '#c4b89e';
+        ctx.fillRect(hw, -s*0.05, reach*0.85, s*0.1);
+        ctx.fillStyle = '#2d7a22';
+        ctx.fillRect(hw, s*0.0, reach*0.85, s*0.06);
+      }
+      // SW: shared garden bottom
+      if (nb & 8) {
+        ctx.fillStyle = '#2d7a22';
+        ctx.fillRect(-s*0.35, hh*0.7, s*0.7, reach*0.5);
+        // Path stones
+        for (var ps2 = 0; ps2 < 4; ps2++) {
+          ctx.fillStyle = ps2%2===0 ? '#c4b89e' : '#b8ac92';
+          ctx.beginPath(); ctx.ellipse(-s*0.2+ps2*s*0.13, hh*0.85, s*0.03, s*0.015, 0, 0, Math.PI*2); ctx.fill();
+        }
+      }
+      ctx.restore();
+      break;
+
+    // ── FACTORY connectors: pipe connections, conveyor belts ──
+    case 'factory':
+      ctx.save();
+      if (nb & 1) {
+        // Pipe going left
+        ctx.fillStyle = '#8a8a8a';
+        ctx.fillRect(-hw-reach*0.9, -s*0.3, reach*0.95, s*0.08);
+        ctx.fillStyle = '#666'; ctx.fillRect(-hw-reach*0.9, -s*0.28, reach*0.95, s*0.02);
+        // Conveyor belt marks
+        ctx.strokeStyle = 'rgba(255,200,0,0.5)'; ctx.lineWidth = 0.8; ctx.setLineDash([4,4]);
+        ctx.beginPath(); ctx.moveTo(-hw, s*0.0); ctx.lineTo(-hw-reach*0.8, s*0.0+reach*0.35); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (nb & 2) {
+        ctx.fillStyle = '#8a8a8a';
+        ctx.fillRect(s*0.1, -hh-reach*0.9, s*0.08, reach*0.95);
+        ctx.fillStyle = '#666'; ctx.fillRect(s*0.1, -hh-reach*0.9, s*0.02, reach*0.95);
+      }
+      if (nb & 4) {
+        ctx.fillStyle = '#8a8a8a';
+        ctx.fillRect(hw, -s*0.3, reach*0.95, s*0.08);
+        ctx.fillStyle = '#666'; ctx.fillRect(hw, -s*0.28, reach*0.95, s*0.02);
+      }
+      if (nb & 8) {
+        ctx.fillStyle = '#8a8a8a';
+        ctx.fillRect(-s*0.1, hh*0.5, s*0.08, reach*0.5);
+        // Smoke trail shared
+        this._smoke(ctx, 0, hh*1.0, tick, 10, 'rgba(140,140,140,0.3)');
+      }
+      ctx.restore();
+      break;
+
+    // ── WAREHOUSE connectors: loading docks, road markings ──
+    case 'warehouse':
+      ctx.save();
+      if (nb & 1) {
+        ctx.fillStyle = '#5a5a5a'; ctx.fillRect(-hw-reach*0.9, -s*0.06, reach*0.95, s*0.12);
+        ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5; ctx.setLineDash([6,4]);
+        ctx.beginPath(); ctx.moveTo(-hw, s*0.0); ctx.lineTo(-hw-reach*0.8, s*0.0+reach*0.35); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (nb & 4) {
+        ctx.fillStyle = '#5a5a5a'; ctx.fillRect(hw, -s*0.06, reach*0.95, s*0.12);
+        ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5; ctx.setLineDash([6,4]);
+        ctx.beginPath(); ctx.moveTo(hw, s*0.0); ctx.lineTo(hw+reach*0.8, s*0.0-reach*0.35); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (nb & 8) {
+        ctx.fillStyle = '#5a5a5a'; ctx.fillRect(-s*0.3, hh*0.5, s*0.6, reach*0.5);
+        // Arrow marking
+        ctx.fillStyle = '#f59e0b'; ctx.font = '12px Arial'; ctx.textAlign='center';
+        ctx.fillText('↓', 0, hh*0.7);
+      }
+      ctx.restore();
+      break;
+
+    // ── GARDEN/PARK connectors: hedges, flower paths ──
+    case 'garden':
+    case 'park':
+      ctx.save();
+      var hedgeColor = '#2d5a1a';
+      if (nb & 1) {
+        ctx.fillStyle = hedgeColor; ctx.fillRect(-hw-reach*0.85, -s*0.12, reach*0.9, s*0.22);
+        // Flowers
+        for (var hf = 0; hf < 3; hf++) {
+          ctx.fillStyle = ['#ef4444','#f59e0b','#a855f7'][hf];
+          ctx.beginPath(); ctx.arc(-hw-reach*0.2-hf*reach*0.2, -s*0.02, 3, 0, Math.PI*2); ctx.fill();
+        }
+      }
+      if (nb & 4) {
+        ctx.fillStyle = hedgeColor; ctx.fillRect(hw, -s*0.12, reach*0.85, s*0.22);
+        for (var hf2 = 0; hf2 < 3; hf2++) {
+          ctx.fillStyle = ['#3b82f6','#22c55e','#f59e0b'][hf2];
+          ctx.beginPath(); ctx.arc(hw+reach*0.2+hf2*reach*0.2, -s*0.02, 3, 0, Math.PI*2); ctx.fill();
+        }
+      }
+      if (nb & 8) {
+        ctx.fillStyle = hedgeColor; ctx.fillRect(-s*0.3, hh*0.5, s*0.6, reach*0.45);
+        // Path through hedge
+        ctx.fillStyle = '#c4b89e'; ctx.fillRect(-s*0.05, hh*0.5, s*0.1, reach*0.45);
+      }
+      if (nb & 2) {
+        ctx.fillStyle = hedgeColor; ctx.fillRect(-s*0.3, -hh*1.3, s*0.6, reach*0.6);
+        ctx.fillStyle = '#c4b89e'; ctx.fillRect(-s*0.05, -hh*1.3, s*0.1, reach*0.6);
+      }
+      ctx.restore();
+      break;
+
+    // ── MARKET connectors: awning extension, shared stall ──
+    case 'market':
+      ctx.save();
+      if (nb & 1) {
+        // Striped awning going left
+        for (var ma = 0; ma < 4; ma++) {
+          ctx.fillStyle = ma%2===0 ? '#ef4444' : '#fef3c7';
+          ctx.fillRect(-hw-reach*0.8, -s*0.35+ma*s*0.06, reach*0.85, s*0.06);
+        }
+        // Table extension
+        ctx.fillStyle = '#d4b896'; ctx.fillRect(-hw-reach*0.7, -s*0.2, reach*0.75, s*0.12);
+      }
+      if (nb & 4) {
+        for (var ma2 = 0; ma2 < 4; ma2++) {
+          ctx.fillStyle = ma2%2===0 ? '#3b82f6' : '#fef3c7';
+          ctx.fillRect(hw, -s*0.35+ma2*s*0.06, reach*0.85, s*0.06);
+        }
+        ctx.fillStyle = '#d4b896'; ctx.fillRect(hw, -s*0.2, reach*0.75, s*0.12);
+      }
+      ctx.restore();
+      break;
+
+    // ── QUARRY connectors: rock wall extension, mining path ──
+    case 'quarry':
+      ctx.save();
+      if (nb & 1) {
+        ctx.fillStyle = '#6b6b6b'; ctx.fillRect(-hw-reach*0.85, -s*0.1, reach*0.9, s*0.18);
+        // Rock texture marks
+        ctx.strokeStyle = '#4a4a4a'; ctx.lineWidth = 0.8;
+        for (var rk = 0; rk < 3; rk++) {
+          ctx.beginPath(); ctx.arc(-hw-reach*0.2-rk*reach*0.2, s*0.0, s*0.04, 0, Math.PI*2); ctx.stroke();
+        }
+      }
+      if (nb & 4) {
+        ctx.fillStyle = '#6b6b6b'; ctx.fillRect(hw, -s*0.1, reach*0.85, s*0.18);
+      }
+      ctx.restore();
+      break;
+
+    // ── POWERPLANT connectors: power lines ──
+    case 'powerplant':
+      ctx.save();
+      if (nb & 1) {
+        // Power cable going left
+        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-hw, -s*0.7);
+        var cSag = reach*0.12;
+        ctx.quadraticCurveTo(-hw-reach*0.5, -s*0.7+cSag, -hw-reach*0.85, -s*0.7+reach*0.35);
+        ctx.stroke();
+        // Secondary cable
+        ctx.beginPath(); ctx.moveTo(-hw, -s*0.6);
+        ctx.quadraticCurveTo(-hw-reach*0.5, -s*0.6+cSag, -hw-reach*0.85, -s*0.6+reach*0.35);
+        ctx.stroke();
+      }
+      if (nb & 4) {
+        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(hw, -s*0.7);
+        var cSag2 = reach*0.12;
+        ctx.quadraticCurveTo(hw+reach*0.5, -s*0.7-cSag2, hw+reach*0.85, -s*0.7-reach*0.35);
+        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(hw, -s*0.6);
+        ctx.quadraticCurveTo(hw+reach*0.5, -s*0.6-cSag2, hw+reach*0.85, -s*0.6-reach*0.35);
+        ctx.stroke();
+      }
+      if (nb & 2) {
+        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(s*0.1, -hh-reach*0.1);
+        ctx.quadraticCurveTo(s*0.1, -hh-reach*0.5, s*0.1, -hh-reach*0.85);
+        ctx.stroke();
+      }
+      ctx.restore();
+      break;
+
+    // ── SCHOOL/LIBRARY/BANK/HOSPITAL: shared plaza/courtyard ──
+    case 'school':
+    case 'library':
+    case 'bank':
+    case 'hospital':
+      ctx.save();
+      var plazaColor = (type==='hospital') ? '#e8f4e8' :
+                       (type==='bank')     ? '#e8e0d0' :
+                       (type==='library')  ? '#d4c8b0' : '#d4d0c8';
+      if (nb & 1) {
+        ctx.fillStyle = plazaColor; ctx.fillRect(-hw-reach*0.85, -s*0.08, reach*0.9, s*0.14);
+        ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 0.5;
+        for (var pc = 0; pc < 3; pc++) {
+          ctx.beginPath(); ctx.moveTo(-hw-pc*reach*0.25, -s*0.08); ctx.lineTo(-hw-pc*reach*0.25, s*0.06); ctx.stroke();
+        }
+      }
+      if (nb & 4) {
+        ctx.fillStyle = plazaColor; ctx.fillRect(hw, -s*0.08, reach*0.85, s*0.14);
+      }
+      if (nb & 8) {
+        ctx.fillStyle = plazaColor; ctx.fillRect(-s*0.35, hh*0.45, s*0.7, reach*0.5);
+        // Crosswalk stripes
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        for (var cw = -3; cw <= 3; cw++) {
+          ctx.fillRect(cw*s*0.1, hh*0.5, s*0.06, reach*0.45);
+        }
+      }
+      ctx.restore();
+      break;
+
+    // ── BAKERY connectors: shared outdoor seating, fragrance ──
+    case 'bakery':
+      ctx.save();
+      if (nb & 1) {
+        // Outdoor table going left
+        ctx.fillStyle = '#d4a870'; ctx.fillRect(-hw-reach*0.7, -s*0.22, reach*0.72, s*0.14);
+        // Cups on table
+        for (var bc = 0; bc < 2; bc++) {
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-hw-reach*0.2-bc*reach*0.25, -s*0.16, 3, 0, Math.PI*2); ctx.fill();
+        }
+        // Steam from bread
+        this._smoke(ctx, -hw-reach*0.3, -s*0.3, tick, 5, 'rgba(255,200,150,0.25)');
+      }
+      if (nb & 4) {
+        ctx.fillStyle = '#d4a870'; ctx.fillRect(hw, -s*0.22, reach*0.72, s*0.14);
+        for (var bc2 = 0; bc2 < 2; bc2++) {
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hw+reach*0.2+bc2*reach*0.25, -s*0.16, 3, 0, Math.PI*2); ctx.fill();
+        }
+      }
+      ctx.restore();
+      break;
+
+    // ── STADIUM connectors: bleacher extension ──
+    case 'stadium':
+      ctx.save();
+      if (nb & 1) {
+        ctx.fillStyle = '#4a6fa5'; ctx.fillRect(-hw-reach*0.85, -s*0.2, reach*0.9, s*0.3);
+        // Seat rows
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 0.8;
+        for (var sr = 0; sr < 4; sr++) {
+          ctx.beginPath(); ctx.moveTo(-hw-reach*0.8, -s*0.2+sr*s*0.07); ctx.lineTo(-hw, -s*0.2+sr*s*0.07); ctx.stroke();
+        }
+      }
+      if (nb & 4) {
+        ctx.fillStyle = '#4a6fa5'; ctx.fillRect(hw, -s*0.2, reach*0.85, s*0.3);
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 0.8;
+        for (var sr2 = 0; sr2 < 4; sr2++) {
+          ctx.beginPath(); ctx.moveTo(hw, -s*0.2+sr2*s*0.07); ctx.lineTo(hw+reach*0.8, -s*0.2+sr2*s*0.07); ctx.stroke();
+        }
+      }
+      ctx.restore();
+      break;
+
+    // ── CRYSTALMINE connectors: crystal vein extension ──
+    case 'crystalmine':
+      ctx.save();
+      var cryColors = ['#7c3aed','#a78bfa','#4c1d95'];
+      if (nb & 1) {
+        ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-hw, -s*0.1); ctx.lineTo(-hw-reach*0.8, -s*0.1+reach*0.35); ctx.stroke();
+        ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(-hw, -s*0.18); ctx.lineTo(-hw-reach*0.7, -s*0.18+reach*0.3); ctx.stroke();
+        // Crystal shard at connection
+        ctx.fillStyle = '#c4b5fd';
+        ctx.beginPath(); ctx.moveTo(-hw-reach*0.3, -s*0.22); ctx.lineTo(-hw-reach*0.4, -s*0.0); ctx.lineTo(-hw-reach*0.2, -s*0.06); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 0.5 + 0.5*Math.sin(tick*0.08);
+        ctx.fillStyle = '#a78bfa';
+        ctx.beginPath(); ctx.arc(-hw-reach*0.3, -s*0.12, 4, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      if (nb & 4) {
+        ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(hw, -s*0.1); ctx.lineTo(hw+reach*0.8, -s*0.1-reach*0.35); ctx.stroke();
+        ctx.fillStyle = '#c4b5fd';
+        ctx.beginPath(); ctx.moveTo(hw+reach*0.3, -s*0.22); ctx.lineTo(hw+reach*0.4, -s*0.0); ctx.lineTo(hw+reach*0.2, -s*0.06); ctx.closePath(); ctx.fill();
+      }
+      if (nb & 2) {
+        ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, -hh-reach*0.2); ctx.lineTo(0, -hh-reach*0.85); ctx.stroke();
+        ctx.fillStyle = '#c4b5fd';
+        ctx.beginPath(); ctx.moveTo(-s*0.06, -hh-reach*0.4); ctx.lineTo(0, -hh-reach*0.65); ctx.lineTo(s*0.06, -hh-reach*0.4); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+      break;
+
+    // ── ARCANETOWER connectors: magical bridge, particle trail ──
+    case 'arcanetower':
+      ctx.save();
+      var ap = 0.5 + 0.5*Math.sin(tick*0.1);
+      if (nb & 1) {
+        // Magical energy beam to left
+        ctx.strokeStyle = 'rgba(139,92,246,'+ap+')'; ctx.lineWidth = 3;
+        ctx.shadowColor = '#7c3aed'; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.moveTo(-hw, -s*0.84); ctx.lineTo(-hw-reach*0.75, -s*0.84+reach*0.35); ctx.stroke();
+        ctx.shadowBlur = 0;
+        // Floating particle along beam
+        var bpx = -hw-reach*0.4*(0.5+0.5*Math.sin(tick*0.07));
+        var bpy = -s*0.84+(reach*0.4*(0.5+0.5*Math.sin(tick*0.07)))*0.35;
+        ctx.fillStyle = '#c4b5fd'; ctx.beginPath(); ctx.arc(bpx, bpy, 3, 0, Math.PI*2); ctx.fill();
+      }
+      if (nb & 4) {
+        ctx.strokeStyle = 'rgba(139,92,246,'+ap+')'; ctx.lineWidth = 3;
+        ctx.shadowColor = '#7c3aed'; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.moveTo(hw, -s*0.84); ctx.lineTo(hw+reach*0.75, -s*0.84-reach*0.35); ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+      if (nb & 2) {
+        ctx.strokeStyle = 'rgba(167,139,250,'+(ap*0.7)+')'; ctx.lineWidth = 2;
+        ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.moveTo(s*0.1, -hh-reach*0.1); ctx.lineTo(s*0.1, -hh-reach*0.8); ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+      ctx.restore();
+      break;
+  }
+};
 
 // ══════════════════════════════════════════════════════════════
 //  ULTRA-DETAILED BUILDING SPRITES  — every pixel counts
 // ══════════════════════════════════════════════════════════════
 
 // ── FARM ─────────────────────────────────────────────────────
-GameRenderer.prototype._sFarm = function(ctx, s, level, tick) {
+GameRenderer.prototype._sFarm = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === GROUND BASE ===
@@ -939,10 +1387,13 @@ GameRenderer.prototype._sFarm = function(ctx, s, level, tick) {
   var wd = (t * 0.1) % 1;
   ctx.fillStyle = 'rgba(64,164,224,' + (0.6-wd*0.6) + ')';
   ctx.beginPath(); ctx.arc(-s*0.07, -s*0.07 - wd*s*0.1, 2, 0, Math.PI*2); ctx.fill();
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'farm', tick);
 };
 
 // ── HOUSE ────────────────────────────────────────────────────
-GameRenderer.prototype._sHouse = function(ctx, s, level, tick) {
+GameRenderer.prototype._sHouse = function(ctx, s, level, tick, nb) {
   var t = tick;
   var floors = Math.min(1 + Math.floor(level / 5), 4);
   var fh = s * 0.25;
@@ -1131,6 +1582,9 @@ GameRenderer.prototype._sHouse = function(ctx, s, level, tick) {
   ctx.fillStyle = '#dc2626'; ctx.fillRect(-s*0.38, -s*0.16, s*0.05, s*0.03);
   // Post
   ctx.fillStyle = '#888'; ctx.fillRect(-s*0.43, -s*0.02, s*0.02, s*0.04);
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'house', tick);
 };
 
 // Helper for detailed windows
@@ -1160,7 +1614,7 @@ GameRenderer.prototype._drawDetailedWindow = function(ctx, x, y, w, h, lit, tick
 };
 
 // ── QUARRY ───────────────────────────────────────────────────
-GameRenderer.prototype._sQuarry = function(ctx, s, level, tick) {
+GameRenderer.prototype._sQuarry = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === PIT ===
@@ -1303,10 +1757,13 @@ GameRenderer.prototype._sQuarry = function(ctx, s, level, tick) {
   ctx.fillStyle = '#fbbf24'; ctx.fillRect(s*0.06, -s*0.52, s*0.1, s*0.08);
   ctx.fillStyle = '#1a1a00'; ctx.font = 'bold 6px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('⚠️', s*0.11, -s*0.48);
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'quarry', tick);
 };
 
 // ── FACTORY ──────────────────────────────────────────────────
-GameRenderer.prototype._sFactory = function(ctx, s, level, tick) {
+GameRenderer.prototype._sFactory = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === GROUND / INDUSTRIAL YARD ===
@@ -1465,10 +1922,13 @@ GameRenderer.prototype._sFactory = function(ctx, s, level, tick) {
   ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(fkx, -s*0.06); ctx.lineTo(fkx-s*0.06, -s*0.06); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(fkx, -s*0.1); ctx.lineTo(fkx-s*0.06, -s*0.1); ctx.stroke();
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'factory', tick);
 };
 
 // ── POWERPLANT ───────────────────────────────────────────────
-GameRenderer.prototype._sPowerplant = function(ctx, s, level, tick) {
+GameRenderer.prototype._sPowerplant = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === BASE BUILDING ===
@@ -1572,10 +2032,13 @@ GameRenderer.prototype._sPowerplant = function(ctx, s, level, tick) {
   ctx.fillStyle = '#fbbf24'; ctx.fillRect(-s*0.5, -s*0.14, s*0.07, s*0.07);
   ctx.fillStyle = '#1a0a00'; ctx.font = '7px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('⚡', -s*0.465, -s*0.105);
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'powerplant', tick);
 };
 
 // ── WAREHOUSE ────────────────────────────────────────────────
-GameRenderer.prototype._sWarehouse = function(ctx, s, level, tick) {
+GameRenderer.prototype._sWarehouse = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === CONCRETE FLOOR ===
@@ -1680,10 +2143,13 @@ GameRenderer.prototype._sWarehouse = function(ctx, s, level, tick) {
   var cam = Math.floor(t/45)%6===0;
   ctx.fillStyle = cam ? '#ef4444' : '#22c55e';
   ctx.beginPath(); ctx.arc(s*0.42, -s*0.34, 2, 0, Math.PI*2); ctx.fill();
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'warehouse', tick);
 };
 
 // ── MARKET ───────────────────────────────────────────────────
-GameRenderer.prototype._sMarket = function(ctx, s, level, tick) {
+GameRenderer.prototype._sMarket = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === COBBLESTONE PLAZA ===
@@ -1786,10 +2252,13 @@ GameRenderer.prototype._sMarket = function(ctx, s, level, tick) {
     ctx.font = '10px Arial'; ctx.textAlign='center';
     ctx.fillText('🧑', -s*0.46, -s*0.26 + Math.abs(Math.sin(t*0.04))*3);
   }
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'market', tick);
 };
 
 // ── GARDEN ───────────────────────────────────────────────────
-GameRenderer.prototype._sGarden = function(ctx, s, level, tick) {
+GameRenderer.prototype._sGarden = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === GROUND ===
@@ -1903,10 +2372,13 @@ GameRenderer.prototype._sGarden = function(ctx, s, level, tick) {
     ctx.font = '8px Arial'; ctx.textAlign='center';
     ctx.fillText('🦋', bfx, bfy);
   }
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'garden', tick);
 };
 
 // ── SCHOOL ───────────────────────────────────────────────────
-GameRenderer.prototype._sSchool = function(ctx, s, level, tick) {
+GameRenderer.prototype._sSchool = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === SCHOOLYARD ===
@@ -2031,10 +2503,13 @@ GameRenderer.prototype._sSchool = function(ctx, s, level, tick) {
   // Door handles
   ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(-s*0.02, -s*0.18, 2, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(s*0.02, -s*0.18, 2, 0, Math.PI*2); ctx.fill();
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'school', tick);
 };
 
 // ── BAKERY ───────────────────────────────────────────────────
-GameRenderer.prototype._sBakery = function(ctx, s, level, tick) {
+GameRenderer.prototype._sBakery = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === COBBLESTONE GROUND ===
@@ -2136,10 +2611,13 @@ GameRenderer.prototype._sBakery = function(ctx, s, level, tick) {
   // Door bell screw
   ctx.fillStyle = '#888'; ctx.beginPath(); ctx.arc(-s*0.1, -s*0.2, 3, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(-s*0.1, -s*0.2, 1.5, 0, Math.PI*2); ctx.fill();
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'bakery', tick);
 };
 
 // ── PARK ─────────────────────────────────────────────────────
-GameRenderer.prototype._sPark = function(ctx, s, level, tick) {
+GameRenderer.prototype._sPark = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === PARK GROUND ===
@@ -2261,10 +2739,13 @@ GameRenderer.prototype._sPark = function(ctx, s, level, tick) {
     ctx.fillRect(bp[0]+s*0.02, bp[1]-s*0.04, s*0.025, s*0.04);
     ctx.fillRect(bp[0]+s*0.13, bp[1]-s*0.04, s*0.025, s*0.04);
   });
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'park', tick);
 };
 
 // ── BANK ─────────────────────────────────────────────────────
-GameRenderer.prototype._sBank = function(ctx, s, level, tick) {
+GameRenderer.prototype._sBank = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === MARBLE PLAZA ===
@@ -2394,10 +2875,13 @@ GameRenderer.prototype._sBank = function(ctx, s, level, tick) {
   ctx.strokeStyle = '#888'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(s*0.34, -s*0.76); ctx.lineTo(s*0.34, -s*0.9); ctx.stroke();
   ctx.fillStyle = '#ef4444'; ctx.fillRect(s*0.34, -s*0.9, s*0.1, s*0.06);
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'bank', tick);
 };
 
 // ── HOSPITAL ─────────────────────────────────────────────────
-GameRenderer.prototype._sHospital = function(ctx, s, level, tick) {
+GameRenderer.prototype._sHospital = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === CLEAN GROUNDS ===
@@ -2510,10 +2994,13 @@ GameRenderer.prototype._sHospital = function(ctx, s, level, tick) {
     ctx.fillStyle = sir ? '#ef4444' : '#3b82f6';
     ctx.beginPath(); ctx.arc(ambX+s*0.1, -s*0.14, 3, 0, Math.PI*2); ctx.fill();
   }
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'hospital', tick);
 };
 
 // ── LIBRARY ──────────────────────────────────────────────────
-GameRenderer.prototype._sLibrary = function(ctx, s, level, tick) {
+GameRenderer.prototype._sLibrary = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === GROUNDS ===
@@ -2613,10 +3100,13 @@ GameRenderer.prototype._sLibrary = function(ctx, s, level, tick) {
   ctx.font = '11px Arial'; ctx.textAlign='center';
   ctx.fillText('🦁', -s*0.46, -s*0.08);
   ctx.fillText('🦁', s*0.46, -s*0.08);
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'library', tick);
 };
 
 // ── STADIUM ──────────────────────────────────────────────────
-GameRenderer.prototype._sStadium = function(ctx, s, level, tick) {
+GameRenderer.prototype._sStadium = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === OUTER STRUCTURE ===
@@ -2738,10 +3228,13 @@ GameRenderer.prototype._sStadium = function(ctx, s, level, tick) {
   ctx.beginPath(); ctx.moveTo(-s*0.52,-s*0.42); ctx.lineTo(-s*0.52+bw4,-s*0.34); ctx.lineTo(-s*0.52,-s*0.26); ctx.closePath(); ctx.fill();
   ctx.fillStyle = 'rgba(29,78,216,0.8)';
   ctx.beginPath(); ctx.moveTo(s*0.52,-s*0.42); ctx.lineTo(s*0.52-bw4,-s*0.34); ctx.lineTo(s*0.52,-s*0.26); ctx.closePath(); ctx.fill();
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'stadium', tick);
 };
 
 // ── CRYSTAL MINE ─────────────────────────────────────────────
-GameRenderer.prototype._sCrystalMine = function(ctx, s, level, tick) {
+GameRenderer.prototype._sCrystalMine = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === MAGICAL GROUND ===
@@ -2880,10 +3373,13 @@ GameRenderer.prototype._sCrystalMine = function(ctx, s, level, tick) {
     ctx.fillStyle = 'rgba(196,181,253,'+fpalpha+')';
     ctx.beginPath(); ctx.arc(fpx2, fpy, 2+fp2%3, 0, Math.PI*2); ctx.fill();
   }
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'crystalmine', tick);
 };
 
 // ── ARCANE TOWER ─────────────────────────────────────────────
-GameRenderer.prototype._sArcaneTower = function(ctx, s, level, tick) {
+GameRenderer.prototype._sArcaneTower = function(ctx, s, level, tick, nb) {
   var t = tick;
 
   // === MAGICAL GROUND ===
@@ -3053,6 +3549,9 @@ GameRenderer.prototype._sArcaneTower = function(ctx, s, level, tick) {
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
+
+  // Neighbor connectors
+  if (nb) this._drawConnectorBridge(ctx, s, nb, 'arcanetower', tick);
 };
 
 // ─── Threat drawing ──────────────────────────────────────────
