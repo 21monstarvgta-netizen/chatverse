@@ -270,6 +270,34 @@ GameUI.prototype.showBuildingInfo = function(building, buildingIndex, config) {
   actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#ff6b6b;" onclick="game.demolishBuilding(' + buildingIndex + ')">🗑️</button>';
   actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#fdcb6e;" onclick="game.startMovingBuilding(' + buildingIndex + ')">🏗️ Переставить</button>';
 
+  // Road variant/rotation controls
+  if (building.type === 'road') {
+    var curVariant = building.roadVariant || 'straight';
+    var curRot = building.roadRotation || 0;
+    actionsHTML += '<div style="margin-top:10px;">';
+    actionsHTML += '<div style="font-size:11px;color:#94a3b8;margin-bottom:5px;">Тип дороги:</div>';
+    actionsHTML += '<div style="display:flex;gap:5px;flex-wrap:wrap;">';
+    var variants = [
+      { id: 'straight', label: '━ Прямая' },
+      { id: 'turn-left', label: '↰ Поворот лев.' },
+      { id: 'turn-right', label: '↱ Поворот пр.' }
+    ];
+    variants.forEach(function(v) {
+      var active = curVariant === v.id ? 'background:rgba(85,239,196,0.25);border-color:#55efc4;color:#55efc4;' : '';
+      actionsHTML += '<button class="btn btn-ghost btn-sm" style="' + active + 'font-size:11px;padding:4px 8px;" onclick="game.setRoadVariant(' + buildingIndex + ',\'' + v.id + '\',' + curRot + ')">' + v.label + '</button>';
+    });
+    actionsHTML += '</div>';
+    actionsHTML += '<div style="font-size:11px;color:#94a3b8;margin:7px 0 5px;">Поворот:</div>';
+    actionsHTML += '<div style="display:flex;gap:5px;">';
+    var rotLabels = ['0°', '90°', '180°', '270°'];
+    for (var ri = 0; ri < 4; ri++) {
+      var rActive = curRot === ri ? 'background:rgba(85,239,196,0.25);border-color:#55efc4;color:#55efc4;' : '';
+      actionsHTML += '<button class="btn btn-ghost btn-sm" style="' + rActive + 'font-size:11px;padding:4px 8px;" onclick="game.setRoadVariant(' + buildingIndex + ',\'' + curVariant + '\',' + ri + ')">' + rotLabels[ri] + '</button>';
+    }
+    actionsHTML += '</div>';
+    actionsHTML += '</div>';
+  }
+
   document.getElementById('building-info-actions').innerHTML = actionsHTML;
   panel.classList.remove('hidden');
 };

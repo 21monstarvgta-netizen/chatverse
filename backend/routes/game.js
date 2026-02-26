@@ -616,6 +616,25 @@ router.post('/move', auth, async function(req, res) {
   }
 });
 
+// Road variant/rotation update
+router.post('/road-config', auth, async function(req, res) {
+  try {
+    var idx = parseInt(req.body.buildingIndex);
+    var variant = req.body.variant; // 'straight', 'turn-left', 'turn-right'
+    var rotation = parseInt(req.body.rotation) || 0; // 0,1,2,3
+    var player = await getOrCreatePlayer(req.userId);
+    if (idx < 0 || idx >= player.buildings.length) return res.status(400).json({ error: 'Здание не найдено' });
+    if (player.buildings[idx].type !== 'road') return res.status(400).json({ error: 'Не дорога' });
+    player.buildings[idx].roadVariant = variant;
+    player.buildings[idx].roadRotation = rotation;
+    player.markModified('buildings');
+    await player.save();
+    res.json({ success: true, player: getPlayerState(player) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
 // Crystal exchange (1 crystal = 100 of any resource)
 router.post('/crystal-exchange', auth, async function(req, res) {
   try {
