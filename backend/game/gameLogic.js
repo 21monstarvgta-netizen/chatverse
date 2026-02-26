@@ -93,6 +93,8 @@ function getNextZones(unlockedZones) {
   var halfInit = Math.floor(config.INITIAL_UNLOCKED / 2);
   var zoneNum = unlockedZones.length + 1;
 
+  // Build the bounding rectangle of ALL currently unlocked territory
+  // (initial zone + all purchased zones)
   var expandedX1 = centerX - halfInit;
   var expandedY1 = centerY - halfInit;
   var expandedX2 = centerX + halfInit - 1;
@@ -109,23 +111,27 @@ function getNextZones(unlockedZones) {
   var candidates = [];
   var gs = config.GRID_SIZE;
 
-  // Zones expand DIAGONALLY so they match visual screen directions in isometric view:
-  // In iso projection: screen-right = x++,y--  screen-left = x--,y++
-  //                    screen-up    = x--,y--   screen-down  = x++,y++
+  // Zones expand as STRIPS that share a full edge with current territory.
+  // This ensures every new zone is visually connected (no dark-tile gaps) in iso view.
   //
-  // East  (screen right): new tiles have x > expandedX2 AND y < expandedY1
-  // West  (screen left):  new tiles have x < expandedX1 AND y > expandedY2
-  // North (screen up):    new tiles have x < expandedX1 AND y < expandedY1
-  // South (screen down):  new tiles have x > expandedX2 AND y > expandedY2
+  // In iso projection:
+  //   screen-up-left  = x decreases  → North strip: x in [x1-size..x1-1], y in [y1..y2]
+  //   screen-down-right = x increases → South strip: x in [x2+1..x2+size], y in [y1..y2]
+  //   screen-up-right = y decreases   → East  strip: y in [y1-size..y1-1], x in [x1..x2]
+  //   screen-down-left = y increases  → West  strip: y in [y2+1..y2+size], x in [x1..x2]
 
-  if (expandedX2 + size < gs && expandedY1 - size >= 0)
-    candidates.push({ x1: expandedX2 + 1, y1: expandedY1 - size, x2: expandedX2 + size, y2: expandedY1 - 1, direction: 'east' });
-  if (expandedX1 - size >= 0 && expandedY2 + size < gs)
-    candidates.push({ x1: expandedX1 - size, y1: expandedY2 + 1, x2: expandedX1 - 1, y2: expandedY2 + size, direction: 'west' });
-  if (expandedX1 - size >= 0 && expandedY1 - size >= 0)
-    candidates.push({ x1: expandedX1 - size, y1: expandedY1 - size, x2: expandedX1 - 1, y2: expandedY1 - 1, direction: 'north' });
-  if (expandedX2 + size < gs && expandedY2 + size < gs)
-    candidates.push({ x1: expandedX2 + 1, y1: expandedY2 + 1, x2: expandedX2 + size, y2: expandedY2 + size, direction: 'south' });
+  // North (upper-left on screen): full-height strip to the left
+  if (expandedX1 - size >= 0)
+    candidates.push({ x1: expandedX1 - size, y1: expandedY1, x2: expandedX1 - 1, y2: expandedY2, direction: 'north' });
+  // South (lower-right on screen): full-height strip to the right
+  if (expandedX2 + size < gs)
+    candidates.push({ x1: expandedX2 + 1, y1: expandedY1, x2: expandedX2 + size, y2: expandedY2, direction: 'south' });
+  // East (upper-right on screen): full-width strip above
+  if (expandedY1 - size >= 0)
+    candidates.push({ x1: expandedX1, y1: expandedY1 - size, x2: expandedX2, y2: expandedY1 - 1, direction: 'east' });
+  // West (lower-left on screen): full-width strip below
+  if (expandedY2 + size < gs)
+    candidates.push({ x1: expandedX1, y1: expandedY2 + 1, x2: expandedX2, y2: expandedY2 + size, direction: 'west' });
 
   candidates = candidates.filter(function(c) {
     for (var j = 0; j < unlockedZones.length; j++) {

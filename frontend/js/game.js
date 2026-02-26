@@ -431,7 +431,7 @@ Game.prototype.showZoneUnlock = function(x, y) {
   this.pendingZone = targetZone;
   // Highlight zone on map
   if (this.renderer) this.renderer.previewZone = targetZone;
-  var dirs = { north: '⬆ Север', south: '⬇ Юг', west: '⬅ Запад', east: '➡ Восток' };
+  var dirs = { north: '↖ Северо-запад', south: '↘ Юго-восток', east: '↗ Северо-восток', west: '↙ Юго-запад' };
   var infoEl = document.getElementById('zone-unlock-info');
   if (infoEl) {
     infoEl.innerHTML =

@@ -141,6 +141,80 @@ async function getOrCreatePlayer(userId) {
   } catch(e) { console.error('[Migration] Error:', e.message); }
 })();
 
+// ── Migrate diagonal zones → strip zones ──────────────────────────────────
+// Old getNextZones generated diagonal squares (x<x1 AND y<y1).
+// New getNextZones generates strips (x<x1, y in [y1..y2]).
+// We detect old diagonal zones and replace them with the correct strip geometry.
+(async function migrateZones() {
+  try {
+    var players = await GamePlayer.find({ 'unlockedZones.0': { $exists: true } });
+    var fixed = 0;
+    var centerX = Math.floor(config.GRID_SIZE / 2);
+    var centerY = Math.floor(config.GRID_SIZE / 2);
+    var halfInit = Math.floor(config.INITIAL_UNLOCKED / 2);
+    var initX1 = centerX - halfInit, initX2 = centerX + halfInit - 1;
+    var initY1 = centerY - halfInit, initY2 = centerY + halfInit - 1;
+
+    for (var i = 0; i < players.length; i++) {
+      var p = players[i];
+      var changed = false;
+      var newZones = [];
+
+      // Rebuild the full unlocked bounding box to remap each zone
+      // by its direction to a proper strip
+      var bx1 = initX1, by1 = initY1, bx2 = initX2, by2 = initY2;
+      for (var z = 0; z < p.unlockedZones.length; z++) {
+        var zn = p.unlockedZones[z];
+        bx1 = Math.min(bx1, zn.x1); by1 = Math.min(by1, zn.y1);
+        bx2 = Math.max(bx2, zn.x2); by2 = Math.max(by2, zn.y2);
+      }
+
+      for (var zi = 0; zi < p.unlockedZones.length; zi++) {
+        var oz = p.unlockedZones[zi];
+        var dir = oz.direction;
+        var width = oz.x2 - oz.x1 + 1;  // e.g. 4
+
+        // Detect if zone is old diagonal type (its y-span != bounding box y-span)
+        var isOldDiag = false;
+        if (dir === 'north' || dir === 'south') {
+          // Should span full y-range of territory at time of purchase
+          // Old diagonal: y-span = width (square). New strip: y-span = full range
+          if ((oz.y2 - oz.y1 + 1) === width && (oz.x2 - oz.x1 + 1) === width) isOldDiag = true;
+        } else if (dir === 'east' || dir === 'west') {
+          if ((oz.x2 - oz.x1 + 1) === width && (oz.y2 - oz.y1 + 1) === width) isOldDiag = true;
+        }
+
+        if (isOldDiag) {
+          // Remap to strip: keep x1/x2 for north/south, recalculate y span
+          // Use initial zone bounds as approximate y/x span (conservative)
+          var fixed_zone;
+          if (dir === 'north') {
+            fixed_zone = { x1: oz.x1, y1: initY1, x2: oz.x2, y2: initY2, direction: dir };
+          } else if (dir === 'south') {
+            fixed_zone = { x1: oz.x1, y1: initY1, x2: oz.x2, y2: initY2, direction: dir };
+          } else if (dir === 'east') {
+            fixed_zone = { x1: initX1, y1: oz.y1, x2: initX2, y2: oz.y2, direction: dir };
+          } else { // west
+            fixed_zone = { x1: initX1, y1: oz.y1, x2: initX2, y2: oz.y2, direction: dir };
+          }
+          newZones.push(fixed_zone);
+          changed = true;
+        } else {
+          newZones.push({ x1: oz.x1, y1: oz.y1, x2: oz.x2, y2: oz.y2, direction: dir });
+        }
+      }
+
+      if (changed) {
+        p.unlockedZones = newZones;
+        p.markModified('unlockedZones');
+        await p.save();
+        fixed++;
+      }
+    }
+    if (fixed > 0) console.log('[Migration] Fixed diagonal zones for', fixed, 'players');
+  } catch(e) { console.error('[Migration] Zone fix error:', e.message); }
+})();
+
 // Fix duplicate key: drop null entries on startup
 (async function() {
   try {
