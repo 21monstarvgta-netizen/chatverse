@@ -29,6 +29,7 @@ Game.prototype.init = async function() {
       document.getElementById('game-canvas'),
       document.getElementById('game-viewport')
     );
+    self.renderer.initialUnlocked = self.config.initialUnlocked || 10;
     self.ui = new GameUI(self);
 
     self.updateRendererState();

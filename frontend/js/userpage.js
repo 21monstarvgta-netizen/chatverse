@@ -67,6 +67,26 @@ document.addEventListener('DOMContentLoaded', async function() {
       document.getElementById('admin-user-actions').innerHTML = actions;
     }
 
+    // Currency editor — only for @YasheNJO
+    if (currentUser.username === 'YasheNJO' && user._id !== currentUser._id) {
+      var currencyHtml =
+        '<div id="currency-editor" style="margin-top:20px;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;border:1px solid rgba(255,255,255,0.1);">' +
+        '<h4 style="margin:0 0 12px;font-size:14px;color:#a78bfa;">🪙 Редактировать валюту (@' + escapeHTML(user.username) + ')</h4>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+        '<select id="currency-type" style="padding:6px 10px;border-radius:8px;background:#1e2535;color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">' +
+        '<option value="coins">🪙 Монеты</option>' +
+        '<option value="food">🍞 Еда</option>' +
+        '<option value="materials">🪨 Материалы</option>' +
+        '<option value="energy">⚡ Энергия</option>' +
+        '<option value="crystals">💎 Кристаллы</option>' +
+        '</select>' +
+        '<input id="currency-amount" type="number" min="0" placeholder="Кол-во" value="1000" ' +
+        'style="width:100px;padding:6px 10px;border-radius:8px;background:#1e2535;color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">' +
+        '<button class="btn btn-primary btn-sm" onclick="setCurrency(\'' + escapeHTML(user.username) + '\')">Установить</button>' +
+        '</div></div>';
+      document.querySelector('.profile-body').insertAdjacentHTML('beforeend', currencyHtml);
+    }
+
     // Load user posts
     try {
       var postsData = await apiRequest('/posts/user/' + userId);
@@ -110,5 +130,18 @@ async function adminAction(action, userId) {
       window.location.href = '/';
     }
     location.reload();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function setCurrency(username) {
+  try {
+    var currency = document.getElementById('currency-type').value;
+    var amount   = parseInt(document.getElementById('currency-amount').value);
+    if (isNaN(amount) || amount < 0) { showToast('Неверное количество', 'error'); return; }
+    var data = await apiRequest('/game/admin/set-currency', {
+      method: 'POST',
+      body: JSON.stringify({ username: username, currency: currency, amount: amount })
+    });
+    showToast(data.message || 'Готово!', 'success');
   } catch (e) { showToast(e.message, 'error'); }
 }

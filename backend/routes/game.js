@@ -459,8 +459,9 @@ router.post('/quest/claim/:questId', auth, async function(req, res) {
     var quest = player.activeQuests[questIdx];
     if ((quest.progress || 0) < quest.count) return res.status(400).json({ error: 'Квест не выполнен' });
 
+    var reward = quest.reward || {};
     var maxStorage = logic.calculateMaxStorage(player.buildings);
-    logic.addResources(player.resources, quest.reward, maxStorage);
+    logic.addResources(player.resources, reward, maxStorage);
 
     player.completedQuests.push(questId);
     player.activeQuests.splice(questIdx, 1);
@@ -489,7 +490,7 @@ router.post('/quest/claim/:questId', auth, async function(req, res) {
     player.markModified('completedQuests');
     await player.save();
 
-    res.json({ success: true, reward: quest.reward, player: getPlayerState(player) });
+    res.json({ success: true, reward: reward, player: getPlayerState(player) });
   } catch (error) {
     console.error('Quest claim error:', error.message);
     res.status(500).json({ error: 'Ошибка: ' + error.message });
@@ -766,6 +767,45 @@ router.get('/leaderboard', auth, async function(req, res) {
     }
     res.json({ leaderboard: leaderboard });
   } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+// ── Admin: edit player currency (ONLY for @YasheNJO) ──────────────────────
+router.post('/admin/set-currency', auth, async function(req, res) {
+  try {
+    // Restrict to the single hardcoded admin account
+    if (!req.user || req.user.username !== 'YasheNJO') {
+      return res.status(403).json({ error: 'Доступ запрещён' });
+    }
+
+    var targetUsername = req.body.username;
+    var currency       = req.body.currency; // 'coins'|'food'|'materials'|'energy'|'crystals'
+    var amount         = parseInt(req.body.amount);
+
+    if (!targetUsername) return res.status(400).json({ error: 'Укажите имя пользователя' });
+    if (!['coins','food','materials','energy','crystals'].includes(currency))
+      return res.status(400).json({ error: 'Неверный тип валюты' });
+    if (isNaN(amount) || amount < 0)
+      return res.status(400).json({ error: 'Неверное количество' });
+
+    var User = require('../models/User');
+    var targetUser = await User.findOne({ username: targetUsername });
+    if (!targetUser) return res.status(404).json({ error: 'Игрок не найден: ' + targetUsername });
+
+    var player = await GamePlayer.findOne({ userId: targetUser._id });
+    if (!player) return res.status(404).json({ error: 'Игровой профиль не найден' });
+
+    player.resources[currency] = amount;
+    player.markModified('resources');
+    await player.save();
+
+    res.json({
+      success: true,
+      message: 'Валюта обновлена: ' + targetUsername + ' → ' + currency + ' = ' + amount
+    });
+  } catch (error) {
+    console.error('Admin set-currency error:', error.message);
     res.status(500).json({ error: 'Ошибка: ' + error.message });
   }
 });

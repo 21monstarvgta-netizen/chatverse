@@ -36,7 +36,8 @@ var GameRenderer = function(canvas, viewport) {
   this.ctx      = canvas.getContext('2d');
   this.viewport = viewport;
 
-  this.gridSize  = 40;
+  this.gridSize       = 40;
+  this.initialUnlocked = 10;
   this.tileW     = 96;   // full diamond width  (left→right)
   this.tileH     = 48;   // full diamond height (top→bottom)
   this.tileDepth = 18;   // 2.5D side extrusion (downward)
@@ -134,12 +135,14 @@ GameRenderer.prototype.resize = function() {
 };
 
 GameRenderer.prototype.centerCamera = function() {
-  // Centre on the middle of the initial unlocked zone (15-24 with GRID_SIZE=40, INITIAL_UNLOCKED=10)
-  // Zone spans center-half .. center+half-1, visual centre ≈ center-1
+  // Centre on the true middle of the initial unlocked zone.
+  // With GRID_SIZE=40 and INITIAL_UNLOCKED=10:
+  //   half = 5, center = 20
+  //   unlocked tiles: x/y in [15, 19]  →  visual centre = tile 17,17
   var gs   = this.gridSize;
-  var half = 5; // Math.floor(INITIAL_UNLOCKED / 2)
-  var c    = Math.floor(gs / 2) - 1; // 19 for gs=40
-  var sc   = this.gridToScreen(c, c);
+  var half = Math.floor(this.initialUnlocked / 2);   // 5
+  var mid  = Math.floor(gs / 2) - Math.floor(half / 2) - 1; // 17 for gs=40, half=5
+  var sc   = this.gridToScreen(mid, mid);
   this.camera.x = sc.x - this.canvasWidth  / 2 / this.zoom;
   this.camera.y = (sc.y + this.tileH / 2) - this.canvasHeight / 2 / this.zoom;
 };
