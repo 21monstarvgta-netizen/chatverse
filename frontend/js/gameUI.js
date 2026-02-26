@@ -270,6 +270,14 @@ GameUI.prototype.showBuildingInfo = function(building, buildingIndex, config) {
   actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#ff6b6b;" onclick="game.demolishBuilding(' + buildingIndex + ')">🗑️</button>';
   actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#fdcb6e;" onclick="game.startMovingBuilding(' + buildingIndex + ')">🏗️ Переставить</button>';
 
+  // Road rotation button (only for isolated roads or dead-ends)
+  if (building.type === 'road') {
+    var curRot = (building.roadRotation || 0);
+    var nextRot = (curRot + 1) % 2;
+    var rotLabel = (curRot % 2 === 0) ? '↕ Вертикально' : '↔ Горизонтально';
+    actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#81ecec;" onclick="game.rotateRoad(' + buildingIndex + ')">' + rotLabel + ' (повернуть)</button>';
+  }
+
   document.getElementById('building-info-actions').innerHTML = actionsHTML;
   panel.classList.remove('hidden');
 };

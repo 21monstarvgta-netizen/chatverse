@@ -659,6 +659,24 @@ Game.prototype.finishMovingBuilding = async function(x, y) {
   }
 };
 
+Game.prototype.rotateRoad = async function(buildingIndex) {
+  var building = this.player.buildings[buildingIndex];
+  if (!building) return;
+  var newRot = ((building.roadRotation || 0) + 1) % 2;
+  try {
+    var data = await apiRequest('/game/road-config', {
+      method: 'POST',
+      body: JSON.stringify({ buildingIndex: buildingIndex, variant: 'straight', rotation: newRot })
+    });
+    this.player = data.player;
+    this.updateRendererState();
+    this.ui.showBuildingInfo(this.player.buildings[buildingIndex], buildingIndex, this.config.buildingTypes);
+    showToast('✅ Дорога повёрнута', 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
 Game.prototype.setRoadVariant = async function(buildingIndex, variant, rotation) {
   try {
     var data = await apiRequest('/game/road-config', {

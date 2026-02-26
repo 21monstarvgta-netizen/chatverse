@@ -303,7 +303,7 @@ GameRenderer.prototype.setBuildings = function(b, c) {
   for (var i = 0; i < this.buildings.length; i++) {
     var bld = this.buildings[i];
     if (bld.type === 'road') {
-      this.roadMap[bld.x + ',' + bld.y] = true;
+      this.roadMap[bld.x + ',' + bld.y] = bld; // store full object for rotation
     }
   }
   // Reset cars when road network changes
@@ -570,7 +570,8 @@ GameRenderer.prototype._drawTile = function(ctx, gx, gy, tx, ty, tick) {
 
   // ── Road tile overlay ──────────────────────────────────────
   if (this.roadMap && this.roadMap[key]) {
-    this._drawRoadTile(ctx, gx, gy, tx, ty);
+    var roadB = this.roadMap[key]; // building obj stored in roadMap
+    this._drawRoadTile(ctx, gx, gy, tx, ty, roadB);
   }
 
   // Hover highlight
@@ -3371,116 +3372,129 @@ GameRenderer.prototype._roadNeighbors = function(gx, gy) {
 };
 
 // Draw a complete road tile (replaces grass, paints asphalt + markings)
-GameRenderer.prototype._drawRoadTile = function(ctx, gx, gy, tx, ty) {
+GameRenderer.prototype._drawRoadTile = function(ctx, gx, gy, tx, ty, building) {
   var tw = this.tileW, th = this.tileH, td = this.tileDepth;
   var hw = tw / 2, hh = th / 2;
 
   var nb = this._roadNeighbors(gx, gy);
   var connCount = (nb.n?1:0) + (nb.s?1:0) + (nb.e?1:0) + (nb.w?1:0);
 
-  // ── Asphalt top face ──
+  // ── Tile-space → screen-space transform ──────────────────
+  // tile_x,tile_y in [0,1]
+  // screen_x = tw * tile_x + (tx - hw)
+  // screen_y = th * tile_y + ty
+  // This means horizontal/vertical lines in tile-space are
+  // horizontal/vertical on screen (before camera/zoom).
+  var ox = tx - hw;  // tile_x=0 screen x
+  var oy = ty;       // tile_y=0 screen y
+
+  // Helper: tile coords → screen coords
+  function t2s(tx_, ty_) {
+    return { x: ox + tw * tx_, y: oy + th * ty_ };
+  }
+
+  // ── Clip to diamond ───────────────────────────────────────
   ctx.save();
-  // Clip to diamond shape
   ctx.beginPath();
-  ctx.moveTo(tx,      ty);
-  ctx.lineTo(tx + hw, ty + hh);
-  ctx.lineTo(tx,      ty + th);
-  ctx.lineTo(tx - hw, ty + hh);
+  ctx.moveTo(tx,       ty);       // N: tile(0.5, 0)
+  ctx.lineTo(tx + hw,  ty + hh);  // E: tile(1,   0.5)
+  ctx.lineTo(tx,       ty + th);  // S: tile(0.5, 1)
+  ctx.lineTo(tx - hw,  ty + hh);  // W: tile(0,   0.5)
   ctx.closePath();
   ctx.clip();
 
-  // Asphalt fill
+  // ── Asphalt surface ───────────────────────────────────────
+  var asphaltDark = '#3a4148';
+  var asphaltMid  = '#46505a';
+  var asphaltLight= '#535f6b';
   var ag = ctx.createLinearGradient(tx, ty, tx, ty + th);
-  ag.addColorStop(0, '#5a6470');
-  ag.addColorStop(0.5,'#4d5560');
-  ag.addColorStop(1, '#424a55');
+  ag.addColorStop(0,   asphaltLight);
+  ag.addColorStop(0.4, asphaltMid);
+  ag.addColorStop(1,   asphaltDark);
   ctx.fillStyle = ag;
-  ctx.fillRect(tx - hw, ty, tw, th);
+  ctx.fillRect(ox, oy, tw, th);
 
-  // Subtle asphalt texture streaks
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-  ctx.lineWidth = 1;
-  for (var si = 0; si < 3; si++) {
-    var sy = ty + th * (0.25 + si * 0.25);
-    ctx.beginPath();
-    ctx.moveTo(tx - hw * 0.8, sy - si * 1);
-    ctx.lineTo(tx + hw * 0.8, sy + si * 1);
-    ctx.stroke();
+  // Fine aggregate noise (tiny light speckles)
+  ctx.fillStyle = 'rgba(255,255,255,0.025)';
+  for (var si = 0; si < 6; si++) {
+    var sx = ox + ((gx * 71 + gy * 37 + si * 53) % 100) / 100 * tw;
+    var sy = oy + ((gx * 43 + gy * 61 + si * 29) % 100) / 100 * th;
+    ctx.fillRect(sx, sy, 2, 1);
   }
 
-  // ── White edge lines (always on all 4 sides) ──
-  ctx.strokeStyle = 'rgba(220,228,240,0.75)';
-  ctx.lineWidth = 1.8;
-  ctx.setLineDash([]);
+  // ── Road markings in tile space ───────────────────────────
+  // We draw stripes as plain screen-space rectangles, which is
+  // correct because tile-space maps linearly to screen-space.
+  
+  // Road width in tile units (how much of tile is road vs shoulder)
+  var rw = 0.82; // road occupies this fraction of tile width/height
+  var rs = (1 - rw) / 2; // shoulder offset
 
-  // NW edge (top-left side of diamond)
-  var edgeIn = 0.12; // fraction inset from edge
-  // We draw lines parallel to each of the 4 iso edges, slightly inset
-  // NW edge: top→left
-  ctx.beginPath();
-  ctx.moveTo(tx - hw*edgeIn,        ty + hh*edgeIn);
-  ctx.lineTo(tx - hw*(1-edgeIn),    ty + hh*(1-edgeIn));
-  ctx.stroke();
-  // NE edge: top→right
-  ctx.beginPath();
-  ctx.moveTo(tx + hw*edgeIn,        ty + hh*edgeIn);
-  ctx.lineTo(tx + hw*(1-edgeIn),    ty + hh*(1-edgeIn));
-  ctx.stroke();
-  // SW edge: left→bottom
-  ctx.beginPath();
-  ctx.moveTo(tx - hw*(1-edgeIn),    ty + hh*(1+edgeIn));
-  ctx.lineTo(tx - hw*edgeIn,        ty + hh*(2-edgeIn));
-  ctx.stroke();
-  // SE edge: right→bottom
-  ctx.beginPath();
-  ctx.moveTo(tx + hw*(1-edgeIn),    ty + hh*(1+edgeIn));
-  ctx.lineTo(tx + hw*edgeIn,        ty + hh*(2-edgeIn));
-  ctx.stroke();
+  // White edge lines — inset from diamond edge, along road lanes
+  ctx.fillStyle = 'rgba(230,235,245,0.70)';
+  var ew = 0.022; // edge line width in tile units
 
-  // ── Yellow centre markings ──
-  // Road goes along two axes in iso space:
-  // NW–SE axis: top↔bottom of diamond  (gx direction)
-  // NE–SW axis: right↔left of diamond  (gy direction)
+  // Determine connectivity for horizontal (E-W) and vertical (N-S) roads
+  // In our tile-space: N-S runs vertically (tile_y direction), E-W runs horizontally (tile_x)
+  // nb.n/s connects vertically (tile_y axis), nb.e/w connects horizontally (tile_x axis)
+  
+  var hasVert = nb.n || nb.s; // N-S road — runs along tile_y, lanes side by side in tile_x
+  var hasHorz = nb.e || nb.w; // E-W road — runs along tile_x, lanes side by side in tile_y
+  if (connCount === 0) { hasVert = true; hasHorz = false; } // default: vertical
 
-  var hasNWSE = nb.n || nb.s; // connects top/bottom
-  var hasNESW = nb.e || nb.w; // connects right/left
-  // If isolated tile, show cross
-  if (connCount === 0) { hasNWSE = true; hasNESW = true; }
+  // Get building rotation (0=default N-S, 1=rotated to E-W)
+  var rot = building && building.roadRotation ? building.roadRotation : 0;
+  if (connCount <= 1) {
+    // Isolated or dead-end: respect rotation
+    if (rot % 2 === 1) { hasVert = false; hasHorz = true; }
+    else               { hasVert = true;  hasHorz = false; }
+  }
 
-  ctx.strokeStyle = '#f5c518';
-  ctx.lineWidth = 2.2;
+  if (hasVert && !hasHorz) {
+    // ── Straight N-S road ──
+    // Left edge line
+    this._tileLine(ctx, ox, oy, tw, th, rs, 0, rs + ew, 1, 'rgba(230,235,245,0.65)');
+    // Right edge line  
+    this._tileLine(ctx, ox, oy, tw, th, 1-rs-ew, 0, 1-rs, 1, 'rgba(230,235,245,0.65)');
+    // Centre dashed yellow line
+    this._tileDashV(ctx, ox, oy, tw, th, 0.5 - ew*0.5, ew, 0, 1, '#f5c518', 0.13, 0.08);
 
-  if (hasNWSE && !hasNESW) {
-    // Straight: NW–SE  (runs top to bottom of diamond)
-    this._roadDash(ctx, tx, ty + th*0.1, tx, ty + th*0.9, 8, 5);
-  } else if (hasNESW && !hasNWSE) {
-    // Straight: NE–SW  (runs left to right of diamond)
-    this._roadDash(ctx, tx - hw*0.8, ty + hh, tx + hw*0.8, ty + hh, 8, 5);
-  } else if (hasNWSE && hasNESW) {
-    if (connCount === 4 || (nb.n && nb.s && nb.e && nb.w)) {
-      // Intersection cross — draw centre dot
-      ctx.fillStyle = '#f5c518';
-      ctx.beginPath();
-      ctx.arc(tx, ty + hh, 3, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // T-junction or corner — draw solid centre marker
-      ctx.fillStyle = '#f5c518';
-      ctx.beginPath();
-      ctx.arc(tx, ty + hh, 2.5, 0, Math.PI * 2);
-      ctx.fill();
+  } else if (hasHorz && !hasVert) {
+    // ── Straight E-W road ──
+    // Top edge line
+    this._tileLine(ctx, ox, oy, tw, th, 0, rs, 1, rs + ew, 'rgba(230,235,245,0.65)');
+    // Bottom edge line
+    this._tileLine(ctx, ox, oy, tw, th, 0, 1-rs-ew, 1, 1-rs, 'rgba(230,235,245,0.65)');
+    // Centre dashed yellow line
+    this._tileDashH(ctx, ox, oy, tw, th, 0.5 - ew*0.5, ew, 0, 1, '#f5c518', 0.13, 0.08);
+
+  } else {
+    // ── Intersection / T-junction / corner ──
+    // Draw asphalt fully (no edge lines on connected sides)
+    // Edge lines only on sides with NO connection
+    if (!nb.n) this._tileLine(ctx, ox, oy, tw, th, rs,     0,    1-rs,   ew,    'rgba(230,235,245,0.65)');
+    if (!nb.s) this._tileLine(ctx, ox, oy, tw, th, rs,     1-ew, 1-rs,   1,     'rgba(230,235,245,0.65)');
+    if (!nb.w) this._tileLine(ctx, ox, oy, tw, th, 0,      rs,   ew,     1-rs,  'rgba(230,235,245,0.65)');
+    if (!nb.e) this._tileLine(ctx, ox, oy, tw, th, 1-ew,   rs,   1,      1-rs,  'rgba(230,235,245,0.65)');
+
+    // Yellow centre lines — from centre to each connected edge
+    var cx_ = 0.5, cy_ = 0.5;
+    var lw2 = ew;
+    if (nb.n) this._tileDashV(ctx, ox, oy, tw, th, cx_-lw2*0.5, lw2, 0,   cy_, '#f5c518', 0.1, 0.07);
+    if (nb.s) this._tileDashV(ctx, ox, oy, tw, th, cx_-lw2*0.5, lw2, cy_, 1,   '#f5c518', 0.1, 0.07);
+    if (nb.w) this._tileDashH(ctx, ox, oy, tw, th, cy_-lw2*0.5, lw2, 0,   cx_, '#f5c518', 0.1, 0.07);
+    if (nb.e) this._tileDashH(ctx, ox, oy, tw, th, cy_-lw2*0.5, lw2, cx_, 1,   '#f5c518', 0.1, 0.07);
+
+    // Centre box (stop box)
+    if (connCount >= 2) {
+      ctx.fillStyle = 'rgba(245,197,24,0.35)';
+      this._tileLine(ctx, ox, oy, tw, th, 0.5-lw2, 0.5-lw2, 0.5+lw2, 0.5+lw2, 'rgba(245,197,24,0.35)');
     }
-    // Half-lines from centre to each connected direction
-    if (nb.n || connCount === 0) this._roadDash(ctx, tx, ty + hh, tx, ty + th*0.1, 6, 4);
-    if (nb.s || connCount === 0) this._roadDash(ctx, tx, ty + hh, tx, ty + th*0.9, 6, 4);
-    if (nb.e || connCount === 0) this._roadDash(ctx, tx, ty + hh, tx + hw*0.8, ty + hh, 6, 4);
-    if (nb.w || connCount === 0) this._roadDash(ctx, tx, ty + hh, tx - hw*0.8, ty + hh, 6, 4);
   }
 
-  ctx.setLineDash([]);
   ctx.restore();
 
-  // ── 2.5D asphalt side faces (SW and SE edges) ──
+  // ── 2.5D asphalt side faces ───────────────────────────────
   var lx = tx - hw, ly = ty + hh;
   var bx = tx,      bby = ty + th;
   var rx = tx + hw, ry = ty + hh;
@@ -3489,38 +3503,55 @@ GameRenderer.prototype._drawRoadTile = function(ctx, gx, gy, tx, ty) {
   ctx.moveTo(lx, ly); ctx.lineTo(bx, bby);
   ctx.lineTo(bx, bby + td); ctx.lineTo(lx, ly + td);
   ctx.closePath();
-  ctx.fillStyle = '#30363f';
+  ctx.fillStyle = '#272e36';
   ctx.fill();
 
   ctx.beginPath();
   ctx.moveTo(bx, bby); ctx.lineTo(rx, ry);
   ctx.lineTo(rx, ry + td); ctx.lineTo(bx, bby + td);
   ctx.closePath();
-  ctx.fillStyle = '#272d35';
+  ctx.fillStyle = '#1e252c';
   ctx.fill();
 };
 
-// Helper: draw dashed line in iso space
-GameRenderer.prototype._roadDash = function(ctx, x1, y1, x2, y2, dashLen, gapLen) {
-  var dx = x2 - x1, dy = y2 - y1;
-  var len = Math.sqrt(dx*dx + dy*dy);
-  if (len < 1) return;
-  var nx = dx/len, ny = dy/len;
-  var pos = 0;
-  var drawing = true;
-  ctx.beginPath();
-  while (pos < len) {
-    var segLen = drawing ? dashLen : gapLen;
-    var endPos = Math.min(pos + segLen, len);
-    if (drawing) {
-      ctx.moveTo(x1 + nx*pos, y1 + ny*pos);
-      ctx.lineTo(x1 + nx*endPos, y1 + ny*endPos);
-    }
-    pos = endPos;
-    drawing = !drawing;
-  }
-  ctx.stroke();
+// Draw a filled rectangle in tile-space coords (tx1,ty1,tx2,ty2 all in [0,1])
+GameRenderer.prototype._tileLine = function(ctx, ox, oy, tw, th, tx1, ty1, tx2, ty2, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(ox + tx1*tw, oy + ty1*th, (tx2-tx1)*tw, (ty2-ty1)*th);
 };
+
+// Dashed vertical stripe in tile-space (along tile_y axis)
+GameRenderer.prototype._tileDashV = function(ctx, ox, oy, tw, th, tx1, txw, ty_start, ty_end, color, dashFrac, gapFrac) {
+  ctx.fillStyle = color;
+  var totalH = (ty_end - ty_start) * th;
+  var dashH = dashFrac * th;
+  var gapH  = gapFrac * th;
+  var cycle = dashH + gapH;
+  var x = ox + tx1 * tw;
+  var w = txw * tw;
+  var y0 = oy + ty_start * th;
+  for (var d = 0; d < totalH; d += cycle) {
+    var dh = Math.min(dashH, totalH - d);
+    if (dh > 0) ctx.fillRect(x, y0 + d, w, dh);
+  }
+};
+
+// Dashed horizontal stripe in tile-space (along tile_x axis)
+GameRenderer.prototype._tileDashH = function(ctx, ox, oy, tw, th, ty1, tyw, tx_start, tx_end, color, dashFrac, gapFrac) {
+  ctx.fillStyle = color;
+  var totalW = (tx_end - tx_start) * tw;
+  var dashW = dashFrac * tw;
+  var gapW  = gapFrac * tw;
+  var cycle = dashW + gapW;
+  var y = oy + ty1 * th;
+  var h = tyw * th;
+  var x0 = ox + tx_start * tw;
+  for (var d = 0; d < totalW; d += cycle) {
+    var dw2 = Math.min(dashW, totalW - d);
+    if (dw2 > 0) ctx.fillRect(x0 + d, y, dw2, h);
+  }
+};
+
 
 // ═══════════════════════════════════════════════════════════
 //  CAR SYSTEM
@@ -3536,22 +3567,35 @@ GameRenderer.prototype._initCars = function() {
   }
   if (roads.length === 0) return;
 
-  // Spawn 1 car per ~4 road tiles, max 12
-  var count = Math.min(Math.floor(roads.length / 4) + 1, 12);
-  var colors = ['#e74c3c','#3498db','#f39c12','#2ecc71','#9b59b6','#1abc9c','#e67e22','#fff'];
+  // 1 car per 6 road tiles
+  var count = Math.min(Math.max(1, Math.floor(roads.length / 6)), 8);
+
+  var carTypes = [
+    { body: '#c0392b', roof: '#922b21', trim: '#e74c3c' }, // red sedan
+    { body: '#2471a3', roof: '#1a5276', trim: '#3498db' }, // blue sedan
+    { body: '#d4ac0d', roof: '#a07d09', trim: '#f4d03f' }, // yellow taxi
+    { body: '#1e8449', roof: '#196f3d', trim: '#27ae60' }, // green SUV
+    { body: '#6c3483', roof: '#512e5f', trim: '#9b59b6' }, // purple
+    { body: '#fffff0', roof: '#d5d8dc', trim: '#f0f0f0' }, // white
+    { body: '#1c2833', roof: '#17202a', trim: '#2e4057' }, // black
+    { body: '#e67e22', roof: '#ca6f1e', trim: '#f39c12' }, // orange
+  ];
 
   for (var i = 0; i < count; i++) {
     var startRoad = roads[Math.floor(Math.random() * roads.length)];
+    var type = carTypes[i % carTypes.length];
     this.cars.push({
       x: startRoad.x,
       y: startRoad.y,
-      fx: startRoad.x,   // fractional position
-      fy: startRoad.y,
-      dir: Math.floor(Math.random() * 4), // 0=N,1=E,2=S,3=W
-      progress: Math.random(), // 0..1 between current and next tile
-      color: colors[i % colors.length],
-      speed: 0.008 + Math.random() * 0.006,
-      waitTimer: 0
+      nx: undefined,
+      ny: undefined,
+      dir: Math.floor(Math.random() * 4),
+      progress: Math.random(),
+      body: type.body,
+      roof: type.roof,
+      trim: type.trim,
+      speed: 0.006 + Math.random() * 0.005,
+      waitTimer: Math.floor(Math.random() * 20)
     });
   }
 };
@@ -3575,133 +3619,210 @@ GameRenderer.prototype._updateAndDrawCars = function(ctx, tick) {
     } else {
       car.progress += car.speed;
       if (car.progress >= 1) {
-        // Arrived at next tile — pick next direction
-        car.x = car.nx !== undefined ? car.nx : car.x;
-        car.y = car.ny !== undefined ? car.ny : car.y;
+        car.x = (car.nx !== undefined) ? car.nx : car.x;
+        car.y = (car.ny !== undefined) ? car.ny : car.y;
         car.progress = 0;
-        car.nx = undefined;
-        car.ny = undefined;
+        car.nx = undefined; car.ny = undefined;
 
-        // Find valid neighbors
         var options = [];
-        var oppositeDir = (car.dir + 2) % 4;
+        var opposite = (car.dir + 2) % 4;
         for (var d = 0; d < 4; d++) {
-          if (d === oppositeDir) continue; // don't reverse unless only option
+          if (d === opposite) continue;
           var nd = CAR_DIRS[d];
-          var nx2 = car.x + nd.dx;
-          var ny2 = car.y + nd.dy;
-          if (rm[nx2 + ',' + ny2]) options.push(d);
+          if (rm[(car.x+nd.dx) + ',' + (car.y+nd.dy)]) options.push(d);
         }
         if (options.length === 0) {
-          // Dead end — try reversing
-          var rev = CAR_DIRS[oppositeDir];
-          if (rm[(car.x + rev.dx) + ',' + (car.y + rev.dy)]) {
-            options.push(oppositeDir);
-          }
+          var rev = CAR_DIRS[opposite];
+          if (rm[(car.x+rev.dx) + ',' + (car.y+rev.dy)]) options.push(opposite);
         }
         if (options.length > 0) {
-          // Prefer going straight, with some randomness
-          var straight = options.indexOf(car.dir);
           var chosen;
-          if (straight >= 0 && Math.random() < 0.65) {
-            chosen = car.dir;
-          } else {
-            chosen = options[Math.floor(Math.random() * options.length)];
-          }
+          var straight = options.indexOf(car.dir);
+          if (straight >= 0 && Math.random() < 0.70) chosen = car.dir;
+          else chosen = options[Math.floor(Math.random() * options.length)];
           car.dir = chosen;
-          var chosenD = CAR_DIRS[chosen];
-          car.nx = car.x + chosenD.dx;
-          car.ny = car.y + chosenD.dy;
+          var cd = CAR_DIRS[chosen];
+          car.nx = car.x + cd.dx;
+          car.ny = car.y + cd.dy;
         } else {
-          car.waitTimer = 30;
+          car.waitTimer = 40;
         }
       }
     }
 
-    // Compute screen position (interpolate between current and next tile)
-    var cx2 = car.x, cy2 = car.y;
-    var nx3 = car.nx !== undefined ? car.nx : cx2;
-    var ny3 = car.ny !== undefined ? car.ny : cy2;
+    var fromX = car.x, fromY = car.y;
+    var toX = (car.nx !== undefined) ? car.nx : fromX;
+    var toY = (car.ny !== undefined) ? car.ny : fromY;
     var t = car.progress;
 
-    var sc1 = this.gridToScreen(cx2, cy2);
-    var sc2 = this.gridToScreen(nx3, ny3);
-    // Car rides at tile centre (tx, ty + tileH/2)
-    var px = sc1.x + (sc2.x - sc1.x) * t;
-    var py = sc1.y + this.tileH / 2 + (sc2.y - sc1.y) * t;
+    var sc1 = this.gridToScreen(fromX, fromY);
+    var sc2b = this.gridToScreen(toX, toY);
+    // ride slightly offset from tile centre (keep to right side of road)
+    var px = sc1.x + (sc2b.x - sc1.x) * t;
+    var py = (sc1.y + this.tileH*0.5) + (sc2b.y - sc1.y) * t;
 
-    this._drawCar(ctx, px, py, car);
+    this._drawCar(ctx, px, py, car, tick);
   }
 };
 
-GameRenderer.prototype._drawCar = function(ctx, px, py, car) {
+GameRenderer.prototype._drawCar = function(ctx, px, py, car, tick) {
   var d = car.dir;
-  // Car body dimensions in screen pixels
-  var cw = 9, ch = 5.5;
+  // The isometric view is top-down at ~30°. Cars are drawn as 2.5D top-view.
+  // Size: roughly 1/4 of a tile
+  var L = this.tileW * 0.22;  // car length
+  var W2 = L * 0.55;           // car width
 
   ctx.save();
   ctx.translate(px, py);
 
-  // Rotate car sprite to match iso direction
-  // In iso: N=upper-left, E=upper-right, S=lower-right, W=lower-left
-  // We tilt based on direction
-  var angles = [
-    -Math.PI/4,       // N (going top-left in iso)
-     Math.PI/4,       // E (going top-right)
-     Math.PI*3/4,     // S (going bottom-right)
-    -Math.PI*3/4      // W (going bottom-left)
+  // Each direction gets an isometric angle:
+  // In iso space: N goes up-left, E goes up-right, S goes down-right, W goes down-left
+  // Angle in screen space for car orientation:
+  var isoAngles = [
+    -Math.PI * 0.75,  // N: up-left
+     Math.PI * 0.25,  // E: up-right  (was -PI*0.25 but iso E goes right+down)
+     Math.PI * 0.25,  // S: down-right
+    -Math.PI * 0.75,  // W: down-left (same as N but flipped)
   ];
-  ctx.rotate(angles[d]);
+  // Actually let's compute directly from isometric directions
+  // gridToScreen(dx,dy) gives the screen delta:
+  // N(0,-1): sc= (-hw*0 + -(-1)*...wait, let me just use the actual projection
+  // gridToScreen(gx+dx, gy+dy) - gridToScreen(gx,gy):
+  // dsx = (dx - dy)*hw*... using iso formula tx=(gx-gy)*hw+originX
+  // dsx = (dx-dy)*hw, dsy=(dx+dy)*hh
+  var hw2 = this.tileW/2, hh2 = this.tileH/2;
+  var dirVecs = [
+    { sx: (0-(-1))*hw2, sy: (0+(-1))*hh2 },  // N: dx=0,dy=-1 -> iso dsx=(0-(-1))*hw, dsy=(0+(-1))*hh
+    { sx: (1-0)*hw2,    sy: (1+0)*hh2 },       // E: dx=1,dy=0
+    { sx: (0-1)*hw2,    sy: (0+1)*hh2 },        // S: dx=0,dy=1
+    { sx: (-1-0)*hw2,   sy: (-1+0)*hh2 },       // W: dx=-1,dy=0
+  ];
+  var dv = dirVecs[d];
+  var angle = Math.atan2(dv.sy, dv.sx);
 
-  // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.rotate(angle);
+
+  // Now draw car: +x = forward direction, y = sideways
+  // In this rotated space, car length along x, width along y
+
+  // ── Shadow ──
+  ctx.fillStyle = 'rgba(0,0,0,0.30)';
   ctx.beginPath();
-  ctx.ellipse(1, 3, cw*0.7, 2.5, 0, 0, Math.PI*2);
+  ctx.ellipse(L*0.05, W2*0.25, L*0.54, W2*0.45, 0, 0, Math.PI*2);
   ctx.fill();
 
-  // Body
-  var bodyGrad = ctx.createLinearGradient(-cw, -ch, cw, ch*0.5);
-  bodyGrad.addColorStop(0, _lightenColor(car.color, 0.35));
-  bodyGrad.addColorStop(0.5, car.color);
-  bodyGrad.addColorStop(1, _darkenColor(car.color, 0.3));
+  // ── Wheels (4 corners, drawn first so body covers middle) ──
+  ctx.fillStyle = '#1a1a1a';
+  var wheelW = W2 * 0.28, wheelH = W2 * 0.22;
+  var wheelPositions = [
+    [-L*0.28, -W2*0.58],  // front-left
+    [ L*0.28, -W2*0.58],  // front-right
+    [-L*0.28,  W2*0.58],  // rear-left
+    [ L*0.28,  W2*0.58],  // rear-right
+  ];
+  // wheel axle lines
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(-L*0.28,-W2*0.58); ctx.lineTo(-L*0.28, W2*0.58); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo( L*0.28,-W2*0.58); ctx.lineTo( L*0.28, W2*0.58); ctx.stroke();
+  
+  for (var wi = 0; wi < 4; wi++) {
+    var wx = wheelPositions[wi][0], wy2 = wheelPositions[wi][1];
+    // Tyre (black ellipse)
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.ellipse(wx, wy2, wheelW, wheelH, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Rim (grey circle)
+    ctx.fillStyle = '#8a8a8a';
+    ctx.beginPath();
+    ctx.ellipse(wx, wy2, wheelW*0.55, wheelH*0.55, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Rim detail
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 0.6;
+    for (var sp = 0; sp < 4; sp++) {
+      var sa = sp * Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(wx, wy2);
+      ctx.lineTo(wx + Math.cos(sa)*wheelW*0.45, wy2 + Math.sin(sa)*wheelH*0.45);
+      ctx.stroke();
+    }
+  }
+
+  // ── Car body (main hull) ──
+  var bodyGrad = ctx.createLinearGradient(-L*0.5, -W2*0.5, L*0.5, W2*0.5);
+  bodyGrad.addColorStop(0,   _lightenColor(car.body, 0.28));
+  bodyGrad.addColorStop(0.45, car.body);
+  bodyGrad.addColorStop(1,   _darkenColor(car.body, 0.25));
   ctx.fillStyle = bodyGrad;
   ctx.beginPath();
-  ctx.roundRect(-cw, -ch, cw*2, ch*1.8, 2);
+  ctx.roundRect(-L*0.5, -W2*0.5, L, W2, 3);
   ctx.fill();
 
-  // Roof (cabin)
-  ctx.fillStyle = _darkenColor(car.color, 0.2);
+  // Body outline
+  ctx.strokeStyle = _darkenColor(car.body, 0.45);
+  ctx.lineWidth = 0.7;
+  ctx.stroke();
+
+  // ── Side body panels (highlight) ──
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
   ctx.beginPath();
-  ctx.roundRect(-cw*0.5, -ch*1.6, cw, ch*0.9, [2,2,1,1]);
+  ctx.roundRect(-L*0.42, -W2*0.42, L*0.84, W2*0.32, 2);
   ctx.fill();
 
-  // Windshield
-  ctx.fillStyle = 'rgba(180,230,255,0.7)';
+  // ── Cabin / roof area ──
+  var cabinGrad = ctx.createLinearGradient(0, -W2*0.5, 0, W2*0.5);
+  cabinGrad.addColorStop(0, _lightenColor(car.roof, 0.15));
+  cabinGrad.addColorStop(1, car.roof);
+  ctx.fillStyle = cabinGrad;
   ctx.beginPath();
-  ctx.roundRect(-cw*0.42, -ch*1.5, cw*0.84, ch*0.55, 1);
+  ctx.roundRect(-L*0.22, -W2*0.48, L*0.44, W2*0.96, 2);
   ctx.fill();
 
-  // Headlights
-  ctx.fillStyle = '#ffffcc';
-  ctx.beginPath(); ctx.ellipse(-cw*0.6, -ch*0.1, 1.8, 1.2, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse( cw*0.6, -ch*0.1, 1.8, 1.2, 0, 0, Math.PI*2); ctx.fill();
+  // ── Windshields (front + rear) ──
+  // Front windshield
+  ctx.fillStyle = 'rgba(160,220,255,0.65)';
+  ctx.beginPath();
+  ctx.roundRect(L*0.22, -W2*0.38, L*0.14, W2*0.76, 1);
+  ctx.fill();
+  // Windshield glare
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.beginPath();
+  ctx.roundRect(L*0.25, -W2*0.32, L*0.06, W2*0.28, 1);
+  ctx.fill();
+  // Rear windshield
+  ctx.fillStyle = 'rgba(140,200,240,0.55)';
+  ctx.beginPath();
+  ctx.roundRect(-L*0.36, -W2*0.36, L*0.14, W2*0.72, 1);
+  ctx.fill();
 
-  // Tail lights
-  ctx.fillStyle = '#ff3333';
-  ctx.beginPath(); ctx.ellipse(-cw*0.6, ch*1.5, 1.5, 1, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse( cw*0.6, ch*1.5, 1.5, 1, 0, 0, Math.PI*2); ctx.fill();
+  // ── Headlights (front) ──
+  ctx.fillStyle = '#fffcd0';
+  ctx.shadowColor = '#ffffaa';
+  ctx.shadowBlur = 4;
+  ctx.beginPath(); ctx.roundRect(L*0.42, -W2*0.42, L*0.08, W2*0.28, 1); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(L*0.42,  W2*0.14, L*0.08, W2*0.28, 1); ctx.fill();
+  ctx.shadowBlur = 0;
 
-  // Wheels (4)
-  ctx.fillStyle = '#1a1a1a';
-  var wpos = [
-    [-cw*0.65, -ch*0.3], [cw*0.65, -ch*0.3],
-    [-cw*0.65,  ch*1.2], [cw*0.65,  ch*1.2]
-  ];
-  for (var wi = 0; wi < 4; wi++) {
-    ctx.beginPath();
-    ctx.ellipse(wpos[wi][0], wpos[wi][1], 2.2, 1.5, 0, 0, Math.PI*2);
-    ctx.fill();
-  }
+  // ── Tail lights (rear) ──
+  var tailPulse = 0.7 + 0.3 * Math.sin((tick || 0) * 0.18 + car.x);
+  ctx.fillStyle = 'rgba(255,' + Math.round(30*tailPulse) + ',' + Math.round(30*tailPulse) + ',' + (0.85*tailPulse) + ')';
+  ctx.shadowColor = 'rgba(255,50,50,0.6)';
+  ctx.shadowBlur = 3 * tailPulse;
+  ctx.beginPath(); ctx.roundRect(-L*0.50, -W2*0.42, L*0.08, W2*0.28, 1); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(-L*0.50,  W2*0.14, L*0.08, W2*0.28, 1); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // ── Roof detail (sunroof stripe) ──
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath();
+  ctx.roundRect(-L*0.16, -W2*0.35, L*0.32, W2*0.70, 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(120,190,240,0.30)';
+  ctx.beginPath();
+  ctx.roundRect(-L*0.14, -W2*0.32, L*0.28, W2*0.64, 2);
+  ctx.fill();
 
   ctx.restore();
 };
