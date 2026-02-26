@@ -107,7 +107,7 @@ function getNextZones(unlockedZones) {
     expandedY2 = Math.max(expandedY2, unlockedZones[i].y2);
   }
 
-  var size = 4;
+  var size = 2;
   var candidates = [];
   var gs = config.GRID_SIZE;
 
