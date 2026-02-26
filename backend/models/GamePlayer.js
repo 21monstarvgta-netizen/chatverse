@@ -16,7 +16,9 @@ var buildingSchema = new mongoose.Schema({
   x: { type: Number, required: true },
   y: { type: Number, required: true },
   lastCollected: { type: Date, default: Date.now },
-  isProducing: { type: Boolean, default: true }
+  isProducing: { type: Boolean, default: true },
+  roadRotation: { type: Number, default: 0 },
+  roadVariant: { type: String, default: 'straight' }
 }, { _id: false });
 
 var zoneSchema = new mongoose.Schema({

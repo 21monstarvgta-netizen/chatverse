@@ -3376,181 +3376,206 @@ GameRenderer.prototype._drawRoadTile = function(ctx, gx, gy, tx, ty, building) {
   var tw = this.tileW, th = this.tileH, td = this.tileDepth;
   var hw = tw / 2, hh = th / 2;
 
+  // Diamond corners in screen space
+  var Nx = tx,      Ny = ty;         // top (north)
+  var Ex = tx + hw, Ey = ty + hh;    // right (east)
+  var Sx = tx,      Sy = ty + th;    // bottom (south)
+  var Wx = tx - hw, Wy = ty + hh;    // left (west)
+  var Cx = tx,      Cy = ty + hh;    // centre
+
+  // Road neighbor connections
   var nb = this._roadNeighbors(gx, gy);
   var connCount = (nb.n?1:0) + (nb.s?1:0) + (nb.e?1:0) + (nb.w?1:0);
 
-  // ── Tile-space → screen-space transform ──────────────────
-  // tile_x,tile_y in [0,1]
-  // screen_x = tw * tile_x + (tx - hw)
-  // screen_y = th * tile_y + ty
-  // This means horizontal/vertical lines in tile-space are
-  // horizontal/vertical on screen (before camera/zoom).
-  var ox = tx - hw;  // tile_x=0 screen x
-  var oy = ty;       // tile_y=0 screen y
+  // ── Determine road axes ──────────────────────────────────────
+  // In screen space:
+  //   N-S road: connects N(upper-right) ↔ S(lower-left), runs along NE-SW diagonal
+  //   E-W road: connects E(lower-right) ↔ W(upper-left), runs along NW-SE diagonal
+  // "Horizontal" feel = E-W (rot=0 default), "Vertical" feel = N-S (rot=1)
+  var hasNS = nb.n || nb.s;
+  var hasEW = nb.e || nb.w;
 
-  // Helper: tile coords → screen coords
-  function t2s(tx_, ty_) {
-    return { x: ox + tw * tx_, y: oy + th * ty_ };
+  if (connCount === 0) {
+    // Isolated: use building rotation. 0=EW(default), 1=NS
+    var rot = building ? ((building.roadRotation || 0) % 2) : 0;
+    hasEW = (rot === 0);
+    hasNS = (rot === 1);
   }
+  // dead-end (connCount===1): already correctly set by nb.*
 
-  // ── Clip to diamond ───────────────────────────────────────
+  // ── Clip and fill asphalt ────────────────────────────────────
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(tx,       ty);       // N: tile(0.5, 0)
-  ctx.lineTo(tx + hw,  ty + hh);  // E: tile(1,   0.5)
-  ctx.lineTo(tx,       ty + th);  // S: tile(0.5, 1)
-  ctx.lineTo(tx - hw,  ty + hh);  // W: tile(0,   0.5)
+  ctx.moveTo(Nx, Ny); ctx.lineTo(Ex, Ey);
+  ctx.lineTo(Sx, Sy); ctx.lineTo(Wx, Wy);
   ctx.closePath();
   ctx.clip();
 
-  // ── Asphalt surface ───────────────────────────────────────
-  var asphaltDark = '#3a4148';
-  var asphaltMid  = '#46505a';
-  var asphaltLight= '#535f6b';
-  var ag = ctx.createLinearGradient(tx, ty, tx, ty + th);
-  ag.addColorStop(0,   asphaltLight);
-  ag.addColorStop(0.4, asphaltMid);
-  ag.addColorStop(1,   asphaltDark);
+  // Asphalt fill
+  var ag = ctx.createLinearGradient(Wx, Wy, Ex, Ey);
+  ag.addColorStop(0,   '#545f6c');
+  ag.addColorStop(0.5, '#47525e');
+  ag.addColorStop(1,   '#3a4149');
   ctx.fillStyle = ag;
-  ctx.fillRect(ox, oy, tw, th);
+  ctx.fillRect(Wx, Ny, tw, th);
 
-  // Fine aggregate noise (tiny light speckles)
-  ctx.fillStyle = 'rgba(255,255,255,0.025)';
+  // Subtle asphalt grain
+  ctx.fillStyle = 'rgba(255,255,255,0.022)';
   for (var si = 0; si < 6; si++) {
-    var sx = ox + ((gx * 71 + gy * 37 + si * 53) % 100) / 100 * tw;
-    var sy = oy + ((gx * 43 + gy * 61 + si * 29) % 100) / 100 * th;
-    ctx.fillRect(sx, sy, 2, 1);
+    ctx.fillRect(
+      Wx + ((gx*71+gy*37+si*53)%90)/90*tw,
+      Ny + ((gx*43+gy*61+si*29)%80)/80*th,
+      2.5, 1
+    );
   }
 
-  // ── Road markings in tile space ───────────────────────────
-  // We draw stripes as plain screen-space rectangles, which is
-  // correct because tile-space maps linearly to screen-space.
-  
-  // Road width in tile units (how much of tile is road vs shoulder)
-  var rw = 0.82; // road occupies this fraction of tile width/height
-  var rs = (1 - rw) / 2; // shoulder offset
+  // ── Road markings ────────────────────────────────────────────
+  // We draw lines using the ACTUAL isometric axis vectors:
+  //
+  // E-W axis (EW road):
+  //   Along-road vector:  from W-corner to E-corner = (+hw*2, 0) ... wait
+  //   W=(tx-hw, ty+hh), E=(tx+hw, ty+hh) → along = (tw, 0) in screen!
+  //   So EW road runs HORIZONTALLY on screen! Edge lines are vertical offsets.
+  //   Perpendicular = (0, 1) in screen space
+  //
+  // N-S axis (NS road):
+  //   N=(tx, ty), S=(tx, ty+th) → along = (0, th) in screen
+  //   So NS road runs VERTICALLY on screen!
+  //   Perpendicular = (1, 0) in screen space
+  //
+  // This means: EW road → horizontal stripes on screen ✓
+  //             NS road → vertical stripes on screen ✓
+  // But wait: W=(tx-hw, ty+hh) to E=(tx+hw, ty+hh) — that's horizontal!
+  // And N=(tx, ty) to S=(tx, ty+th) — that's vertical!
+  // These ARE axis-aligned on screen! So we CAN draw simple horizontal/vertical lines!
 
-  // White edge lines — inset from diamond edge, along road lanes
-  ctx.fillStyle = 'rgba(230,235,245,0.70)';
-  var ew = 0.022; // edge line width in tile units
+  var lw = 1.8;  // edge line width
+  var dlw = 1.5; // dash line width
+  var dashA = '#f5c518'; // yellow
+  var edgeA = 'rgba(225,232,245,0.72)'; // white
 
-  // Determine connectivity for horizontal (E-W) and vertical (N-S) roads
-  // In our tile-space: N-S runs vertically (tile_y direction), E-W runs horizontally (tile_x)
-  // nb.n/s connects vertically (tile_y axis), nb.e/w connects horizontally (tile_x axis)
-  
-  var hasVert = nb.n || nb.s; // N-S road — runs along tile_y, lanes side by side in tile_x
-  var hasHorz = nb.e || nb.w; // E-W road — runs along tile_x, lanes side by side in tile_y
-  if (connCount === 0) { hasVert = true; hasHorz = false; } // default: vertical
+  if (hasEW && !hasNS) {
+    // ── Straight EW: horizontal road on screen ──
+    // Road band occupies ~80% of tile height
+    var band = th * 0.38; // half-band from centre line (Cy)
+    // White edge lines (horizontal)
+    ctx.strokeStyle = edgeA; ctx.lineWidth = lw; ctx.setLineDash([]);
+    // Top edge (at Cy - band)
+    ctx.beginPath(); ctx.moveTo(Wx, Cy - band); ctx.lineTo(Ex, Cy - band); ctx.stroke();
+    // Bottom edge (at Cy + band)
+    ctx.beginPath(); ctx.moveTo(Wx, Cy + band); ctx.lineTo(Ex, Cy + band); ctx.stroke();
+    // Left cap if no W neighbor
+    if (!nb.w) { ctx.beginPath(); ctx.moveTo(Wx+2, Cy-band); ctx.lineTo(Wx+2, Cy+band); ctx.stroke(); }
+    // Right cap if no E neighbor
+    if (!nb.e) { ctx.beginPath(); ctx.moveTo(Ex-2, Cy-band); ctx.lineTo(Ex-2, Cy+band); ctx.stroke(); }
+    // Yellow dashed centre line (horizontal)
+    this._screenDashH(ctx, Wx + hw*0.08, Ex - hw*0.08, Cy, dashA, dlw);
 
-  // Get building rotation (0=default N-S, 1=rotated to E-W)
-  var rot = building && building.roadRotation ? building.roadRotation : 0;
-  if (connCount <= 1) {
-    // Isolated or dead-end: respect rotation
-    if (rot % 2 === 1) { hasVert = false; hasHorz = true; }
-    else               { hasVert = true;  hasHorz = false; }
-  }
+  } else if (hasNS && !hasEW) {
+    // ── Straight NS: vertical road on screen ──
+    var bandV = hw * 0.38;
+    ctx.strokeStyle = edgeA; ctx.lineWidth = lw; ctx.setLineDash([]);
+    // Left edge (at Cx - bandV)
+    ctx.beginPath(); ctx.moveTo(Cx - bandV, Ny); ctx.lineTo(Cx - bandV, Sy); ctx.stroke();
+    // Right edge (at Cx + bandV)
+    ctx.beginPath(); ctx.moveTo(Cx + bandV, Ny); ctx.lineTo(Cx + bandV, Sy); ctx.stroke();
+    // Top cap if no N neighbor
+    if (!nb.n) { ctx.beginPath(); ctx.moveTo(Cx-bandV, Ny+2); ctx.lineTo(Cx+bandV, Ny+2); ctx.stroke(); }
+    // Bottom cap if no S neighbor
+    if (!nb.s) { ctx.beginPath(); ctx.moveTo(Cx-bandV, Sy-2); ctx.lineTo(Cx+bandV, Sy-2); ctx.stroke(); }
+    // Yellow dashed centre line (vertical)
+    this._screenDashV(ctx, Cx, Ny + hh*0.08, Sy - hh*0.08, dashA, dlw);
 
-  if (hasVert && !hasHorz) {
-    // ── Straight N-S road ──
-    // Left edge line
-    this._tileLine(ctx, ox, oy, tw, th, rs, 0, rs + ew, 1, 'rgba(230,235,245,0.65)');
-    // Right edge line  
-    this._tileLine(ctx, ox, oy, tw, th, 1-rs-ew, 0, 1-rs, 1, 'rgba(230,235,245,0.65)');
-    // Centre dashed yellow line
-    this._tileDashV(ctx, ox, oy, tw, th, 0.5 - ew*0.5, ew, 0, 1, '#f5c518', 0.13, 0.08);
-
-  } else if (hasHorz && !hasVert) {
-    // ── Straight E-W road ──
-    // Top edge line
-    this._tileLine(ctx, ox, oy, tw, th, 0, rs, 1, rs + ew, 'rgba(230,235,245,0.65)');
-    // Bottom edge line
-    this._tileLine(ctx, ox, oy, tw, th, 0, 1-rs-ew, 1, 1-rs, 'rgba(230,235,245,0.65)');
-    // Centre dashed yellow line
-    this._tileDashH(ctx, ox, oy, tw, th, 0.5 - ew*0.5, ew, 0, 1, '#f5c518', 0.13, 0.08);
-
-  } else {
-    // ── Intersection / T-junction / corner ──
-    // Draw asphalt fully (no edge lines on connected sides)
-    // Edge lines only on sides with NO connection
-    if (!nb.n) this._tileLine(ctx, ox, oy, tw, th, rs,     0,    1-rs,   ew,    'rgba(230,235,245,0.65)');
-    if (!nb.s) this._tileLine(ctx, ox, oy, tw, th, rs,     1-ew, 1-rs,   1,     'rgba(230,235,245,0.65)');
-    if (!nb.w) this._tileLine(ctx, ox, oy, tw, th, 0,      rs,   ew,     1-rs,  'rgba(230,235,245,0.65)');
-    if (!nb.e) this._tileLine(ctx, ox, oy, tw, th, 1-ew,   rs,   1,      1-rs,  'rgba(230,235,245,0.65)');
-
-    // Yellow centre lines — from centre to each connected edge
-    var cx_ = 0.5, cy_ = 0.5;
-    var lw2 = ew;
-    if (nb.n) this._tileDashV(ctx, ox, oy, tw, th, cx_-lw2*0.5, lw2, 0,   cy_, '#f5c518', 0.1, 0.07);
-    if (nb.s) this._tileDashV(ctx, ox, oy, tw, th, cx_-lw2*0.5, lw2, cy_, 1,   '#f5c518', 0.1, 0.07);
-    if (nb.w) this._tileDashH(ctx, ox, oy, tw, th, cy_-lw2*0.5, lw2, 0,   cx_, '#f5c518', 0.1, 0.07);
-    if (nb.e) this._tileDashH(ctx, ox, oy, tw, th, cy_-lw2*0.5, lw2, cx_, 1,   '#f5c518', 0.1, 0.07);
-
-    // Centre box (stop box)
-    if (connCount >= 2) {
-      ctx.fillStyle = 'rgba(245,197,24,0.35)';
-      this._tileLine(ctx, ox, oy, tw, th, 0.5-lw2, 0.5-lw2, 0.5+lw2, 0.5+lw2, 'rgba(245,197,24,0.35)');
+  } else if (hasEW && hasNS) {
+    // ── Intersection or T-junction or corner ──
+    var bandX = hw * 0.38, bandY = th * 0.38;
+    ctx.strokeStyle = edgeA; ctx.lineWidth = lw; ctx.setLineDash([]);
+    // Edge lines only on sides with NO road connection
+    if (!nb.w && !nb.e) { // isolated EW – shouldn't happen but safety
     }
+    // Horizontal edges (top/bottom of EW band) — only where NS doesn't open
+    var ewLeft  = nb.w ? Wx : Cx - bandX;
+    var ewRight = nb.e ? Ex : Cx + bandX;
+    if (ewLeft < Cx - bandX*0.1 || !nb.w) {
+      ctx.beginPath(); ctx.moveTo(ewLeft, Cy - bandY); ctx.lineTo(Cx - bandX*0.9, Cy - bandY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ewLeft, Cy + bandY); ctx.lineTo(Cx - bandX*0.9, Cy + bandY); ctx.stroke();
+    }
+    if (ewRight > Cx + bandX*0.1 || !nb.e) {
+      ctx.beginPath(); ctx.moveTo(Cx + bandX*0.9, Cy - bandY); ctx.lineTo(ewRight, Cy - bandY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(Cx + bandX*0.9, Cy + bandY); ctx.lineTo(ewRight, Cy + bandY); ctx.stroke();
+    }
+    // Vertical edges (left/right of NS band)
+    var nsTop    = nb.n ? Ny : Cy - bandY;
+    var nsBottom = nb.s ? Sy : Cy + bandY;
+    if (!nb.n || nsTop < Cy - bandY*0.1) {
+      ctx.beginPath(); ctx.moveTo(Cx - bandX, nsTop); ctx.lineTo(Cx - bandX, Cy - bandY*0.9); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(Cx + bandX, nsTop); ctx.lineTo(Cx + bandX, Cy - bandY*0.9); ctx.stroke();
+    }
+    if (!nb.s || nsBottom > Cy + bandY*0.1) {
+      ctx.beginPath(); ctx.moveTo(Cx - bandX, Cy + bandY*0.9); ctx.lineTo(Cx - bandX, nsBottom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(Cx + bandX, Cy + bandY*0.9); ctx.lineTo(Cx + bandX, nsBottom); ctx.stroke();
+    }
+
+    // End caps
+    if (!nb.w) { ctx.beginPath(); ctx.moveTo(Cx-bandX+2, Cy-bandY); ctx.lineTo(Cx-bandX+2, Cy+bandY); ctx.stroke(); }
+    if (!nb.e) { ctx.beginPath(); ctx.moveTo(Cx+bandX-2, Cy-bandY); ctx.lineTo(Cx+bandX-2, Cy+bandY); ctx.stroke(); }
+    if (!nb.n) { ctx.beginPath(); ctx.moveTo(Cx-bandX, Cy-bandY+2); ctx.lineTo(Cx+bandX, Cy-bandY+2); ctx.stroke(); }
+    if (!nb.s) { ctx.beginPath(); ctx.moveTo(Cx-bandX, Cy+bandY-2); ctx.lineTo(Cx+bandX, Cy+bandY-2); ctx.stroke(); }
+
+    // Yellow centre dashes from centre to each connected side
+    if (nb.e || nb.w) this._screenDashH(ctx, nb.w ? Wx+2 : Cx, nb.e ? Ex-2 : Cx, Cy, dashA, dlw);
+    if (nb.n || nb.s) this._screenDashV(ctx, Cx, nb.n ? Ny+2 : Cy, nb.s ? Sy-2 : Cy, dashA, dlw);
+    // Centre intersection box
+    ctx.fillStyle = 'rgba(245,197,24,0.22)';
+    ctx.fillRect(Cx - bandX*0.5, Cy - bandY*0.5, bandX, bandY);
   }
 
+  ctx.setLineDash([]);
   ctx.restore();
 
-  // ── 2.5D asphalt side faces ───────────────────────────────
-  var lx = tx - hw, ly = ty + hh;
-  var bx = tx,      bby = ty + th;
-  var rx = tx + hw, ry = ty + hh;
-
+  // ── 2.5D asphalt side faces ──────────────────────────────────
   ctx.beginPath();
-  ctx.moveTo(lx, ly); ctx.lineTo(bx, bby);
-  ctx.lineTo(bx, bby + td); ctx.lineTo(lx, ly + td);
+  ctx.moveTo(Wx, Wy); ctx.lineTo(Sx, Sy);
+  ctx.lineTo(Sx, Sy+td); ctx.lineTo(Wx, Wy+td);
   ctx.closePath();
   ctx.fillStyle = '#272e36';
   ctx.fill();
 
   ctx.beginPath();
-  ctx.moveTo(bx, bby); ctx.lineTo(rx, ry);
-  ctx.lineTo(rx, ry + td); ctx.lineTo(bx, bby + td);
+  ctx.moveTo(Sx, Sy); ctx.lineTo(Ex, Ey);
+  ctx.lineTo(Ex, Ey+td); ctx.lineTo(Sx, Sy+td);
   ctx.closePath();
   ctx.fillStyle = '#1e252c';
   ctx.fill();
 };
 
-// Draw a filled rectangle in tile-space coords (tx1,ty1,tx2,ty2 all in [0,1])
-GameRenderer.prototype._tileLine = function(ctx, ox, oy, tw, th, tx1, ty1, tx2, ty2, color) {
+// Horizontal dashed line in screen space
+GameRenderer.prototype._screenDashH = function(ctx, x1, x2, y, color, lw) {
+  if (x2 <= x1) return;
+  var len = x2 - x1;
+  var dashW = Math.max(len * 0.14, 4);
+  var gapW  = Math.max(len * 0.09, 3);
   ctx.fillStyle = color;
-  ctx.fillRect(ox + tx1*tw, oy + ty1*th, (tx2-tx1)*tw, (ty2-ty1)*th);
-};
-
-// Dashed vertical stripe in tile-space (along tile_y axis)
-GameRenderer.prototype._tileDashV = function(ctx, ox, oy, tw, th, tx1, txw, ty_start, ty_end, color, dashFrac, gapFrac) {
-  ctx.fillStyle = color;
-  var totalH = (ty_end - ty_start) * th;
-  var dashH = dashFrac * th;
-  var gapH  = gapFrac * th;
-  var cycle = dashH + gapH;
-  var x = ox + tx1 * tw;
-  var w = txw * tw;
-  var y0 = oy + ty_start * th;
-  for (var d = 0; d < totalH; d += cycle) {
-    var dh = Math.min(dashH, totalH - d);
-    if (dh > 0) ctx.fillRect(x, y0 + d, w, dh);
+  ctx.lineWidth = lw;
+  for (var x = x1; x < x2; x += dashW + gapW) {
+    var dw = Math.min(dashW, x2 - x);
+    ctx.fillRect(x, y - lw*0.5, dw, lw);
   }
 };
 
-// Dashed horizontal stripe in tile-space (along tile_x axis)
-GameRenderer.prototype._tileDashH = function(ctx, ox, oy, tw, th, ty1, tyw, tx_start, tx_end, color, dashFrac, gapFrac) {
+// Vertical dashed line in screen space
+GameRenderer.prototype._screenDashV = function(ctx, x, y1, y2, color, lw) {
+  if (y2 <= y1) return;
+  var len = y2 - y1;
+  var dashH = Math.max(len * 0.14, 4);
+  var gapH  = Math.max(len * 0.09, 3);
   ctx.fillStyle = color;
-  var totalW = (tx_end - tx_start) * tw;
-  var dashW = dashFrac * tw;
-  var gapW  = gapFrac * tw;
-  var cycle = dashW + gapW;
-  var y = oy + ty1 * th;
-  var h = tyw * th;
-  var x0 = ox + tx_start * tw;
-  for (var d = 0; d < totalW; d += cycle) {
-    var dw2 = Math.min(dashW, totalW - d);
-    if (dw2 > 0) ctx.fillRect(x0 + d, y, dw2, h);
+  for (var y = y1; y < y2; y += dashH + gapH) {
+    var dh = Math.min(dashH, y2 - y);
+    ctx.fillRect(x - lw*0.5, y, lw, dh);
   }
 };
+
 
 
 // ═══════════════════════════════════════════════════════════

@@ -270,12 +270,13 @@ GameUI.prototype.showBuildingInfo = function(building, buildingIndex, config) {
   actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#ff6b6b;" onclick="game.demolishBuilding(' + buildingIndex + ')">🗑️</button>';
   actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#fdcb6e;" onclick="game.startMovingBuilding(' + buildingIndex + ')">🏗️ Переставить</button>';
 
-  // Road rotation button (only for isolated roads or dead-ends)
+  // Road rotation button
   if (building.type === 'road') {
-    var curRot = (building.roadRotation || 0);
-    var nextRot = (curRot + 1) % 2;
-    var rotLabel = (curRot % 2 === 0) ? '↕ Вертикально' : '↔ Горизонтально';
-    actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#81ecec;" onclick="game.rotateRoad(' + buildingIndex + ')">' + rotLabel + ' (повернуть)</button>';
+    var curRot = (building.roadRotation || 0) % 2;
+    var curLabel = (curRot === 0) ? '↔ Горизонтально' : '↕ Вертикально';
+    var nextLabel = (curRot === 0) ? '↕ Вертикально' : '↔ Горизонтально';
+    actionsHTML += '<div style="margin-top:8px;font-size:11px;color:#94a3b8;">Направление: <b style="color:#81ecec">' + curLabel + '</b></div>';
+    actionsHTML += '<button class="btn btn-ghost btn-sm" style="color:#81ecec;margin-top:4px;" onclick="game.rotateRoad(' + buildingIndex + ')">🔄 Повернуть → ' + nextLabel + '</button>';
   }
 
   document.getElementById('building-info-actions').innerHTML = actionsHTML;
