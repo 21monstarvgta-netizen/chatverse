@@ -653,882 +653,259 @@ GameRenderer.prototype._drawBuildingSprite = function(ctx, type, level, tw, th, 
 };
 
 // ── Helpers for sprites ──────────────────────────────────────
-
-// Gradient helper
-GameRenderer.prototype._grad = function(ctx, x1, y1, x2, y2, stops) {
-  var g = ctx.createLinearGradient(x1, y1, x2, y2);
-  stops.forEach(function(s) { g.addColorStop(s[0], s[1]); });
-  return g;
-};
-
-// Radial gradient helper
-GameRenderer.prototype._radgrad = function(ctx, x, y, r1, r2, stops) {
-  var g = ctx.createRadialGradient(x, y, r1, x, y, r2);
-  stops.forEach(function(s) { g.addColorStop(s[0], s[1]); });
-  return g;
-};
-
-// Detailed isometric box with gradient faces
-GameRenderer.prototype._isoBox = function(ctx, x, y, w, h, hue, sat, lit) {
-  var d = h * 0.32;
-  // Top face - gradient
-  var tg = ctx.createLinearGradient(x, y-d, x+w, y);
-  tg.addColorStop(0, 'hsl('+hue+','+sat+'%,'+(lit+12)+'%)');
-  tg.addColorStop(1, 'hsl('+hue+','+sat+'%,'+(lit+4)+'%)');
-  ctx.fillStyle = tg;
+// box2d: a simple 2.5D box. x,y = top-left of the FRONT FACE, w=width, h=height, d=depth
+GameRenderer.prototype._box = function(ctx, x, y, w, h, topC, frontC, sideC) {
+  var d = h * 0.28;
+  // top face
+  ctx.fillStyle = topC;
   ctx.fillRect(x, y - d, w, d);
-  // Front face - gradient
-  var fg = ctx.createLinearGradient(x, y, x, y+h);
-  fg.addColorStop(0, 'hsl('+hue+','+sat+'%,'+lit+'%)');
-  fg.addColorStop(1, 'hsl('+hue+','+sat+'%,'+(lit-8)+'%)');
-  ctx.fillStyle = fg;
+  // front face
+  ctx.fillStyle = frontC;
   ctx.fillRect(x, y, w, h);
-  // Right side face
+  // right side face
   ctx.beginPath();
-  ctx.moveTo(x+w, y-d);
-  ctx.lineTo(x+w+d*0.6, y-d*0.6);
-  ctx.lineTo(x+w+d*0.6, y+h-d*0.6);
-  ctx.lineTo(x+w, y+h);
+  ctx.moveTo(x + w, y - d);
+  ctx.lineTo(x + w + d * 0.55, y - d * 0.55);
+  ctx.lineTo(x + w + d * 0.55, y + h - d * 0.55);
+  ctx.lineTo(x + w, y + h);
   ctx.closePath();
-  var sg = ctx.createLinearGradient(x+w, y, x+w+d*0.6, y+h);
-  sg.addColorStop(0, 'hsl('+hue+','+sat+'%,'+(lit-14)+'%)');
-  sg.addColorStop(1, 'hsl('+hue+','+sat+'%,'+(lit-22)+'%)');
-  ctx.fillStyle = sg;
+  ctx.fillStyle = sideC;
   ctx.fill();
-  // Edge highlight on top-left
-  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x, y-d); ctx.lineTo(x+w, y-d); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x, y-d); ctx.lineTo(x, y+h); ctx.stroke();
 };
 
-// Window with glow effect
-GameRenderer.prototype._isoWin = function(ctx, x, y, w, h, lit, tick) {
-  var on = lit || Math.floor(tick / 40) % 2 === 0;
-  if (on) {
-    ctx.shadowColor = '#fde68a'; ctx.shadowBlur = 6;
-    ctx.fillStyle = '#fef3c7';
-  } else {
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(186,230,253,0.7)';
-  }
+GameRenderer.prototype._win = function(ctx, x, y, w, h) {
+  ctx.fillStyle = 'rgba(186,230,253,0.8)';
   ctx.fillRect(x, y, w, h);
-  // Frame
-  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-  ctx.lineWidth = 0.5;
-  ctx.strokeRect(x, y, w, h);
-  // Cross divider
-  ctx.beginPath();
-  ctx.moveTo(x + w/2, y); ctx.lineTo(x + w/2, y + h);
-  ctx.moveTo(x, y + h/2); ctx.lineTo(x + w, y + h/2);
-  ctx.stroke();
-  ctx.shadowBlur = 0;
 };
 
-// Smoke particle
-GameRenderer.prototype._smoke = function(ctx, x, y, tick, offset, color) {
-  var t = (tick * 0.5 + offset) % 50;
-  var alpha = Math.max(0, 0.6 - t / 50);
-  var spread = t * 0.3;
-  ctx.strokeStyle = color || ('rgba(180,180,180,' + alpha + ')');
-  ctx.lineWidth = Math.max(1, 4 - t * 0.06);
-  ctx.beginPath();
-  ctx.arc(x + Math.sin(t * 0.3) * spread, y - t * 0.7, spread * 0.5 + 2, 0, Math.PI * 2);
-  ctx.stroke();
-};
+// ── Sprites (all centred on 0,0, extending upward) ──────────
 
-// Roof triangle
-GameRenderer.prototype._roof = function(ctx, x, y, w, h, col1, col2) {
-  var g = ctx.createLinearGradient(x, y - h, x + w, y);
-  g.addColorStop(0, col1);
-  g.addColorStop(1, col2);
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + w/2, y - h);
-  ctx.lineTo(x + w, y);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-  ctx.lineWidth = 0.5;
-  ctx.stroke();
-};
-
-// ── FARM ─────────────────────────────────────────────────────
 GameRenderer.prototype._sFarm = function(ctx, s, level, tick) {
-  // Ground / soil patches
-  var sg = ctx.createLinearGradient(-s*0.5, -s*0.08, s*0.5, 0);
-  sg.addColorStop(0, '#3d2008'); sg.addColorStop(1, '#5c3317');
-  ctx.fillStyle = sg;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.02, s*0.48, s*0.12, 0, 0, Math.PI*2); ctx.fill();
-
-  // Crop rows with animated wheat
-  var rows = Math.min(3 + Math.floor(level / 2), 9);
+  // Soil strip
+  ctx.fillStyle = '#5c3317';
+  ctx.fillRect(-s * 0.5, -s * 0.06, s, s * 0.1);
+  // Crop rows
+  var rows = Math.min(3 + Math.floor(level / 3), 8);
   for (var r = 0; r < rows; r++) {
-    var rx = -s*0.42 + r * (s*0.84 / (rows-1||1));
-    var sway = Math.sin(tick * 0.035 + r * 0.7) * 2.5;
-    var height = s * (0.22 + 0.1 * Math.sin(tick * 0.02 + r));
-    // Stem
-    ctx.strokeStyle = '#5a8a2a';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(rx, -s*0.06); ctx.lineTo(rx + sway, -s*0.06 - height); ctx.stroke();
-    // Leaves
-    ctx.strokeStyle = '#6aaa30';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(rx, -s*0.06 - height*0.4);
-    ctx.quadraticCurveTo(rx + 8 + sway, -s*0.06 - height*0.35, rx + 12, -s*0.06 - height*0.25);
-    ctx.stroke();
-    // Wheat head
-    var wg = ctx.createLinearGradient(rx, -s*0.06-height, rx, -s*0.06-height-8);
-    wg.addColorStop(0, '#e8b740'); wg.addColorStop(1, '#f4d03f');
-    ctx.fillStyle = wg;
-    ctx.beginPath(); ctx.ellipse(rx + sway, -s*0.06 - height - 5, 3, 7, sway*0.1, 0, Math.PI*2); ctx.fill();
+    var rx = -s * 0.44 + r * (s * 0.88 / (rows - 1 || 1));
+    var grow = 0.5 + 0.5 * Math.sin(tick * 0.03 + r);
+    ctx.strokeStyle = '#4a9e4a';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(rx, -s * 0.05); ctx.lineTo(rx, -s * 0.05 - s * 0.3 * grow); ctx.stroke();
+    ctx.fillStyle = '#e8b740';
+    ctx.beginPath(); ctx.ellipse(rx, -s * 0.05 - s * 0.3 * grow - 3, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
   }
-
-  // Barn - detailed
-  this._isoBox(ctx, -s*0.2, -s*0.46, s*0.4, s*0.28, 25, 65, 35);
-  // Barn roof
-  this._roof(ctx, -s*0.24, -s*0.46, s*0.48, s*0.22, '#c0392b', '#922b21');
-  // Barn door
-  ctx.fillStyle = '#4a2800';
-  ctx.fillRect(-s*0.07, -s*0.38, s*0.14, s*0.2);
-  ctx.strokeStyle = '#6b3c10'; ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(0, -s*0.38); ctx.lineTo(0, -s*0.18); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-s*0.07, -s*0.28); ctx.lineTo(0, -s*0.28); ctx.stroke();
-  // Barn X detail
-  ctx.strokeStyle = '#7d4a1e'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(-s*0.16, -s*0.44); ctx.lineTo(s*0.16, -s*0.18); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(s*0.16, -s*0.44); ctx.lineTo(-s*0.16, -s*0.18); ctx.stroke();
-  // Weathervane
-  ctx.strokeStyle = '#888'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, -s*0.68); ctx.lineTo(0, -s*0.76); ctx.stroke();
-  var wv = tick * 0.02;
-  ctx.fillStyle = '#aaa';
-  ctx.beginPath(); ctx.moveTo(Math.cos(wv)*8, -s*0.76+Math.sin(wv)*4);
-  ctx.lineTo(0, -s*0.76); ctx.lineTo(Math.cos(wv+Math.PI)*5, -s*0.76+Math.sin(wv+Math.PI)*2);
-  ctx.closePath(); ctx.fill();
+  // Barn
+  this._box(ctx, -s * 0.18, -s * 0.46, s * 0.36, s * 0.22, '#a0522d', '#8b4513', '#6b3410');
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath(); ctx.moveTo(-s*0.2,-s*0.46); ctx.lineTo(0,-s*0.68); ctx.lineTo(s*0.2,-s*0.46); ctx.closePath(); ctx.fill();
 };
 
-// ── HOUSE ────────────────────────────────────────────────────
 GameRenderer.prototype._sHouse = function(ctx, s, level, tick) {
-  var floors = Math.min(1 + Math.floor(level / 6), 4);
-  var fh = s * 0.24;
-  var wallHues = [30, 28, 32, 27];
+  var floors = Math.min(1 + Math.floor(level / 7), 4);
+  var fh = s * 0.22;
+  var cols = ['#d4a97a','#c8885e','#d4a97a','#b87850'];
   for (var f = 0; f < floors; f++) {
     var fy = -f * fh;
-    var h = wallHues[f % 4];
-    this._isoBox(ctx, -s*0.38, fy - fh, s*0.76, fh, h, 50, 50);
-    // Windows
-    this._isoWin(ctx, -s*0.28, fy - fh + s*0.04, s*0.14, s*0.12, false, tick);
-    this._isoWin(ctx, s*0.06, fy - fh + s*0.04, s*0.14, s*0.12, f===0, tick);
-    if (f > 1) this._isoWin(ctx, -s*0.1, fy - fh + s*0.04, s*0.12, s*0.1, false, tick);
+    var c = cols[f % 4];
+    this._box(ctx, -s*0.36, fy - fh, s*0.72, fh, this._shade(c, 1.15), c, this._shade(c, 0.72));
+    this._win(ctx, -s*0.24, fy - fh + 3, s*0.14, s*0.12);
+    this._win(ctx, s*0.08, fy - fh + 3, s*0.14, s*0.12);
   }
-  // Foundation
-  ctx.fillStyle = '#5a4a3a'; ctx.fillRect(-s*0.4, 0, s*0.8, s*0.04);
   // Roof
-  var ry = -floors * fh;
-  this._roof(ctx, -s*0.42, ry, s*0.84, s*0.32, '#8b1a1a', '#5a1111');
-  // Dormer window in roof
-  if (floors >= 2) {
-    this._isoBox(ctx, -s*0.1, ry - s*0.22, s*0.2, s*0.14, 30, 50, 48);
-    this._roof(ctx, -s*0.13, ry - s*0.22, s*0.26, s*0.1, '#8b1a1a', '#5a1111');
-  }
-  // Chimney
-  ctx.fillStyle = '#6d4c41'; ctx.fillRect(s*0.1, ry - s*0.36, s*0.1, s*0.22);
-  ctx.fillStyle = '#5d3c31'; ctx.fillRect(s*0.08, ry - s*0.38, s*0.14, s*0.04);
-  // Smoke
-  this._smoke(ctx, s*0.15, ry - s*0.36, tick, 0);
-  this._smoke(ctx, s*0.15, ry - s*0.36, tick, 18);
-  // Door
-  ctx.fillStyle = '#4a2800';
-  ctx.beginPath(); ctx.roundRect(-s*0.08, -s*0.22, s*0.16, s*0.22, [4, 4, 0, 0]); ctx.fill();
-  ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(-s*0.02, -s*0.11, 2, 0, Math.PI*2); ctx.fill();
+  var roofY = -floors * fh;
+  ctx.fillStyle = '#8b1a1a';
+  ctx.beginPath(); ctx.moveTo(-s*0.4, roofY); ctx.lineTo(0, roofY - s*0.28); ctx.lineTo(s*0.4, roofY); ctx.closePath(); ctx.fill();
+  // Chimney + smoke
+  ctx.fillStyle = '#6d4c41';
+  ctx.fillRect(s*0.1, roofY - s*0.3, s*0.08, s*0.18);
+  var smk = (tick * 0.5) % 30;
+  ctx.strokeStyle = 'rgba(200,200,200,' + (0.55 - smk / 55) + ')';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(s*0.14, roofY - s*0.3 - smk * 0.45, smk * 0.22, 0, Math.PI * 2); ctx.stroke();
 };
 
-// ── QUARRY ───────────────────────────────────────────────────
 GameRenderer.prototype._sQuarry = function(ctx, s, level, tick) {
-  // Pit
-  var pg = ctx.createRadialGradient(0, -s*0.04, s*0.1, 0, -s*0.04, s*0.44);
-  pg.addColorStop(0, '#374151'); pg.addColorStop(1, '#6b7280');
-  ctx.fillStyle = pg;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.04, s*0.44, s*0.16, 0, 0, Math.PI*2); ctx.fill();
-  ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.04, s*0.44, s*0.16, 0, 0, Math.PI*2); ctx.stroke();
-
-  // Rock formations
-  var rocks = [
-    [-0.16,-0.32, 0.18,0.22, 15],
-    [-0.04,-0.50, 0.14,0.19, 10],
-    [ 0.14,-0.34, 0.16,0.20, -8]
-  ];
-  rocks.forEach(function(r, i) {
-    var rg = ctx.createLinearGradient(s*r[0], s*r[1]-s*r[3], s*r[0]+s*r[2], s*r[1]);
-    rg.addColorStop(0, '#d1d5db'); rg.addColorStop(0.5, '#9ca3af'); rg.addColorStop(1, '#6b7280');
-    ctx.fillStyle = rg;
-    ctx.save(); ctx.rotate(r[4] * Math.PI/180);
-    ctx.beginPath(); ctx.ellipse(s*r[0], s*r[1], s*r[2], s*r[3], 0, 0, Math.PI*2); ctx.fill();
-    // Highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.beginPath(); ctx.ellipse(s*r[0]-s*r[2]*0.25, s*r[1]-s*r[3]*0.3, s*r[2]*0.35, s*r[3]*0.28, 0, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-    // Crack lines
-    ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(s*r[0]-4, s*r[1]-8); ctx.lineTo(s*r[0]+2, s*r[1]+2); ctx.stroke();
+  ctx.fillStyle = '#6b7280';
+  ctx.beginPath(); ctx.ellipse(0, 0, s*0.44, s*0.16, 0, 0, Math.PI*2); ctx.fill();
+  var rocks = [[-0.14,-0.28,0.17,0.2],[-0.02,-0.44,0.13,0.17],[0.12,-0.3,0.15,0.19]];
+  rocks.forEach(function(r) {
+    ctx.fillStyle = '#9ca3af';
+    ctx.beginPath(); ctx.ellipse(s*r[0],s*r[1],s*r[2],s*r[3],r[0]*0.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#d1d5db';
+    ctx.beginPath(); ctx.ellipse(s*r[0]-2,s*r[1]-2,s*r[2]*0.38,s*r[3]*0.3,0,0,Math.PI*2); ctx.fill();
   });
-
-  // Crane/pickaxe animation
-  var sw2 = Math.sin(tick * 0.12) * 0.35;
-  ctx.save(); ctx.translate(s*0.22, -s*0.36); ctx.rotate(sw2);
-  // Handle
-  var hg = ctx.createLinearGradient(0, 0, 0, s*0.28);
-  hg.addColorStop(0, '#92400e'); hg.addColorStop(1, '#78350f');
-  ctx.strokeStyle = '#92400e'; ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, s*0.26); ctx.stroke();
-  // Pick head
-  ctx.fillStyle = '#9ca3af';
-  ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(7, 0); ctx.lineTo(4, -8); ctx.lineTo(-4, -8); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#d1d5db';
-  ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-4, -8); ctx.lineTo(-3, -4); ctx.closePath(); ctx.fill();
-  // Dust if hitting
-  if (Math.abs(sw2) > 0.28) {
-    ctx.fillStyle = 'rgba(200,190,170,0.5)';
-    for (var d2 = 0; d2 < 3; d2++) {
-      ctx.beginPath(); ctx.arc(Math.random()*14-7, s*0.28+Math.random()*6, 2+Math.random()*3, 0, Math.PI*2); ctx.fill();
-    }
-  }
-  ctx.restore();
-
-  // Rope/chain support
-  ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 1;
-  ctx.setLineDash([2,2]);
-  ctx.beginPath(); ctx.moveTo(-s*0.3, -s*0.6); ctx.lineTo(s*0.22, -s*0.36); ctx.stroke();
-  ctx.setLineDash([]);
+  var sw = Math.sin(tick * 0.12) * 0.32;
+  ctx.save(); ctx.translate(s*0.2,-s*0.34); ctx.rotate(sw);
+  ctx.strokeStyle = '#92400e'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,s*0.22); ctx.stroke();
+  ctx.fillStyle = '#718096'; ctx.fillRect(-4,0,8,6); ctx.restore();
 };
 
-// ── FACTORY ──────────────────────────────────────────────────
 GameRenderer.prototype._sFactory = function(ctx, s, level, tick) {
-  // Main building body
-  this._isoBox(ctx, -s*0.44, -s*0.54, s*0.88, s*0.54, 220, 15, 38);
-  // Roof detail - concrete ledge
-  ctx.fillStyle = '#475569';
-  ctx.fillRect(-s*0.46, -s*0.56, s*0.92, s*0.04);
-
-  // Windows - row of industrial windows
-  for (var wi = 0; wi < 3; wi++) {
-    this._isoBox(ctx, -s*0.36 + wi*s*0.26, -s*0.44, s*0.18, s*0.28, 210, 30, 52);
-    this._isoWin(ctx, -s*0.32 + wi*s*0.26, -s*0.42, s*0.14, s*0.2, wi===1, tick);
-  }
-
-  // Loading bay door
-  ctx.fillStyle = '#1e293b';
-  ctx.fillRect(-s*0.12, -s*0.28, s*0.24, s*0.28);
-  // Door stripes
-  for (var ds = 0; ds < 4; ds++) {
-    ctx.fillStyle = ds%2===0 ? '#fbbf24' : '#1e293b';
-    ctx.fillRect(-s*0.12, -s*0.28 + ds*s*0.07, s*0.24, s*0.07);
-  }
-
-  // Chimneys
-  var nc = Math.min(2 + Math.floor(level/3), 5);
+  this._box(ctx,-s*0.42,-s*0.5,s*0.84,s*0.5,'#94a3b8','#64748b','#475569');
+  var nc = Math.min(2+Math.floor(level/4),5);
   for (var ci = 0; ci < nc; ci++) {
-    var cx2 = -s*0.36 + ci*(s*0.72/(nc-1||1));
-    // Chimney body
-    this._isoBox(ctx, cx2-s*0.05, -s*0.78, s*0.1, s*0.26, 220, 10, 30);
-    // Chimney cap
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(cx2-s*0.07, -s*0.78, s*0.14, s*0.03);
-    // Smoke
-    this._smoke(ctx, cx2, -s*0.78, tick, ci*15, null);
-    this._smoke(ctx, cx2, -s*0.78, tick, ci*15+25, null);
+    var cx2 = -s*0.34+ci*(s*0.68/(nc-1||1));
+    ctx.fillStyle='#4b5563'; ctx.fillRect(cx2-4,-s*0.72,8,s*0.24);
+    var off=(tick*0.8+ci*15)%40;
+    ctx.strokeStyle='rgba(180,180,180,'+(0.6-off/62)+')'; ctx.lineWidth=4-off/14;
+    ctx.beginPath(); ctx.moveTo(cx2,-s*0.72); ctx.bezierCurveTo(cx2+6,-s*0.72-off*0.4,cx2-4,-s*0.72-off*0.6,cx2,-s*0.72-off*0.82); ctx.stroke();
   }
-
-  // Sign
-  ctx.fillStyle = '#1e40af';
-  ctx.fillRect(-s*0.28, -s*0.52, s*0.56, s*0.1);
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 7px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('FACTORY', 0, -s*0.47);
+  ctx.fillStyle='rgba(255,200,50,0.65)';
+  for (var wi=0;wi<3;wi++) ctx.fillRect(-s*0.32+wi*s*0.24,-s*0.42,s*0.14,s*0.14);
 };
 
-// ── POWERPLANT ───────────────────────────────────────────────
 GameRenderer.prototype._sPowerplant = function(ctx, s, level, tick) {
-  // Base building
-  this._isoBox(ctx, -s*0.38, -s*0.3, s*0.76, s*0.3, 215, 20, 35);
-
-  // Cooling tower - iconic shape
-  var tg = ctx.createLinearGradient(-s*0.26, -s*0.7, s*0.26, 0);
-  tg.addColorStop(0, '#94a3b8'); tg.addColorStop(0.5, '#cbd5e1'); tg.addColorStop(1, '#94a3b8');
-  ctx.fillStyle = tg;
-  ctx.beginPath();
-  ctx.moveTo(-s*0.26, 0);
-  ctx.quadraticCurveTo(-s*0.34, -s*0.35, -s*0.18, -s*0.68);
-  ctx.lineTo(s*0.18, -s*0.68);
-  ctx.quadraticCurveTo(s*0.34, -s*0.35, s*0.26, 0);
-  ctx.closePath(); ctx.fill();
-  // Cooling tower interior shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.beginPath();
-  ctx.moveTo(-s*0.16, 0);
-  ctx.quadraticCurveTo(-s*0.24, -s*0.35, -s*0.1, -s*0.66);
-  ctx.lineTo(s*0.1, -s*0.66);
-  ctx.quadraticCurveTo(s*0.24, -s*0.35, s*0.16, 0);
-  ctx.closePath(); ctx.fill();
-  // Rim highlight
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(-s*0.18, -s*0.68); ctx.lineTo(s*0.18, -s*0.68); ctx.stroke();
-
-  // Steam coming out
-  for (var si = 0; si < 3; si++) {
-    var st2 = (tick * 0.4 + si*18) % 52;
-    var sa = 0.5 - st2/52;
-    if (sa > 0) {
-      ctx.fillStyle = 'rgba(220,220,220,' + sa + ')';
-      ctx.beginPath(); ctx.arc((-0.1+si*0.1)*s, -s*0.68 - st2*0.5, 4+st2*0.3, 0, Math.PI*2); ctx.fill();
-    }
-  }
-
-  // Lightning bolt symbol
-  var lp = 0.7 + 0.3*Math.sin(tick*0.15);
-  ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12*lp;
-  ctx.fillStyle = '#fbbf24';
-  ctx.beginPath();
-  ctx.moveTo(s*0.06, -s*0.26); ctx.lineTo(-s*0.06, -s*0.14); ctx.lineTo(s*0.02, -s*0.14);
-  ctx.lineTo(-s*0.06, 0); ctx.lineTo(s*0.08, -s*0.16); ctx.lineTo(0, -s*0.16);
-  ctx.closePath(); ctx.fill();
-  ctx.shadowBlur = 0;
-
-  // Control building
-  this._isoBox(ctx, s*0.26, -s*0.24, s*0.14, s*0.24, 215, 25, 40);
-  this._isoWin(ctx, s*0.28, -s*0.22, s*0.1, s*0.08, true, tick);
+  ctx.fillStyle='#94a3b8'; ctx.beginPath();
+  ctx.moveTo(-s*0.28,0); ctx.quadraticCurveTo(-s*0.4,-s*0.3,-s*0.2,-s*0.62); ctx.lineTo(s*0.2,-s*0.62);
+  ctx.quadraticCurveTo(s*0.4,-s*0.3,s*0.28,0); ctx.closePath(); ctx.fill();
+  var st=(tick*0.6)%38;
+  ctx.strokeStyle='rgba(230,230,230,'+(0.55-st/65)+')'; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.arc(0,-s*0.62-st*0.42,st*0.22,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='#fbbf24'; ctx.beginPath();
+  ctx.moveTo(s*0.04,-s*0.45); ctx.lineTo(-s*0.04,-s*0.28); ctx.lineTo(s*0.02,-s*0.28); ctx.lineTo(-s*0.05,-s*0.1);
+  ctx.lineTo(s*0.1,-s*0.3); ctx.lineTo(s*0.02,-s*0.3); ctx.closePath(); ctx.fill();
 };
 
-// ── WAREHOUSE ────────────────────────────────────────────────
 GameRenderer.prototype._sWarehouse = function(ctx, s, level, tick) {
-  // Main warehouse body - wide and low
-  this._isoBox(ctx, -s*0.48, -s*0.36, s*0.96, s*0.36, 30, 40, 38);
-  // Arched metal roof
-  var rg = ctx.createLinearGradient(-s*0.5, -s*0.56, s*0.5, -s*0.36);
-  rg.addColorStop(0, '#94a3b8'); rg.addColorStop(0.5, '#cbd5e1'); rg.addColorStop(1, '#64748b');
-  ctx.fillStyle = rg;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.36, s*0.5, s*0.22, 0, Math.PI, 0); ctx.fill();
-  // Roof ribs
-  ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1;
-  for (var ri = -3; ri <= 3; ri++) {
-    ctx.beginPath(); ctx.ellipse(0, -s*0.36, s*0.5, s*0.22, 0, Math.PI+ri*0.22, Math.PI+(ri+0.5)*0.22); ctx.stroke();
-  }
-  // Large doors
-  ctx.fillStyle = '#1e293b';
-  ctx.beginPath(); ctx.arc(-s*0.2, -s*0.18, s*0.18, Math.PI, 0); ctx.rect(-s*0.38, -s*0.18, s*0.36, s*0.18); ctx.fill();
-  ctx.fillStyle = '#334155';
-  ctx.fillRect(-s*0.36, -s*0.34, s*0.34, s*0.18);
-  // Door panels
-  ctx.strokeStyle = '#475569'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(-s*0.19, -s*0.34); ctx.lineTo(-s*0.19, -s*0.16); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-s*0.36, -s*0.25); ctx.lineTo(-s*0.02, -s*0.25); ctx.stroke();
-  // Loading dock
-  ctx.fillStyle = '#fbbf24';
-  ctx.fillRect(-s*0.5, -s*0.02, s, s*0.02);
-  // Forklift indicator light
-  var fl = Math.floor(tick/25)%2===0;
-  ctx.fillStyle = fl ? '#ef4444' : '#374151';
-  ctx.beginPath(); ctx.arc(s*0.42, -s*0.28, 4, 0, Math.PI*2); ctx.fill();
+  this._box(ctx,-s*0.46,-s*0.38,s*0.92,s*0.38,'#b45309','#92400e','#78350f');
+  ctx.fillStyle='#6b7280'; ctx.beginPath(); ctx.ellipse(0,-s*0.38,s*0.48,s*0.2,0,Math.PI,0); ctx.fill();
+  ctx.fillStyle='#451a03'; ctx.beginPath(); ctx.arc(0,-s*0.13,s*0.16,Math.PI,0); ctx.rect(-s*0.16,-s*0.13,s*0.32,s*0.13); ctx.fill();
 };
 
-// ── MARKET ───────────────────────────────────────────────────
 GameRenderer.prototype._sMarket = function(ctx, s, level, tick) {
-  // Building base
-  this._isoBox(ctx, -s*0.4, -s*0.4, s*0.8, s*0.4, 45, 55, 52);
-  // Awning - scalloped
-  ctx.fillStyle = '#dc2626';
-  ctx.beginPath(); ctx.moveTo(-s*0.44, -s*0.4);
-  for (var aw = 0; aw < 6; aw++) {
-    var ax = -s*0.44 + aw * s*0.88/5;
-    ctx.lineTo(ax + s*0.07, -s*0.54);
-    ctx.lineTo(ax + s*0.147, -s*0.4);
-  }
+  this._box(ctx,-s*0.38,-s*0.42,s*0.76,s*0.42,'#fde68a','#fbbf24','#f59e0b');
+  ctx.fillStyle='#dc2626'; ctx.beginPath(); ctx.moveTo(-s*0.42,-s*0.42);
+  for (var aw=0;aw<5;aw++){var awx=-s*0.42+aw*s*0.84/4; ctx.lineTo(awx+s*0.1,-s*0.51); ctx.lineTo(awx+s*0.21,-s*0.42);}
   ctx.closePath(); ctx.fill();
-  // Awning stripes
-  ctx.fillStyle = '#b91c1c';
-  for (var as = 0; as < 3; as++) {
-    ctx.fillRect(-s*0.44 + as*s*0.32, -s*0.54, s*0.08, s*0.14);
-  }
-  // Awning edge
-  ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(-s*0.44, -s*0.4); ctx.lineTo(s*0.44, -s*0.4); ctx.stroke();
-
-  // Counter/display
-  ctx.fillStyle = '#92400e'; ctx.fillRect(-s*0.34, -s*0.3, s*0.68, s*0.1);
-  // Produce display - animated bounce
-  var b = Math.sin(tick * 0.06) * 1.5;
-  ctx.font = '11px Arial'; ctx.textAlign = 'center';
-  ctx.fillText('🍎', -s*0.2, -s*0.3 + b);
-  ctx.fillText('🥕', 0, -s*0.3 + b*0.7);
-  ctx.fillText('🍇', s*0.2, -s*0.3 + b*1.2);
-  // Sign
-  ctx.fillStyle = '#fef3c7';
-  ctx.fillRect(-s*0.22, -s*0.52, s*0.44, s*0.1);
-  ctx.fillStyle = '#78350f'; ctx.font = 'bold 7px Arial'; ctx.textBaseline = 'middle';
-  ctx.fillText('РЫНОК', 0, -s*0.47);
+  ctx.font='10px Arial'; ctx.textAlign='center';
+  ctx.fillText('🍎',-s*0.18,-s*0.22+Math.sin(tick*0.05)*2);
+  ctx.fillText('🥕',s*0.1,-s*0.22+Math.sin(tick*0.05+1)*2);
 };
 
-// ── GARDEN ───────────────────────────────────────────────────
 GameRenderer.prototype._sGarden = function(ctx, s, level, tick) {
-  // Stone path
-  var pg2 = ctx.createLinearGradient(-s*0.44, 0, s*0.44, 0);
-  pg2.addColorStop(0, '#9ca3af'); pg2.addColorStop(0.5, '#d1d5db'); pg2.addColorStop(1, '#9ca3af');
-  for (var pp = -3; pp <= 3; pp++) {
-    ctx.fillStyle = pg2;
-    ctx.beginPath(); ctx.ellipse(pp*s*0.14, -s*0.04, s*0.06, s*0.04, 0, 0, Math.PI*2); ctx.fill();
-  }
-  ctx.fillStyle = '#b0b0b0'; ctx.fillRect(-s*0.44, -s*0.02, s*0.88, s*0.02);
-
-  // Central fountain
-  ctx.fillStyle = '#0369a1';
-  ctx.beginPath(); ctx.ellipse(0, -s*0.12, s*0.14, s*0.06, 0, 0, Math.PI*2); ctx.fill();
-  // Fountain basin
-  ctx.strokeStyle = '#d4a574'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.12, s*0.14, s*0.06, 0, 0, Math.PI*2); ctx.stroke();
-  // Water jet
-  var wt = (tick * 0.08) % (Math.PI * 2);
-  ctx.strokeStyle = 'rgba(125,211,252,0.8)'; ctx.lineWidth = 1.5;
-  for (var wj = 0; wj < 4; wj++) {
-    var wa = wj * Math.PI/2 + wt*0.1;
-    var wh2 = s*0.08 + Math.sin(tick*0.1+wj)*s*0.02;
-    ctx.beginPath(); ctx.moveTo(0, -s*0.12);
-    ctx.quadraticCurveTo(Math.cos(wa)*s*0.08, -s*0.12-wh2, Math.cos(wa)*s*0.12, -s*0.12-s*0.02);
-    ctx.stroke();
-  }
-
-  // Trees/bushes
-  var nt = Math.min(2 + Math.floor(level/2), 6);
-  for (var t = 0; t < nt; t++) {
-    var angle2 = t * (Math.PI*2/nt);
-    var tr = s * 0.28;
-    var tx2 = Math.cos(angle2) * tr;
-    var ty2 = Math.sin(angle2) * tr * 0.4 - s*0.28;
-    var sw3 = Math.sin(tick*0.04+t) * 1.5;
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.beginPath(); ctx.ellipse(tx2, ty2 + s*0.24, s*0.08, s*0.03, 0, 0, Math.PI*2); ctx.fill();
-    // Trunk
-    var tg2 = ctx.createLinearGradient(tx2, ty2+s*0.2, tx2, ty2);
-    tg2.addColorStop(0, '#78350f'); tg2.addColorStop(1, '#92400e');
-    ctx.fillStyle = tg2; ctx.fillRect(tx2-2, ty2, 4, s*0.16);
-    // Foliage layers
-    var colors2 = ['#166534','#15803d','#16a34a'];
-    for (var fl2 = 0; fl2 < 3; fl2++) {
-      var fg2 = ctx.createRadialGradient(tx2+sw3, ty2-fl2*s*0.06, 0, tx2+sw3, ty2-fl2*s*0.06, s*(0.11-fl2*0.02));
-      fg2.addColorStop(0, colors2[fl2]); fg2.addColorStop(1, '#14532d');
-      ctx.fillStyle = fg2;
-      ctx.beginPath(); ctx.arc(tx2+sw3, ty2-fl2*s*0.08, s*(0.11-fl2*0.02), 0, Math.PI*2); ctx.fill();
-    }
-    // Flowers
-    ctx.fillStyle = ['#f43f5e','#a855f7','#eab308','#ec4899'][t%4];
-    ctx.beginPath(); ctx.arc(tx2+sw3+s*0.04, ty2-s*0.22, 3, 0, Math.PI*2); ctx.fill();
+  for(var f=-3;f<=3;f++){ctx.fillStyle='#d4a574'; ctx.fillRect(f*s*0.13-2,-s*0.1,4,s*0.14);}
+  ctx.fillStyle='#d4a574'; ctx.fillRect(-s*0.42,-s*0.04,s*0.84,3);
+  var nt=Math.min(1+Math.floor(level/3),5);
+  for(var t=0;t<nt;t++){
+    var tx=-s*0.28+t*(s*0.56/(nt-1||1)), sw=Math.sin(tick*0.04+t)*2;
+    ctx.fillStyle='#166534'; ctx.beginPath(); ctx.arc(tx+sw,-s*0.38,s*0.13,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#15803d'; ctx.beginPath(); ctx.arc(tx+sw,-s*0.5,s*0.1,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#8b5cf6'; ctx.beginPath(); ctx.arc(tx+sw,-s*0.58,s*0.07,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#92400e'; ctx.fillRect(tx-2,-s*0.26,4,s*0.14);
   }
 };
 
-// ── SCHOOL ───────────────────────────────────────────────────
 GameRenderer.prototype._sSchool = function(ctx, s, level, tick) {
-  // Main building
-  this._isoBox(ctx, -s*0.46, -s*0.56, s*0.92, s*0.56, 55, 60, 90);
-  // Roof ledge
-  ctx.fillStyle = '#fbbf24'; ctx.fillRect(-s*0.48, -s*0.58, s*0.96, s*0.04);
-  // Columns
-  for (var c2 = 0; c2 < 4; c2++) {
-    this._isoBox(ctx, -s*0.38+c2*s*0.24, -s*0.5, s*0.06, s*0.5, 55, 20, 82);
-  }
-  // Windows - arched tops
-  for (var w2 = 0; w2 < 3; w2++) {
-    var wx = -s*0.3 + w2*s*0.28;
-    // Arch
-    ctx.fillStyle = 'rgba(186,230,253,0.8)';
-    ctx.beginPath(); ctx.arc(wx+s*0.08, -s*0.38, s*0.08, Math.PI, 0); ctx.rect(wx, -s*0.38, s*0.16, s*0.2); ctx.fill();
-    ctx.strokeStyle = '#fde68a'; ctx.lineWidth = 1;
-    ctx.strokeRect(wx, -s*0.38, s*0.16, s*0.2);
-  }
-  // Bell tower
-  this._isoBox(ctx, -s*0.08, -s*0.76, s*0.16, s*0.2, 55, 25, 78);
-  ctx.fillStyle = '#b45309';
-  ctx.beginPath(); ctx.moveTo(-s*0.1, -s*0.76); ctx.lineTo(0, -s*0.94); ctx.lineTo(s*0.1, -s*0.76); ctx.closePath(); ctx.fill();
-  // Bell
-  var bs2 = Math.sin(tick * 0.08) * 0.2;
-  ctx.fillStyle = '#ca8a04'; ctx.strokeStyle = '#a16207'; ctx.lineWidth = 1;
-  ctx.save(); ctx.translate(0, -s*0.78); ctx.rotate(bs2);
-  ctx.beginPath(); ctx.arc(0, 0, s*0.05, 0, Math.PI); ctx.fill(); ctx.stroke();
-  ctx.restore();
-  // Flag
-  ctx.strokeStyle = '#888'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, -s*0.94); ctx.lineTo(0, -s*1.08); ctx.stroke();
-  var fw2 = Math.sin(tick * 0.1) * 4;
-  ctx.fillStyle = '#ef4444';
-  ctx.beginPath(); ctx.moveTo(0,-s*1.08); ctx.lineTo(s*0.18+fw2,-s*1.01); ctx.lineTo(0,-s*0.95); ctx.closePath(); ctx.fill();
-  // Door
-  ctx.fillStyle = '#92400e';
-  ctx.beginPath(); ctx.roundRect(-s*0.08, -s*0.28, s*0.16, s*0.28, [6,6,0,0]); ctx.fill();
-  ctx.fillStyle = '#fbbf24'; ctx.font = '8px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('⭐', 0, -s*0.14);
+  this._box(ctx,-s*0.44,-s*0.54,s*0.88,s*0.54,'#fef9c3','#fef3c7','#fde68a');
+  ctx.fillStyle='#e5e7eb'; for(var c=0;c<4;c++) ctx.fillRect(-s*0.36+c*s*0.24,-s*0.48,7,s*0.36);
+  ctx.strokeStyle='#9ca3af'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,-s*0.54); ctx.lineTo(0,-s*0.82); ctx.stroke();
+  var fw=Math.sin(tick*0.1)*4;
+  ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.moveTo(0,-s*0.82); ctx.lineTo(s*0.2+fw,-s*0.74); ctx.lineTo(0,-s*0.66); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(186,230,253,.8)';
+  [[-s*0.26,-s*0.44],[s*0.08,-s*0.44],[-s*0.26,-s*0.3],[s*0.08,-s*0.3]].forEach(function(w){ctx.fillRect(w[0],w[1],s*0.16,s*0.1);});
 };
 
-// ── BAKERY ───────────────────────────────────────────────────
 GameRenderer.prototype._sBakery = function(ctx, s, level, tick) {
-  this._isoBox(ctx, -s*0.34, -s*0.46, s*0.68, s*0.46, 40, 70, 58);
-  // Roof with tiles
-  this._roof(ctx, -s*0.38, -s*0.46, s*0.76, s*0.24, '#c2410c', '#9a3412');
-  // Chimney/oven stack
-  this._isoBox(ctx, s*0.08, -s*0.56, s*0.12, s*0.14, 25, 30, 30);
-  this._smoke(ctx, s*0.14, -s*0.56, tick, 0, 'rgba(255,160,50,0.5)');
-  this._smoke(ctx, s*0.14, -s*0.56, tick, 20, 'rgba(200,120,30,0.4)');
-  // Window display
-  this._isoBox(ctx, -s*0.26, -s*0.38, s*0.36, s*0.26, 30, 40, 65);
-  // Bread display
-  ctx.fillStyle = '#fbbf24';
-  for (var b2 = 0; b2 < 3; b2++) {
-    ctx.beginPath(); ctx.ellipse(-s*0.18+b2*s*0.1, -s*0.24, s*0.04, s*0.03, 0, 0, Math.PI*2); ctx.fill();
-  }
-  // Sign board
-  ctx.fillStyle = '#92400e'; ctx.fillRect(-s*0.28, -s*0.52, s*0.56, s*0.08);
-  ctx.fillStyle = '#fef3c7'; ctx.font = 'bold 7px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('🥐 ПЕКАРНЯ', 0, -s*0.48);
-  // Door bell
-  var db = Math.floor(tick/60)%8===0;
-  if (db) { ctx.font = '8px Arial'; ctx.fillText('🔔', -s*0.3, -s*0.34); }
+  this._box(ctx,-s*0.32,-s*0.44,s*0.64,s*0.44,'#fde68a','#f59e0b','#d97706');
+  ctx.fillStyle='#78350f'; ctx.fillRect(s*0.1,-s*0.5,s*0.1,s*0.1);
+  var ar=(tick*0.5)%26; ctx.strokeStyle='rgba(255,190,80,'+(0.8-ar/26)+')'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(s*0.15,-s*0.5-ar*0.36,ar*0.2,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='#7c2d12'; ctx.fillRect(-s*0.22,-s*0.56,s*0.44,s*0.1);
+  ctx.fillStyle='#fef3c7'; ctx.font='bold 7px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('ПЕКАРНЯ',0,-s*0.51);
 };
 
-// ── PARK ─────────────────────────────────────────────────────
 GameRenderer.prototype._sPark = function(ctx, s, level, tick) {
-  // Pond
-  var pond = ctx.createRadialGradient(0, -s*0.08, 0, 0, -s*0.08, s*0.22);
-  pond.addColorStop(0, '#38bdf8'); pond.addColorStop(1, '#0284c7');
-  ctx.fillStyle = pond;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.08, s*0.22, s*0.1, 0, 0, Math.PI*2); ctx.fill();
-  // Water ripple
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  var rp = (tick * 0.05) % 1;
-  ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(0, -s*0.08, s*0.1*(1+rp), s*0.04*(1+rp), 0, 0, Math.PI*2); ctx.stroke();
-
-  // Paths
-  var pg3 = ctx.createLinearGradient(-s*0.44, 0, s*0.44, 0);
-  pg3.addColorStop(0, '#d4a574'); pg3.addColorStop(0.5, '#e8c99e'); pg3.addColorStop(1, '#d4a574');
-  ctx.fillStyle = pg3;
-  ctx.fillRect(-s*0.04, -s*0.6, s*0.08, s*0.6);
-  ctx.fillRect(-s*0.44, -s*0.04, s*0.88, s*0.08);
-
-  // Trees at corners - animated sway
-  var tpos = [[-s*0.32,-s*0.46],[s*0.32,-s*0.46],[-s*0.32,s*0.04],[s*0.32,s*0.04]];
-  tpos.forEach(function(tp, i) {
-    var sw4 = Math.sin(tick*0.04+i*1.1)*2;
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    ctx.beginPath(); ctx.ellipse(tp[0], tp[1]+s*0.24, s*0.08, s*0.03, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#78350f'; ctx.fillRect(tp[0]-2, tp[1]+s*0.08, 4, s*0.14);
-    var tcs = ['#166534','#15803d','#16a34a'];
-    tcs.forEach(function(tc, li) {
-      ctx.fillStyle = tc;
-      ctx.beginPath(); ctx.arc(tp[0]+sw4, tp[1]-(li*s*0.06), s*(0.1-li*0.015), 0, Math.PI*2); ctx.fill();
-    });
+  ctx.fillStyle='#0ea5e9'; ctx.beginPath(); ctx.ellipse(0,-s*0.06,s*0.22,s*0.1,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#38bdf8'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(0,-s*0.06,s*0.22,s*0.1,0,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='#d4a574'; ctx.fillRect(-3,-s*0.18,6,s*0.34); ctx.fillRect(-s*0.34,-3,s*0.68,6);
+  [[-s*0.3,-s*0.36],[s*0.3,-s*0.36],[-s*0.3,s*0.1],[s*0.3,s*0.1]].forEach(function(pt,i){
+    var sw=Math.sin(tick*0.04+i)*2;
+    ctx.fillStyle='#166534'; ctx.beginPath(); ctx.arc(pt[0]+sw,pt[1],s*0.13,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#92400e'; ctx.fillRect(pt[0]-2,pt[1]+s*0.11,4,s*0.11);
   });
-
-  // Ferris wheel / carousel
-  var ang2 = tick * 0.02;
-  ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(0, -s*0.56, s*0.16, 0, Math.PI*2); ctx.stroke();
-  ctx.fillStyle = '#6b7280'; ctx.beginPath(); ctx.arc(0, -s*0.56, 3, 0, Math.PI*2); ctx.fill();
-  var colors3 = ['#ef4444','#3b82f6','#22c55e','#f59e0b','#a855f7','#ec4899'];
-  for (var sp2 = 0; sp2 < 6; sp2++) {
-    var a2 = ang2 + sp2*Math.PI/3;
-    var px = Math.cos(a2)*s*0.16, py = -s*0.56+Math.sin(a2)*s*0.16;
-    ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, -s*0.56); ctx.lineTo(px, py); ctx.stroke();
-    ctx.fillStyle = colors3[sp2];
-    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI*2); ctx.fill();
+  var ang=tick*0.02;
+  ctx.strokeStyle='#6b7280'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,-s*0.52,s*0.18,0,Math.PI*2); ctx.stroke();
+  for(var sp=0;sp<6;sp++){
+    var a=ang+sp*Math.PI/3;
+    ctx.beginPath(); ctx.moveTo(0,-s*0.52); ctx.lineTo(Math.cos(a)*s*0.18,-s*0.52+Math.sin(a)*s*0.18); ctx.stroke();
+    ctx.fillStyle='#f87171'; ctx.fillRect(Math.cos(a)*s*0.18-3,-s*0.52+Math.sin(a)*s*0.18-3,6,6);
   }
 };
 
-// ── BANK ─────────────────────────────────────────────────────
 GameRenderer.prototype._sBank = function(ctx, s, level, tick) {
-  // Grand base/steps
-  ctx.fillStyle = '#cbd5e1'; ctx.fillRect(-s*0.48, -s*0.06, s*0.96, s*0.06);
-  ctx.fillStyle = '#e2e8f0'; ctx.fillRect(-s*0.44, -s*0.1, s*0.88, s*0.04);
-
-  // Main building
-  this._isoBox(ctx, -s*0.42, -s*0.7, s*0.84, s*0.64, 220, 10, 90);
-  // Pediment/classical roof
-  ctx.fillStyle = '#f1f5f9';
-  ctx.beginPath(); ctx.moveTo(-s*0.46, -s*0.7); ctx.lineTo(0, -s*0.94); ctx.lineTo(s*0.46, -s*0.7); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.stroke();
-  // Pediment detail
-  ctx.fillStyle = '#e2e8f0';
-  ctx.beginPath(); ctx.moveTo(-s*0.3, -s*0.7); ctx.lineTo(0, -s*0.86); ctx.lineTo(s*0.3, -s*0.7); ctx.closePath(); ctx.fill();
-
-  // Columns
-  for (var cp2 = 0; cp2 < 5; cp2++) {
-    var cxp = -s*0.36 + cp2*s*0.18;
-    this._isoBox(ctx, cxp, -s*0.64, s*0.06, s*0.58, 220, 8, 85);
-    // Capital
-    ctx.fillStyle = '#e2e8f0'; ctx.fillRect(cxp - 2, -s*0.64, s*0.06+4, s*0.03);
-  }
-
-  // Main door
-  ctx.fillStyle = '#1e3a5f';
-  ctx.beginPath(); ctx.roundRect(-s*0.1, -s*0.38, s*0.2, s*0.32, [8,8,0,0]); ctx.fill();
-  // Door details
-  ctx.strokeStyle = '#c8a135'; ctx.lineWidth = 1.5;
-  ctx.strokeRect(-s*0.08, -s*0.36, s*0.16, s*0.28);
-  ctx.beginPath(); ctx.arc(0, -s*0.1, s*0.06, Math.PI, 0); ctx.stroke();
-
-  // Glowing $ sign
-  var gl2 = 0.7 + 0.3*Math.sin(tick*0.08);
-  ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 18*gl2;
-  ctx.fillStyle = 'hsl(45,100%,' + (55+gl2*15) + '%)';
-  ctx.font = 'bold 20px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('$', 0, -s*0.52);
-  ctx.shadowBlur = 0;
-
-  // Security camera blink
-  var bl = Math.floor(tick/30)%2===0;
-  ctx.fillStyle = bl ? '#ef4444' : '#374151';
-  ctx.beginPath(); ctx.arc(s*0.38, -s*0.54, 3, 0, Math.PI*2); ctx.fill();
+  this._box(ctx,-s*0.44,-s*0.64,s*0.88,s*0.64,'#f8fafc','#e2e8f0','#cbd5e1');
+  ctx.fillStyle='#94a3b8'; for(var p=0;p<5;p++) ctx.fillRect(-s*0.38+p*s*0.19,-s*0.56,7,s*0.44);
+  ctx.fillStyle='#e2e8f0'; ctx.beginPath(); ctx.moveTo(-s*0.46,-s*0.64); ctx.lineTo(0,-s*0.88); ctx.lineTo(s*0.46,-s*0.64); ctx.closePath(); ctx.fill();
+  var gl=0.7+0.3*Math.sin(tick*0.08);
+  ctx.fillStyle='rgba(250,204,21,'+gl+')'; ctx.font='bold 18px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('$',0,-s*0.36);
 };
 
-// ── HOSPITAL ─────────────────────────────────────────────────
 GameRenderer.prototype._sHospital = function(ctx, s, level, tick) {
-  // Main building - white
-  this._isoBox(ctx, -s*0.42, -s*0.64, s*0.84, s*0.64, 150, 20, 95);
-  // Roof
-  ctx.fillStyle = '#dcfce7'; ctx.fillRect(-s*0.44, -s*0.66, s*0.88, s*0.04);
-
-  // Wings
-  this._isoBox(ctx, -s*0.44, -s*0.44, s*0.12, s*0.44, 150, 15, 90);
-  this._isoBox(ctx, s*0.32, -s*0.44, s*0.12, s*0.44, 150, 15, 90);
-
-  // Large red cross
-  ctx.fillStyle = '#dc2626';
-  ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 6;
-  ctx.fillRect(-s*0.05, -s*0.58, s*0.1, s*0.28);
-  ctx.fillRect(-s*0.15, -s*0.48, s*0.3, s*0.1);
-  ctx.shadowBlur = 0;
-
-  // Windows - alternating lights
-  var wpos = [[-s*0.32,-s*0.58],[-s*0.16,-s*0.58],[s*0.1,-s*0.58],[s*0.26,-s*0.58],
-              [-s*0.32,-s*0.44],[-s*0.16,-s*0.44],[s*0.1,-s*0.44],[s*0.26,-s*0.44]];
-  wpos.forEach(function(wp, i) {
-    var on2 = Math.floor(tick/40+i)%2===0;
-    ctx.fillStyle = on2 ? '#fef9c3' : 'rgba(186,230,253,0.7)';
-    if (on2) { ctx.shadowColor = '#fef08a'; ctx.shadowBlur = 4; }
-    ctx.fillRect(wp[0], wp[1], s*0.1, s*0.1);
-    ctx.shadowBlur = 0;
-  });
-
-  // Entrance canopy
-  ctx.fillStyle = '#16a34a';
-  ctx.fillRect(-s*0.18, -s*0.28, s*0.36, s*0.04);
-  ctx.fillStyle = '#166534'; ctx.fillRect(-s*0.14, -s*0.28, s*0.04, s*0.04);
-  ctx.fillRect(s*0.1, -s*0.28, s*0.04, s*0.04);
-  // Doors
-  ctx.fillStyle = 'rgba(186,230,253,0.5)';
-  ctx.fillRect(-s*0.12, -s*0.28, s*0.1, s*0.28);
-  ctx.fillRect(s*0.02, -s*0.28, s*0.1, s*0.28);
-
-  // Helicopter pad sign on roof
-  ctx.fillStyle = '#15803d';
-  ctx.beginPath(); ctx.arc(0, -s*0.68, s*0.06, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 6px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('H', 0, -s*0.68);
+  this._box(ctx,-s*0.4,-s*0.6,s*0.8,s*0.6,'#f0fdf4','#dcfce7','#bbf7d0');
+  ctx.fillStyle='#ef4444'; ctx.fillRect(-s*0.04,-s*0.5,s*0.08,s*0.22); ctx.fillRect(-s*0.12,-s*0.42,s*0.24,s*0.08);
+  var lo=Math.floor(tick/30)%2===0;
+  ctx.fillStyle=lo?'rgba(255,250,150,.9)':'rgba(186,230,253,.7)';
+  [[-s*0.28,-s*0.5],[-s*0.28,-s*0.36],[s*0.16,-s*0.5],[s*0.16,-s*0.36]].forEach(function(w){ctx.fillRect(w[0],w[1],s*0.1,s*0.1);});
+  ctx.strokeStyle='#22c55e'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,-s*0.64,s*0.12,0,Math.PI*2); ctx.stroke();
+  ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#22c55e'; ctx.fillText('H',0,-s*0.64);
 };
 
-// ── LIBRARY ──────────────────────────────────────────────────
 GameRenderer.prototype._sLibrary = function(ctx, s, level, tick) {
-  this._isoBox(ctx, -s*0.44, -s*0.6, s*0.88, s*0.6, 40, 45, 60);
-  // Classic brick texture
-  ctx.fillStyle = 'rgba(0,0,0,0.05)';
-  for (var br = 0; br < 5; br++) {
-    for (var bc = 0; bc < 8; bc++) {
-      if ((br+bc)%2===0) ctx.fillRect(-s*0.42+bc*s*0.1, -s*0.56+br*s*0.1, s*0.1, s*0.1);
-    }
-  }
-  // Pediment
-  ctx.fillStyle = '#d4a26a';
-  ctx.beginPath(); ctx.moveTo(-s*0.46, -s*0.6); ctx.lineTo(0, -s*0.82); ctx.lineTo(s*0.46, -s*0.6); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#b8864e';
-  ctx.beginPath(); ctx.moveTo(-s*0.28, -s*0.6); ctx.lineTo(0, -s*0.74); ctx.lineTo(s*0.28, -s*0.6); ctx.closePath(); ctx.fill();
-  // Arched windows
-  for (var lw = 0; lw < 3; lw++) {
-    var lwx = -s*0.3+lw*s*0.3;
-    ctx.fillStyle = 'rgba(186,230,253,0.75)';
-    ctx.beginPath(); ctx.arc(lwx+s*0.08, -s*0.44, s*0.08, Math.PI, 0); ctx.rect(lwx, -s*0.44, s*0.16, s*0.24); ctx.fill();
-    ctx.strokeStyle = '#b8864e'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(lwx+s*0.08, -s*0.44, s*0.08, Math.PI, 0); ctx.stroke();
-    ctx.strokeRect(lwx, -s*0.44, s*0.16, s*0.24);
-  }
-  // Floating books
-  var by2 = Math.abs(Math.sin(tick*0.04))*s*0.08;
-  ctx.font = '13px Arial'; ctx.textAlign='center';
-  ctx.fillText('📚', 0, -s*0.82 - by2);
-  // Door
-  ctx.fillStyle = '#78350f';
-  ctx.beginPath(); ctx.roundRect(-s*0.1, -s*0.34, s*0.2, s*0.34, [6,6,0,0]); ctx.fill();
-  ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 1; ctx.strokeRect(-s*0.08, -s*0.32, s*0.16, s*0.3);
+  this._box(ctx,-s*0.42,-s*0.58,s*0.84,s*0.58,'#fef3c7','#fde68a','#f59e0b');
+  [[-s*0.3,-s*0.5],[-s*0.08,-s*0.5],[s*0.14,-s*0.5]].forEach(function(w){
+    ctx.fillStyle='rgba(186,230,253,.8)'; ctx.beginPath(); ctx.arc(w[0]+s*0.07,w[1],s*0.08,Math.PI,0); ctx.rect(w[0],w[1],s*0.14,s*0.12); ctx.fill();
+  });
+  var by=s*0.12*Math.abs(Math.sin(tick*0.04));
+  ctx.font='12px Arial'; ctx.textAlign='center'; ctx.fillText('📚',0,-s*0.68-by);
 };
 
-// ── STADIUM ──────────────────────────────────────────────────
 GameRenderer.prototype._sStadium = function(ctx, s, level, tick) {
-  // Outer bowl
-  var og = ctx.createRadialGradient(0, -s*0.2, s*0.2, 0, -s*0.2, s*0.52);
-  og.addColorStop(0, '#374151'); og.addColorStop(1, '#1f2937');
-  ctx.fillStyle = og;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.2, s*0.52, s*0.28, 0, 0, Math.PI*2); ctx.fill();
-  // Stadium tiers - colored seating
-  var tierColors = ['#dc2626','#1d4ed8','#dc2626','#1d4ed8'];
-  for (var tier = 0; tier < 4; tier++) {
-    ctx.fillStyle = tierColors[tier];
-    ctx.beginPath(); ctx.ellipse(0, -s*0.2, s*(0.48-tier*0.06), s*(0.24-tier*0.03), 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(0, -s*0.2, s*(0.42-tier*0.06), s*(0.21-tier*0.03), 0, 0, Math.PI*2); ctx.fill();
-  }
-  // Field
-  var fg3 = ctx.createRadialGradient(0, -s*0.2, 0, 0, -s*0.2, s*0.2);
-  fg3.addColorStop(0, '#16a34a'); fg3.addColorStop(1, '#15803d');
-  ctx.fillStyle = fg3;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.2, s*0.2, s*0.1, 0, 0, Math.PI*2); ctx.fill();
-  // Field lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.2, s*0.1, s*0.05, 0, 0, Math.PI*2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, -s*0.3); ctx.lineTo(0, -s*0.1); ctx.stroke();
-  // Floodlights
-  [[-s*0.5,-s*0.56],[s*0.5,-s*0.56]].forEach(function(l) {
-    ctx.fillStyle = '#6b7280'; ctx.fillRect(l[0]-2, l[1], 4, s*0.4);
-    var lg2 = 0.7+0.3*Math.sin(tick*0.1);
-    ctx.shadowColor = '#fef9c3'; ctx.shadowBlur = 20*lg2;
-    ctx.fillStyle = 'rgba(255,250,200,'+lg2+')';
-    ctx.beginPath(); ctx.arc(l[0], l[1], 7, 0, Math.PI*2); ctx.fill();
-    ctx.shadowBlur = 0;
+  ctx.fillStyle='#374151'; ctx.beginPath(); ctx.ellipse(0,-s*0.18,s*0.46,s*0.26,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#4b5563'; ctx.beginPath(); ctx.ellipse(0,-s*0.18,s*0.35,s*0.18,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#15803d'; ctx.beginPath(); ctx.ellipse(0,-s*0.18,s*0.26,s*0.12,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(0,-s*0.18,s*0.1,s*0.06,0,0,Math.PI*2); ctx.stroke();
+  [[-s*0.44,-s*0.54],[s*0.44,-s*0.54]].forEach(function(l){
+    ctx.fillStyle='#9ca3af'; ctx.fillRect(l[0]-2,l[1],4,s*0.38);
+    var lg=0.6+0.4*Math.sin(tick*0.1);
+    ctx.fillStyle='rgba(255,250,150,'+lg+')'; ctx.beginPath(); ctx.arc(l[0],l[1],8,0,Math.PI*2); ctx.fill();
   });
-  // Crowd celebration
-  if (Math.floor(tick/15)%4===0) {
-    ctx.font = '9px Arial'; ctx.textAlign='center';
-    ctx.fillText('🎉', Math.sin(tick*0.2)*s*0.3, -s*0.42);
-    ctx.fillText('🎊', Math.cos(tick*0.15)*s*0.25, -s*0.48);
-  }
+  if(Math.floor(tick/20)%3===0){ctx.font='9px Arial'; ctx.textAlign='center'; ctx.fillText('🎉',s*Math.sin(tick*0.15)*0.2,-s*0.48);}
 };
 
-// ── CRYSTAL MINE ─────────────────────────────────────────────
 GameRenderer.prototype._sCrystalMine = function(ctx, s, level, tick) {
-  // Ground / rocky base
-  var bg3 = ctx.createRadialGradient(0, 0, 0, 0, 0, s*0.44);
-  bg3.addColorStop(0, '#3b1f6e'); bg3.addColorStop(1, '#1f1035');
-  ctx.fillStyle = bg3;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.04, s*0.44, s*0.14, 0, 0, Math.PI*2); ctx.fill();
-
   // Mine entrance arch
-  ctx.fillStyle = '#374151';
-  ctx.beginPath(); ctx.arc(0, -s*0.22, s*0.28, Math.PI, 0); ctx.rect(-s*0.28, -s*0.22, s*0.56, s*0.22); ctx.fill();
-  // Arch bricks
-  ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 1;
-  for (var ab = 0; ab < 8; ab++) {
-    var aa = Math.PI + ab * Math.PI/8;
-    ctx.beginPath(); ctx.moveTo(Math.cos(aa)*s*0.28, -s*0.22+Math.sin(aa)*s*0.28);
-    ctx.lineTo(Math.cos(aa)*s*0.24, -s*0.22+Math.sin(aa)*s*0.24); ctx.stroke();
-  }
-  // Dark interior with glow
-  ctx.fillStyle = '#0f0720';
-  ctx.beginPath(); ctx.arc(0, -s*0.22, s*0.22, Math.PI, 0); ctx.rect(-s*0.22, -s*0.22, s*0.44, s*0.22); ctx.fill();
-  // Interior purple glow
-  var gp = 0.3 + 0.2*Math.sin(tick*0.08);
-  var ig = ctx.createRadialGradient(0, -s*0.14, 0, 0, -s*0.14, s*0.18);
-  ig.addColorStop(0, 'rgba(167,139,250,'+gp+')'); ig.addColorStop(1, 'rgba(109,40,217,0)');
-  ctx.fillStyle = ig;
-  ctx.beginPath(); ctx.arc(0, -s*0.22, s*0.22, Math.PI, 0); ctx.rect(-s*0.22, -s*0.22, s*0.44, s*0.22); ctx.fill();
-
-  // Crystals emerging from mine entrance
-  var crystalData = [[-0.16,-0.54,0.1],[0.0,-0.68,0.13],[0.18,-0.56,0.1],[-0.06,-0.46,0.08],[0.1,-0.44,0.07]];
-  crystalData.forEach(function(c3, i) {
-    var pha2 = tick*0.06+i*1.2;
-    var cp2 = 0.8+0.2*Math.sin(pha2);
-    ctx.save(); ctx.translate(s*c3[0], s*c3[1]); ctx.rotate(Math.sin(pha2*0.7)*0.08);
-    // Glow
-    ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 14*cp2;
-    // Crystal body
-    var cg2 = ctx.createLinearGradient(-s*c3[2]*0.5, 0, s*c3[2]*0.5, s*c3[2]);
-    cg2.addColorStop(0, '#c4b5fd'); cg2.addColorStop(0.4, '#8b5cf6'); cg2.addColorStop(1, '#4c1d95');
-    ctx.fillStyle = cg2;
-    ctx.beginPath();
-    ctx.moveTo(0, -s*c3[2]*1.6); ctx.lineTo(s*c3[2]*0.55, 0); ctx.lineTo(0, s*c3[2]*0.55); ctx.lineTo(-s*c3[2]*0.55, 0);
-    ctx.closePath(); ctx.fill();
-    // Highlight facet
-    ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    ctx.beginPath(); ctx.moveTo(0,-s*c3[2]*1.6); ctx.lineTo(s*c3[2]*0.25,0); ctx.lineTo(0,-s*c3[2]*0.4); ctx.closePath(); ctx.fill();
-    ctx.shadowBlur = 0; ctx.restore();
+  ctx.fillStyle='#374151'; ctx.beginPath(); ctx.arc(0,-s*0.2,s*0.28,Math.PI,0); ctx.rect(-s*0.28,-s*0.2,s*0.56,s*0.22); ctx.fill();
+  ctx.fillStyle='#1f2937'; ctx.beginPath(); ctx.arc(0,-s*0.2,s*0.2,Math.PI,0); ctx.rect(-s*0.2,-s*0.2,s*0.4,s*0.2); ctx.fill();
+  // Crystals
+  var cp=0.8+0.2*Math.sin(tick*0.1);
+  [[-.18,-.52,.09],[-.04,-.65,.12],[.14,-.55,.1]].forEach(function(c,i){
+    var pha=tick*0.08+i*0.8;
+    ctx.save(); ctx.translate(s*c[0],s*c[1]); ctx.rotate(Math.sin(pha)*0.05);
+    ctx.shadowColor='#a78bfa'; ctx.shadowBlur=8*cp;
+    ctx.fillStyle='#8b5cf6'; ctx.beginPath();
+    ctx.moveTo(0,-s*c[2]*1.4); ctx.lineTo(s*c[2]*0.5,0); ctx.lineTo(0,s*c[2]*0.5); ctx.lineTo(-s*c[2]*0.5,0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#c4b5fd'; ctx.beginPath(); ctx.moveTo(0,-s*c[2]*1.4); ctx.lineTo(s*c[2]*0.2,0); ctx.lineTo(0,-s*c[2]*0.5); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur=0; ctx.restore();
   });
-
-  // Minecart track
-  ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(-s*0.28, 0); ctx.lineTo(-s*0.24, -s*0.12); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(s*0.28, 0); ctx.lineTo(s*0.24, -s*0.12); ctx.stroke();
-  for (var tr2 = 0; tr2 < 5; tr2++) {
-    var tx3 = -s*0.26 + tr2*s*0.13;
-    ctx.beginPath(); ctx.moveTo(tx3, -tr2*s*0.024); ctx.lineTo(tx3+s*0.02, -s*0.12+tr2*s*0.024); ctx.stroke();
-  }
 };
 
-// ── ARCANE TOWER ─────────────────────────────────────────────
 GameRenderer.prototype._sArcaneTower = function(ctx, s, level, tick) {
-  // Stone base
-  this._isoBox(ctx, -s*0.3, -s*0.2, s*0.6, s*0.2, 270, 20, 25);
-  // Base decoration - runes
-  var rp2 = 0.5 + 0.5*Math.sin(tick*0.05);
-  ctx.fillStyle = 'rgba(167,139,250,' + rp2 + ')';
-  for (var r2 = 0; r2 < 4; r2++) {
-    var ra = tick*0.03 + r2*Math.PI/2;
-    ctx.beginPath(); ctx.arc(Math.cos(ra)*s*0.22, -s*0.1+Math.sin(ra)*s*0.06, 2, 0, Math.PI*2); ctx.fill();
-  }
-
-  // Tower body - tapered
-  var tg3 = ctx.createLinearGradient(-s*0.22, -s*0.2, s*0.22, 0);
-  tg3.addColorStop(0, '#5b21b6'); tg3.addColorStop(1, '#7c3aed');
-  ctx.fillStyle = tg3;
-  ctx.beginPath();
-  ctx.moveTo(-s*0.22, -s*0.2); ctx.lineTo(-s*0.14, -s*0.82); ctx.lineTo(s*0.14, -s*0.82); ctx.lineTo(s*0.22, -s*0.2);
-  ctx.closePath(); ctx.fill();
-  // Tower edge highlights
-  ctx.strokeStyle = 'rgba(196,181,253,0.4)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(-s*0.22,-s*0.2); ctx.lineTo(-s*0.14,-s*0.82); ctx.stroke();
-
-  // Tower windows - magical glow
-  var winGlow = 0.7+0.3*Math.sin(tick*0.12);
-  [[0,-s*0.44],[0,-s*0.6]].forEach(function(wp2, i) {
-    ctx.shadowColor = '#c4b5fd'; ctx.shadowBlur = 12*winGlow;
-    ctx.fillStyle = 'rgba(196,181,253,' + winGlow + ')';
-    ctx.beginPath(); ctx.arc(wp2[0], wp2[1], s*0.05, 0, Math.PI*2); ctx.fill();
-    ctx.shadowBlur = 0;
-  });
-
-  // Conical roof with stars
-  var roofG = ctx.createLinearGradient(-s*0.18, -s*0.82, s*0.18, -s*1.14);
-  roofG.addColorStop(0, '#4c1d95'); roofG.addColorStop(1, '#2e1065');
-  ctx.fillStyle = roofG;
-  ctx.beginPath(); ctx.moveTo(-s*0.18,-s*0.82); ctx.lineTo(0,-s*1.14); ctx.lineTo(s*0.18,-s*0.82); ctx.closePath(); ctx.fill();
-  // Roof stars
-  ctx.fillStyle = '#fef3c7';
-  [[s*0.06,-s*0.92],[- s*0.06,-s*0.98],[s*0.02,-s*1.04]].forEach(function(st) {
-    ctx.beginPath(); ctx.arc(st[0], st[1], 1.5, 0, Math.PI*2); ctx.fill();
-  });
-
-  // Orbiting magic orb
-  var op3 = 0.5+0.5*Math.sin(tick*0.1);
-  ctx.shadowColor = '#c4b5fd'; ctx.shadowBlur = 20*op3;
-  ctx.fillStyle = 'rgba(167,139,250,' + (0.8+0.2*op3) + ')';
-  ctx.beginPath(); ctx.arc(0, -s*1.14, s*0.1, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#ede9fe';
-  ctx.beginPath(); ctx.arc(-s*0.03, -s*1.18, s*0.04, 0, Math.PI*2); ctx.fill();
-  ctx.shadowBlur = 0;
-
-  // 3 orbiting particles
-  for (var op4 = 0; op4 < 3; op4++) {
-    var oa2 = tick*0.1 + op4*Math.PI*2/3;
-    ctx.fillStyle = 'rgba(196,181,253,0.9)';
-    ctx.beginPath(); ctx.arc(Math.cos(oa2)*s*0.24, -s*0.84+Math.sin(oa2)*s*0.1, 3, 0, Math.PI*2); ctx.fill();
+  this._box(ctx,-s*0.22,-s*0.18,s*0.44,s*0.18,'#4c1d95','#6d28d9','#5b21b6');
+  ctx.fillStyle='#7c3aed'; ctx.beginPath();
+  ctx.moveTo(-s*0.22,-s*0.18); ctx.lineTo(-s*0.15,-s*0.76); ctx.lineTo(s*0.15,-s*0.76); ctx.lineTo(s*0.22,-s*0.18); ctx.closePath(); ctx.fill();
+  var op=0.5+0.5*Math.sin(tick*0.1);
+  ctx.shadowColor='#c4b5fd'; ctx.shadowBlur=16*op;
+  ctx.fillStyle='#a78bfa'; ctx.beginPath(); ctx.arc(0,-s*0.84,s*0.12,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ede9fe'; ctx.beginPath(); ctx.arc(-s*0.04,-s*0.88,s*0.05,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  for(var op2=0;op2<3;op2++){
+    var oa=tick*0.1+op2*Math.PI*2/3;
+    ctx.fillStyle='rgba(196,181,253,.85)'; ctx.beginPath(); ctx.arc(Math.cos(oa)*s*0.22,-s*0.84+Math.sin(oa)*s*0.1,3,0,Math.PI*2); ctx.fill();
   }
 };
-
 
 // ─── Threat drawing ──────────────────────────────────────────
 //  tx,ty = top corner of the tile
