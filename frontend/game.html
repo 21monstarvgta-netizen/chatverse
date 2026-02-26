@@ -118,7 +118,17 @@
         <h3>📋 Квесты</h3>
         <button class="panel-close" id="close-quests-panel">✕</button>
       </div>
-      <div class="quests-list" id="quests-list"></div>
+      <!-- Quest tabs -->
+      <div class="quest-tabs">
+        <button class="quest-tab active" id="tab-story-quests" onclick="game && game.ui.switchQuestTab('story')">📜 История</button>
+        <button class="quest-tab" id="tab-daily-quests" onclick="game && game.ui.switchQuestTab('daily')">🌅 Ежедневные<span class="daily-badge hidden" id="daily-badge">!</span></button>
+      </div>
+      <div id="quest-story-section">
+        <div class="quests-list" id="quests-list"></div>
+      </div>
+      <div id="quest-daily-section" class="hidden">
+        <div id="daily-quests-list"></div>
+      </div>
     </div>
 
     <!-- Social Panel -->
@@ -205,6 +215,77 @@
     <div class="visit-banner hidden" id="visit-banner">
       <span id="visit-banner-text">Просмотр города</span>
       <button class="btn btn-secondary btn-sm" id="visit-back">← Мой город</button>
+    </div>
+  </div>
+
+  <!-- Visit Building Info Popup -->
+  <div class="zone-unlock-modal hidden" id="visit-building-modal">
+    <div class="zone-unlock-content" style="max-width:320px;">
+      <div style="font-size:36px;text-align:center;margin-bottom:8px;" id="visit-bld-emoji">🏠</div>
+      <h3 style="text-align:center;margin:0 0 4px;" id="visit-bld-name">Здание</h3>
+      <div style="text-align:center;color:var(--text-muted);font-size:12px;margin-bottom:12px;" id="visit-bld-owner"></div>
+      <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:12px;" id="visit-bld-info"></div>
+      <button class="btn btn-secondary btn-sm" style="width:100%;" onclick="document.getElementById('visit-building-modal').classList.add('hidden')">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- Admin Panel Modal -->
+  <div class="zone-unlock-modal hidden" id="admin-panel-modal">
+    <div class="zone-unlock-content" style="max-width:420px;max-height:80vh;overflow-y:auto;">
+      <div class="panel-header" style="margin-bottom:12px;">
+        <h3>⚙️ Панель администратора</h3>
+        <button class="panel-close" onclick="document.getElementById('admin-panel-modal').classList.add('hidden')">✕</button>
+      </div>
+
+      <!-- Create daily quest -->
+      <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:14px;margin-bottom:14px;">
+        <h4 style="margin:0 0 10px;color:#fbbf24;">🌅 Создать ежедневный квест</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <input type="text" id="adm-title" placeholder="Название квеста" class="game-input" />
+          <input type="text" id="adm-desc" placeholder="Описание (напр: Постройте 2 фермы)" class="game-input" />
+          <select id="adm-type" class="game-input">
+            <option value="build">Построить здание</option>
+            <option value="collect">Собрать ресурс</option>
+            <option value="upgrade">Улучшить здание</option>
+            <option value="spend">Потратить ресурс</option>
+            <option value="unlock_zone">Открыть зону</option>
+            <option value="reach_population">Достичь население</option>
+          </select>
+          <input type="text" id="adm-target" placeholder="Цель: farm / coins / any / zone" class="game-input" />
+          <input type="number" id="adm-count" placeholder="Количество (напр: 3)" class="game-input" min="1" />
+          <div style="color:var(--text-muted);font-size:11px;margin-top:2px;">Награда:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+            <input type="number" id="adm-r-coins" placeholder="🪙 Монеты" class="game-input" min="0" />
+            <input type="number" id="adm-r-food" placeholder="🍞 Еда" class="game-input" min="0" />
+            <input type="number" id="adm-r-materials" placeholder="🪨 Матер." class="game-input" min="0" />
+            <input type="number" id="adm-r-crystals" placeholder="💎 Крист." class="game-input" min="0" />
+            <input type="number" id="adm-r-exp" placeholder="✨ Опыт" class="game-input" min="0" />
+          </div>
+          <button class="btn btn-primary btn-sm" style="width:100%;" onclick="game && game.adminCreateDailyQuest()">✅ Создать квест (24ч)</button>
+        </div>
+      </div>
+
+      <!-- Existing daily quests management -->
+      <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:14px;margin-bottom:14px;">
+        <h4 style="margin:0 0 10px;color:#fbbf24;">📋 Активные ежедневные квесты</h4>
+        <div id="adm-daily-list"><div style="color:var(--text-muted);font-size:12px;">Загрузка...</div></div>
+      </div>
+
+      <!-- Set currency (existing) -->
+      <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:14px;">
+        <h4 style="margin:0 0 10px;color:#fbbf24;">💰 Изменить валюту игроку</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <input type="text" id="adm-username" placeholder="Имя игрока" class="game-input" />
+          <select id="adm-currency" class="game-input">
+            <option value="coins">🪙 Монеты</option>
+            <option value="food">🍞 Еда</option>
+            <option value="materials">🪨 Материалы</option>
+            <option value="crystals">💎 Кристаллы</option>
+          </select>
+          <input type="number" id="adm-amount" placeholder="Количество" class="game-input" min="0" />
+          <button class="btn btn-primary btn-sm" style="width:100%;" onclick="game && game.adminSetCurrency()">Применить</button>
+        </div>
+      </div>
     </div>
   </div>
 

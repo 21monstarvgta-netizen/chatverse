@@ -59,6 +59,23 @@ Game.prototype.init = async function() {
       self.renderer.setThreats(self.player.activeThreats);
     }
 
+    // Show admin button for YasheNJO
+    var currentUser = getUser();
+    if (currentUser && currentUser.username === 'YasheNJO') {
+      var adminBtn = document.getElementById('admin-open-btn');
+      if (!adminBtn) {
+        adminBtn = document.createElement('button');
+        adminBtn.id = 'admin-open-btn';
+        adminBtn.title = 'Панель администратора';
+        adminBtn.textContent = '⚙️ Админ';
+        adminBtn.style.cssText = 'position:fixed;top:10px;right:10px;z-index:2000;' +
+          'background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:6px 12px;' +
+          'font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);';
+        adminBtn.addEventListener('click', function() { self.openAdminPanel(); });
+        document.body.appendChild(adminBtn);
+      }
+    }
+
     console.log('Game loaded. Tiles:', Object.keys(self.renderer.unlockedTiles).length,
       'Canvas:', self.renderer.canvasWidth, 'x', self.renderer.canvasHeight);
 
@@ -243,7 +260,7 @@ Game.prototype.startTimerUpdates = function() {
 };
 
 Game.prototype.onTileClick = function(x, y) {
-  if (this.visitingUserId) return;
+  if (this.visitingUserId) { this.onTileClickVisit(x, y); return; }
   // Check threat click first
   if (this.threatManager && this.threatManager.handleTileClick(x, y)) return;
 
@@ -762,6 +779,161 @@ Game.prototype.normalizeTerritory = async function() {
   } catch (e) {
     this.showNotification('Ошибка нормализации: ' + e.message, 'error');
   }
+};
+
+
+// ── Daily quests ─────────────────────────────────────────────
+Game.prototype.loadDailyQuests = async function() {
+  try {
+    var data = await apiRequest('/game/daily-quests');
+    this.ui.renderDailyQuests(data.dailyQuests || []);
+  } catch (e) {
+    showToast('Ошибка загрузки ежедневных квестов', 'error');
+  }
+};
+
+Game.prototype.claimDailyQuest = async function(questId) {
+  try {
+    var data = await apiRequest('/game/daily-quest/claim/' + questId, { method: 'POST' });
+    if (data.success) {
+      this.player = data.player;
+      this.ui.renderQuests(this.player.activeQuests);
+      this.updateRendererState();
+      var rStr = this._rewardToStr(data.reward);
+      showToast('🎁 Награда получена!' + (rStr ? ' ' + rStr : ''), 'success');
+      await this.loadDailyQuests();
+    }
+  } catch (e) { showToast(e.message, 'error'); }
+};
+
+Game.prototype._rewardToStr = function(reward) {
+  if (!reward) return '';
+  return Object.keys(reward).filter(function(k) { return reward[k] > 0; }).map(function(k) {
+    var ic = { coins:'🪙',food:'🍞',materials:'🪨',crystals:'💎',experience:'✨' }[k] || k;
+    return ic + reward[k];
+  }).join(' ');
+};
+
+// ── Visit: click building in neighbor city ──────────────────
+Game.prototype.onTileClickVisit = async function(x, y) {
+  if (!this.visitingUserId) return;
+  try {
+    var data = await apiRequest('/game/visit/' + this.visitingUserId + '/building?x=' + x + '&y=' + y);
+    var b = data.building;
+    var cfg = this.config.buildingTypes;
+    var bt = (cfg && cfg[b.type]) || { emoji: '🏠', name: b.type, maxLevel: '?' };
+    var modal = document.getElementById('visit-building-modal');
+    document.getElementById('visit-bld-emoji').textContent = bt.emoji || '🏠';
+    document.getElementById('visit-bld-name').textContent = bt.name || b.type;
+    document.getElementById('visit-bld-owner').textContent =
+      '🏙 ' + escapeHTML(data.cityName) + ' — ' + escapeHTML(data.ownerName);
+    var icons = { coins:'🪙',food:'🍞',materials:'🪨',energy:'⚡',population:'👥',experience:'✨',crystals:'💎',storage:'📦' };
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px;">';
+    html += '<div>📊 Уровень</div><div><b>' + b.level + ' / ' + (bt.maxLevel || '?') + '</b></div>';
+    if (bt.baseOutput) {
+      Object.keys(bt.baseOutput).forEach(function(r) {
+        var actual = Math.floor(bt.baseOutput[r] * Math.pow(1.18, b.level - 1));
+        html += '<div>' + (icons[r] || r) + ' ' + r + '</div><div><b>+' + actual + '</b> / цикл</div>';
+      });
+    }
+    html += '</div>';
+    document.getElementById('visit-bld-info').innerHTML = html;
+    modal.classList.remove('hidden');
+  } catch (e) { /* No building here — silent */ }
+};
+
+// ── Admin panel ──────────────────────────────────────────────
+Game.prototype.openAdminPanel = async function() {
+  var modal = document.getElementById('admin-panel-modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  await this.adminLoadDailyQuests();
+};
+
+Game.prototype.adminLoadDailyQuests = async function() {
+  var listEl = document.getElementById('adm-daily-list');
+  if (!listEl) return;
+  try {
+    var data = await apiRequest('/game/admin/daily-quests');
+    var quests = data.quests || [];
+    if (!quests.length) {
+      listEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:12px;">Нет квестов</div>';
+      return;
+    }
+    var now = Date.now();
+    listEl.innerHTML = quests.map(function(q) {
+      var expired = new Date(q.expiresAt) < now || !q.active;
+      var rem = Math.max(0, new Date(q.expiresAt) - now);
+      var hrs = Math.floor(rem / 3600000), mins = Math.floor((rem % 3600000) / 60000);
+      var timeStr = expired ? '⛔ Истёк' : '⏰ ' + hrs + 'ч ' + mins + 'м';
+      return '<div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:8px;margin-bottom:6px;">' +
+        '<div style="display:flex;justify-content:space-between;">' +
+          '<b style="font-size:13px;">' + escapeHTML(q.title) + '</b>' +
+          '<span style="font-size:11px;color:' + (expired ? '#ef4444' : '#22c55e') + ';">' + timeStr + '</span>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);">' + escapeHTML(q.description) + '</div>' +
+        '<div style="font-size:11px;margin-top:2px;">тип: <b>' + q.type + '</b> · цель: <b>' + q.target + '</b> · кол: <b>' + q.count + '</b></div>' +
+        (!expired ? '<button onclick="game&&game.adminDeleteDailyQuest(\'' + q.questId + '\')" ' +
+          'style="margin-top:5px;padding:2px 10px;font-size:11px;background:#ef4444;border:none;border-radius:4px;color:#fff;cursor:pointer;">🗑 Удалить</button>' : '') +
+        '</div>';
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="color:#ef4444;font-size:12px;">Ошибка: ' + e.message + '</div>';
+  }
+};
+
+Game.prototype.adminCreateDailyQuest = async function() {
+  var title  = (document.getElementById('adm-title').value || '').trim();
+  var desc   = (document.getElementById('adm-desc').value || '').trim();
+  var type   = document.getElementById('adm-type').value;
+  var target = (document.getElementById('adm-target').value || '').trim();
+  var count  = parseInt(document.getElementById('adm-count').value) || 0;
+  var reward = {
+    coins:      parseInt(document.getElementById('adm-r-coins').value)     || 0,
+    food:       parseInt(document.getElementById('adm-r-food').value)      || 0,
+    materials:  parseInt(document.getElementById('adm-r-materials').value) || 0,
+    crystals:   parseInt(document.getElementById('adm-r-crystals').value)  || 0,
+    experience: parseInt(document.getElementById('adm-r-exp').value)       || 0
+  };
+  Object.keys(reward).forEach(function(k) { if (!reward[k]) delete reward[k]; });
+  if (!title || !desc || !target || count < 1) { showToast('Заполните все поля', 'error'); return; }
+  try {
+    var data = await apiRequest('/game/admin/daily-quest/create', {
+      method: 'POST',
+      body: JSON.stringify({ title: title, description: desc, type: type, target: target, count: count, reward: reward })
+    });
+    if (data.success) {
+      showToast('✅ Квест создан и разослан всем игрокам!', 'success');
+      ['adm-title','adm-desc','adm-target','adm-count','adm-r-coins',
+       'adm-r-food','adm-r-materials','adm-r-crystals','adm-r-exp'].forEach(function(id) {
+        var el = document.getElementById(id); if (el) el.value = '';
+      });
+      await this.adminLoadDailyQuests();
+    }
+  } catch (e) { showToast(e.message, 'error'); }
+};
+
+Game.prototype.adminDeleteDailyQuest = async function(questId) {
+  if (!confirm('Удалить этот квест?')) return;
+  try {
+    await apiRequest('/game/admin/daily-quest/' + questId, { method: 'DELETE' });
+    showToast('Квест удалён', 'success');
+    await this.adminLoadDailyQuests();
+  } catch (e) { showToast(e.message, 'error'); }
+};
+
+Game.prototype.adminSetCurrency = async function() {
+  var username = (document.getElementById('adm-username').value || '').trim();
+  var currency = document.getElementById('adm-currency').value;
+  var amount   = parseInt(document.getElementById('adm-amount').value);
+  if (!username || isNaN(amount)) { showToast('Заполните поля', 'error'); return; }
+  try {
+    var data = await apiRequest('/game/admin/set-currency', {
+      method: 'POST',
+      body: JSON.stringify({ username: username, currency: currency, amount: amount })
+    });
+    if (data.success) showToast('✅ Ресурс обновлён для ' + username, 'success');
+  } catch (e) { showToast(e.message, 'error'); }
 };
 
 document.addEventListener('DOMContentLoaded', function() {

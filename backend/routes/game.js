@@ -906,4 +906,186 @@ router.post('/admin/set-currency', auth, async function(req, res) {
   }
 });
 
+// ════════════════════════════════════════════════════════════
+//  DAILY QUESTS
+// ════════════════════════════════════════════════════════════
+var DailyQuest = require('../models/DailyQuest');
+
+// Get active daily quests + player progress for each
+router.get('/daily-quests', auth, async function(req, res) {
+  try {
+    var now = new Date();
+    var dailyQuests = await DailyQuest.find({ active: true, expiresAt: { $gt: now } }).sort({ createdAt: -1 });
+    var player = await getOrCreatePlayer(req.userId);
+    var completed = player.completedDailyQuests || [];
+
+    var result = dailyQuests.map(function(dq) {
+      var isClaimed = completed.indexOf(dq.questId) !== -1;
+      // Calculate player's progress for this quest
+      var progress = 0;
+      if (!isClaimed) {
+        var aq = (player.activeQuests || []).find(function(q) { return q.questId === dq.questId; });
+        progress = aq ? (aq.progress || 0) : 0;
+      }
+      return {
+        questId:     dq.questId,
+        title:       dq.title,
+        description: dq.description,
+        type:        dq.type,
+        target:      dq.target,
+        count:       dq.count,
+        reward:      dq.reward,
+        expiresAt:   dq.expiresAt,
+        progress:    isClaimed ? dq.count : progress,
+        claimed:     isClaimed,
+        done:        isClaimed || progress >= dq.count
+      };
+    });
+    res.json({ dailyQuests: result });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+// Claim a daily quest reward
+router.post('/daily-quest/claim/:questId', auth, async function(req, res) {
+  try {
+    var questId = req.params.questId;
+    var now = new Date();
+    var dq = await DailyQuest.findOne({ questId: questId, active: true, expiresAt: { $gt: now } });
+    if (!dq) return res.status(404).json({ error: 'Ежедневный квест не найден или истёк' });
+
+    var player = await getOrCreatePlayer(req.userId);
+    if (!player.completedDailyQuests) player.completedDailyQuests = [];
+    if (player.completedDailyQuests.indexOf(questId) !== -1)
+      return res.status(400).json({ error: 'Награда уже получена' });
+
+    // Check progress in activeQuests
+    var aq = (player.activeQuests || []).find(function(q) { return q.questId === questId; });
+    var progress = aq ? (aq.progress || 0) : 0;
+    if (progress < dq.count) return res.status(400).json({ error: 'Квест ещё не выполнен' });
+
+    // Give reward
+    var maxStorage = logic.calculateMaxStorage(player.buildings);
+    logic.addResources(player.resources, dq.reward, maxStorage);
+    if (dq.reward.experience) {
+      player.experience = (player.experience || 0) + dq.reward.experience;
+      checkLevelUp(player);
+    }
+    player.completedDailyQuests.push(questId);
+    // Remove from activeQuests
+    player.activeQuests = player.activeQuests.filter(function(q) { return q.questId !== questId; });
+    player.markModified('resources'); player.markModified('completedDailyQuests'); player.markModified('activeQuests');
+    await player.save();
+
+    res.json({ success: true, reward: dq.reward, player: getPlayerState(player) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+// ── Admin: create daily quest ─────────────────────────────────
+router.post('/admin/daily-quest/create', auth, async function(req, res) {
+  try {
+    if (!req.user || req.user.username !== 'YasheNJO')
+      return res.status(403).json({ error: 'Доступ запрещён' });
+
+    var { title, description, type, target, count, reward } = req.body;
+    if (!title || !description || !type || !target || !count)
+      return res.status(400).json({ error: 'Заполните все поля' });
+
+    var allowedTypes = ['build','collect','upgrade','spend','unlock_zone','reach_population'];
+    if (allowedTypes.indexOf(type) === -1)
+      return res.status(400).json({ error: 'Неверный тип квеста' });
+
+    var questId = 'daily_' + Date.now();
+    var expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    var dq = new DailyQuest({
+      questId, title, description, type, target,
+      count: parseInt(count),
+      reward: reward || {},
+      createdBy: 'YasheNJO',
+      expiresAt
+    });
+    await dq.save();
+
+    // Push this quest into ALL active players' activeQuests so progress is tracked
+    await pushDailyQuestToAllPlayers(dq);
+
+    res.json({ success: true, quest: dq });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+// Push daily quest to all players who haven't claimed it yet
+async function pushDailyQuestToAllPlayers(dq) {
+  try {
+    var players = await GamePlayer.find({});
+    for (var i = 0; i < players.length; i++) {
+      var p = players[i];
+      if (!p.completedDailyQuests) p.completedDailyQuests = [];
+      if (p.completedDailyQuests.indexOf(dq.questId) !== -1) continue;
+      var alreadyIn = (p.activeQuests || []).some(function(q) { return q.questId === dq.questId; });
+      if (!alreadyIn) {
+        p.activeQuests.push({
+          questId: dq.questId,
+          type: dq.type,
+          target: dq.target,
+          count: dq.count,
+          reward: dq.reward,
+          description: dq.description,
+          progress: 0
+        });
+        p.markModified('activeQuests');
+        await p.save();
+      }
+    }
+  } catch(e) { console.error('pushDailyQuest error:', e); }
+}
+
+// Admin: delete/deactivate a daily quest
+router.delete('/admin/daily-quest/:questId', auth, async function(req, res) {
+  try {
+    if (!req.user || req.user.username !== 'YasheNJO')
+      return res.status(403).json({ error: 'Доступ запрещён' });
+    await DailyQuest.findOneAndUpdate({ questId: req.params.questId }, { active: false });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+// Admin: list all daily quests
+router.get('/admin/daily-quests', auth, async function(req, res) {
+  try {
+    if (!req.user || req.user.username !== 'YasheNJO')
+      return res.status(403).json({ error: 'Доступ запрещён' });
+    var quests = await DailyQuest.find({}).sort({ createdAt: -1 }).limit(50);
+    res.json({ quests });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
+// ── Visit: get building info while visiting neighbor ──────────
+router.get('/visit/:userId/building', auth, async function(req, res) {
+  try {
+    var User = require('../models/User');
+    var targetUser = await User.findById(req.params.userId);
+    if (!targetUser) return res.status(404).json({ error: 'Игрок не найден' });
+    var player = await GamePlayer.findOne({ userId: targetUser._id });
+    if (!player) return res.status(404).json({ error: 'Нет данных' });
+
+    var x = parseInt(req.query.x), y = parseInt(req.query.y);
+    var building = (player.buildings || []).find(function(b) { return b.x === x && b.y === y; });
+    if (!building) return res.status(404).json({ error: 'Нет здания на этой клетке' });
+
+    res.json({ building: building, cityName: player.cityName, ownerName: targetUser.username });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
 module.exports = router;

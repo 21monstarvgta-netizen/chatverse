@@ -66,52 +66,124 @@ GameUI.prototype.renderBuildList = function(buildingTypes, playerLevel, resource
   });
 };
 
+// ── helper to build reward string ───────────────────────────
+GameUI.prototype._rewardStr = function(reward) {
+  if (!reward || !Object.keys(reward).length) return '—';
+  return Object.keys(reward).filter(function(r) { return reward[r] > 0; }).map(function(r) {
+    var icon = { coins: '🪙', food: '🍞', materials: '🪨', crystals: '💎', experience: '✨', energy: '⚡' }[r] || r;
+    return icon + reward[r];
+  }).join(' ');
+};
+
+// ── Switch quest tabs ────────────────────────────────────────
+GameUI.prototype.switchQuestTab = function(tab) {
+  var storySection = document.getElementById('quest-story-section');
+  var dailySection = document.getElementById('quest-daily-section');
+  var tabStory = document.getElementById('tab-story-quests');
+  var tabDaily = document.getElementById('tab-daily-quests');
+  if (tab === 'story') {
+    storySection.classList.remove('hidden');
+    dailySection.classList.add('hidden');
+    tabStory.classList.add('active');
+    tabDaily.classList.remove('active');
+  } else {
+    storySection.classList.add('hidden');
+    dailySection.classList.remove('hidden');
+    tabStory.classList.remove('active');
+    tabDaily.classList.add('active');
+    if (this.game) this.game.loadDailyQuests();
+  }
+};
+
+// ── Story quests ─────────────────────────────────────────────
 GameUI.prototype.renderQuests = function(quests) {
   var list = document.getElementById('quests-list');
   var self = this;
-
-  if (!quests || quests.length === 0) {
+  var storyQuests = (quests || []).filter(function(q) {
+    return !q.questId || q.questId.indexOf('daily_') !== 0;
+  });
+  if (!storyQuests.length) {
     list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">Все квесты выполнены! 🎉</div>';
     this.updateQuestBadge(0);
     return;
   }
-
   var completedCount = 0;
-  list.innerHTML = quests.map(function(q) {
-    var pct = Math.min(100, Math.floor(q.progress / q.count * 100));
-    var done = q.progress >= q.count;
+  list.innerHTML = storyQuests.map(function(q) {
+    var pct = Math.min(100, Math.floor((q.progress || 0) / q.count * 100));
+    var done = (q.progress || 0) >= q.count;
     if (done) completedCount++;
-    var rewardStr = Object.keys(q.reward).map(function(r) {
-      var icon = { coins: '🪙', food: '🍞', materials: '🪨', crystals: '💎', experience: '✨' }[r] || r;
-      return icon + q.reward[r];
-    }).join(' ');
-
     return '<div class="quest-item' + (done ? ' completed' : '') + '">' +
-      '<div class="quest-desc">' + q.description + '</div>' +
+      '<div class="quest-desc">' + escapeHTML(q.description) + '</div>' +
       '<div class="quest-progress-bar"><div class="quest-progress-fill" style="width:' + pct + '%"></div></div>' +
-      '<div class="quest-progress-text">' + Math.min(q.progress, q.count) + ' / ' + q.count + '</div>' +
-      '<div class="quest-reward">Награда: ' + rewardStr + '</div>' +
+      '<div class="quest-progress-text">' + Math.min(q.progress || 0, q.count) + ' / ' + q.count + '</div>' +
+      '<div class="quest-reward">Награда: ' + self._rewardStr(q.reward) + '</div>' +
       (done ? '<button class="quest-claim-btn" data-quest-id="' + q.questId + '">🎁 Забрать</button>' : '') +
       '</div>';
   }).join('');
-
   list.querySelectorAll('.quest-claim-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      self.game.claimQuest(btn.dataset.questId);
-    });
+    btn.addEventListener('click', function() { self.game.claimQuest(btn.dataset.questId); });
   });
-
   this.updateQuestBadge(completedCount);
+};
+
+// ── Daily quests ─────────────────────────────────────────────
+GameUI.prototype.renderDailyQuests = function(dailyQuests) {
+  var list = document.getElementById('daily-quests-list');
+  var self = this;
+  if (!list) return;
+  if (!dailyQuests || !dailyQuests.length) {
+    list.innerHTML = '<div style="text-align:center;padding:32px 16px;color:var(--text-muted);">' +
+      '<div style="font-size:36px;margin-bottom:8px;">🌅</div>' +
+      '<div>Ежедневных квестов пока нет</div>' +
+      '<div style="font-size:11px;margin-top:6px;opacity:0.7;">Администратор скоро добавит новые задания</div></div>';
+    this.updateDailyBadge(0);
+    return;
+  }
+  var readyCount = 0;
+  list.innerHTML = dailyQuests.map(function(q) {
+    var pct = Math.min(100, Math.floor((q.progress || 0) / q.count * 100));
+    var claimed = q.claimed;
+    var done = q.done;
+    if (done && !claimed) readyCount++;
+    var remaining = Math.max(0, new Date(q.expiresAt) - Date.now());
+    var hrs  = Math.floor(remaining / 3600000);
+    var mins = Math.floor((remaining % 3600000) / 60000);
+    var timerStr = remaining > 0 ? (hrs + 'ч ' + mins + 'м') : 'Истёк';
+    var timerColor = remaining < 3600000 ? '#ef4444' : remaining < 10800000 ? '#f59e0b' : '#22c55e';
+    return '<div class="quest-item daily-quest-item' + (claimed ? ' claimed' : done ? ' completed' : '') + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+        '<div style="flex:1;">' +
+          '<div class="daily-quest-title">🌅 ' + escapeHTML(q.title) + '</div>' +
+          '<div class="quest-desc" style="margin-top:3px;">' + escapeHTML(q.description) + '</div>' +
+        '</div>' +
+        '<div style="color:' + timerColor + ';white-space:nowrap;font-size:11px;padding-top:2px;">⏰ ' + timerStr + '</div>' +
+      '</div>' +
+      (!claimed ?
+        '<div class="quest-progress-bar" style="margin-top:8px;"><div class="quest-progress-fill daily-fill" style="width:' + pct + '%"></div></div>' +
+        '<div class="quest-progress-text">' + Math.min(q.progress || 0, q.count) + ' / ' + q.count + '</div>'
+      : '<div class="quest-progress-text" style="color:#22c55e;margin-top:6px;">✅ Получено</div>') +
+      '<div class="quest-reward">Награда: ' + self._rewardStr(q.reward) + '</div>' +
+      (done && !claimed ? '<button class="quest-claim-btn daily-claim-btn" data-quest-id="' + q.questId + '">🎁 Забрать награду!</button>' : '') +
+      '</div>';
+  }).join('');
+  list.querySelectorAll('.daily-claim-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { self.game.claimDailyQuest(btn.dataset.questId); });
+  });
+  this.updateDailyBadge(readyCount);
 };
 
 GameUI.prototype.updateQuestBadge = function(count) {
   var badge = document.getElementById('quest-badge');
-  if (count > 0) {
-    badge.textContent = count;
-    badge.classList.remove('hidden');
-  } else {
-    badge.classList.add('hidden');
-  }
+  if (!badge) return;
+  if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
+  else { badge.classList.add('hidden'); }
+};
+
+GameUI.prototype.updateDailyBadge = function(count) {
+  var badge = document.getElementById('daily-badge');
+  if (!badge) return;
+  if (count > 0) { badge.textContent = '!'; badge.classList.remove('hidden'); }
+  else { badge.classList.add('hidden'); }
 };
 
 GameUI.prototype.renderLeaderboard = function(leaderboard) {

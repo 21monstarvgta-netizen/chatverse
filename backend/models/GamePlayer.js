@@ -46,6 +46,7 @@ var gamePlayerSchema = new mongoose.Schema({
   buildings: [buildingSchema],
   unlockedZones: [zoneSchema],
   completedQuests: [{ type: String }],
+  completedDailyQuests: [{ type: String }],  // stores questId of claimed daily quests
   activeQuests: [activeQuestSchema],
   activeThreats: [{
     id: String,

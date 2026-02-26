@@ -241,6 +241,89 @@
 .quest-claim-btn:hover { transform: scale(1.03); }
 .quest-claim-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Quest tabs */
+.quest-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 8px;
+}
+.quest-tab {
+  flex: 1;
+  padding: 7px 10px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.quest-tab.active {
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+  border-color: #7c3aed;
+  color: #fff;
+}
+.quest-tab:hover:not(.active) { background: rgba(255,255,255,0.12); color: var(--text-primary); }
+.daily-badge {
+  position: absolute;
+  top: -5px; right: -5px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Daily quest items */
+.daily-quest-item {
+  border-left: 3px solid #f59e0b !important;
+}
+.daily-quest-item.claimed {
+  border-left-color: #22c55e !important;
+  opacity: 0.65;
+}
+.daily-quest-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #fde68a;
+}
+.daily-fill {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%) !important;
+}
+.daily-claim-btn {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  animation: pulse-gold 1.5s ease-in-out infinite;
+}
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 6px rgba(245,158,11,0.4); }
+  50% { box-shadow: 0 0 14px rgba(245,158,11,0.8); }
+}
+
+/* Admin form inputs */
+.game-input {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.game-input:focus {
+  outline: none;
+  border-color: #7c3aed;
+  background: rgba(124,58,237,0.1);
+}
+.game-input option { background: #1e1b4b; color: #e2e8f0; }
+
 /* Leaderboard */
 .leaderboard-list { padding: 0 12px 16px; }
 .leader-item {
