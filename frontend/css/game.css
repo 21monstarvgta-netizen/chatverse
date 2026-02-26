@@ -383,7 +383,7 @@
   .res-item { padding: 3px 6px; font-size: 11px; }
   .res-icon { font-size: 12px; }
   .bottom-tab { padding: 8px 4px; font-size: 11px; }
-  .game-panel { max-height: 50vh; }
+  .game-panel { max-height: 75vh; }
   .building-info-panel {
     bottom: 56px; width: calc(100% - 16px); padding: 12px;
   }

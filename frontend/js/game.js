@@ -68,7 +68,7 @@ Game.prototype.init = async function() {
         adminBtn.id = 'admin-open-btn';
         adminBtn.title = 'Панель администратора';
         adminBtn.textContent = '⚙️ Админ';
-        adminBtn.style.cssText = 'position:fixed;top:10px;right:10px;z-index:2000;' +
+        adminBtn.style.cssText = 'position:fixed;top:80px;right:10px;z-index:2000;' +
           'background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:6px 12px;' +
           'font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);';
         adminBtn.addEventListener('click', function() { self.openAdminPanel(); });

@@ -56,7 +56,7 @@ function subtractResources(resources, cost) {
 }
 
 function addResources(resources, reward, maxStorage) {
-  maxStorage = maxStorage || 999999;
+  maxStorage = maxStorage || 1000000000;
   var keys = Object.keys(reward);
   for (var i = 0; i < keys.length; i++) {
     var res = keys[i];
