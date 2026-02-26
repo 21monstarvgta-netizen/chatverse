@@ -644,6 +644,8 @@ GameRenderer.prototype._drawBuildingSprite = function(ctx, type, level, tw, th, 
     case 'stadium':     this._sStadium(ctx, s, level, tick);    break;
     case 'crystalmine': this._sCrystalMine(ctx, s, level, tick);break;
     case 'arcanetower': this._sArcaneTower(ctx, s, level, tick);break;
+    case 'road':        this._sRoad(ctx, s, level, tick);       break;
+    case 'windmill':    this._sWindmill(ctx, s, level, tick);   break;
     default:
       ctx.font = Math.round(s * 0.5) + 'px Arial';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -3116,6 +3118,348 @@ GameRenderer.prototype._drawSelectionRing = function(ctx, tx, ty, tick) {
   ctx.lineWidth = 2 + pulse;
   this._isoPath(ctx, tx, ty - 2);
   ctx.stroke();
+};
+
+
+// ─── Road sprite ─────────────────────────────────────────────
+GameRenderer.prototype._sRoad = function(ctx, s, level, tick) {
+  var t = tick;
+
+  // === ROAD SURFACE — isometric cobblestone path ===
+  // Shadow under road
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(0, s*0.06, s*0.52, s*0.13, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Road base asphalt gradient (isometric diamond shape)
+  var roadGrad = ctx.createLinearGradient(-s*0.44, -s*0.06, s*0.44, s*0.06);
+  roadGrad.addColorStop(0, '#4b5563');
+  roadGrad.addColorStop(0.5, '#6b7280');
+  roadGrad.addColorStop(1, '#374151');
+  ctx.fillStyle = roadGrad;
+  ctx.beginPath();
+  ctx.moveTo(0, -s*0.12);
+  ctx.lineTo(s*0.46, s*0.06);
+  ctx.lineTo(0, s*0.22);
+  ctx.lineTo(-s*0.46, s*0.06);
+  ctx.closePath();
+  ctx.fill();
+
+  // Road edges highlight
+  ctx.strokeStyle = 'rgba(156,163,175,0.5)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(0, -s*0.12);
+  ctx.lineTo(s*0.46, s*0.06);
+  ctx.moveTo(0, -s*0.12);
+  ctx.lineTo(-s*0.46, s*0.06);
+  ctx.stroke();
+
+  // === COBBLESTONE DETAIL ===
+  var stones = [
+    [-0.28,-0.04], [-0.12,-0.07], [0.06,-0.08], [0.22,-0.04],
+    [-0.20, 0.03], [-0.04, 0.00], [0.12, 0.01], [0.28, 0.04],
+    [-0.30, 0.10], [-0.14, 0.07], [0.02, 0.08], [0.18, 0.10], [0.32, 0.12]
+  ];
+  for (var i = 0; i < stones.length; i++) {
+    var sx2 = stones[i][0]*s, sy = stones[i][1]*s;
+    var sg = ctx.createRadialGradient(sx2-1, sy-1, 0, sx2, sy, s*0.06);
+    sg.addColorStop(0, '#9ca3af');
+    sg.addColorStop(1, '#4b5563');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.ellipse(sx2, sy, s*0.055, s*0.035, -0.3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(55,65,81,0.7)';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+  }
+
+  // === CENTRE LINE (dashed, animated) ===
+  var dashOff = (t * 0.6) % (s * 0.16);
+  ctx.save();
+  ctx.setLineDash([s*0.08, s*0.07]);
+  ctx.lineDashOffset = -dashOff;
+  ctx.strokeStyle = 'rgba(252,211,77,0.85)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-s*0.38, s*0.06);
+  ctx.lineTo(s*0.38, s*0.06);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // === ROADSIDE DETAILS: tiny kerb stones ===
+  for (var k = -3; k <= 3; k++) {
+    var kx = k * s * 0.13;
+    // Left kerb
+    ctx.fillStyle = '#d1d5db';
+    ctx.beginPath();
+    ctx.ellipse(kx - s*0.38 + s*0.04, s*0.06 + kx*0.25, s*0.025, s*0.014, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Right kerb
+    ctx.beginPath();
+    ctx.ellipse(kx + s*0.38 - s*0.04, s*0.06 - kx*0.25, s*0.025, s*0.014, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // === ROAD MARKINGS: small arrow (level >= 2) ===
+  if (level >= 2) {
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.save();
+    ctx.translate(0, s*0.04);
+    ctx.scale(1, 0.45);
+    ctx.beginPath();
+    ctx.moveTo(0, -s*0.1);
+    ctx.lineTo(s*0.06, -s*0.02);
+    ctx.lineTo(s*0.02, -s*0.02);
+    ctx.lineTo(s*0.02, s*0.06);
+    ctx.lineTo(-s*0.02, s*0.06);
+    ctx.lineTo(-s*0.02, -s*0.02);
+    ctx.lineTo(-s*0.06, -s*0.02);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // === LAMP POST (level >= 3) ===
+  if (level >= 3) {
+    // Post
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(s*0.30, -s*0.01);
+    ctx.lineTo(s*0.30, -s*0.38);
+    ctx.stroke();
+    // Arm
+    ctx.beginPath();
+    ctx.moveTo(s*0.30, -s*0.38);
+    ctx.quadraticCurveTo(s*0.30, -s*0.44, s*0.22, -s*0.44);
+    ctx.stroke();
+    // Lamp glow
+    var glowA = 0.6 + 0.4 * Math.sin(t * 0.08);
+    ctx.shadowColor = '#fde68a';
+    ctx.shadowBlur = 10 * glowA;
+    ctx.fillStyle = 'rgba(253,230,138,' + (0.9 * glowA) + ')';
+    ctx.beginPath();
+    ctx.ellipse(s*0.22, -s*0.44, s*0.04, s*0.025, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Halo
+    var haloGrad = ctx.createRadialGradient(s*0.22, -s*0.44, 0, s*0.22, -s*0.44, s*0.12);
+    haloGrad.addColorStop(0, 'rgba(253,230,138,' + (0.25 * glowA) + ')');
+    haloGrad.addColorStop(1, 'rgba(253,230,138,0)');
+    ctx.fillStyle = haloGrad;
+    ctx.beginPath();
+    ctx.arc(s*0.22, -s*0.44, s*0.12, 0, Math.PI*2);
+    ctx.fill();
+  }
+};
+
+// ─── Windmill sprite ──────────────────────────────────────────
+GameRenderer.prototype._sWindmill = function(ctx, s, level, tick) {
+  var t = tick;
+  var rotSpeed = 0.018 + level * 0.003;
+  var angle = t * rotSpeed;
+
+  // === BASE FOUNDATION ===
+  ctx.fillStyle = '#d1d5db';
+  ctx.beginPath();
+  ctx.ellipse(0, s*0.05, s*0.22, s*0.09, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // === STONE TOWER (tapered) ===
+  var towerGrad = ctx.createLinearGradient(-s*0.18, -s*0.7, s*0.18, 0);
+  towerGrad.addColorStop(0, '#e5e7eb');
+  towerGrad.addColorStop(0.4, '#d1d5db');
+  towerGrad.addColorStop(1, '#9ca3af');
+  ctx.fillStyle = towerGrad;
+  ctx.beginPath();
+  ctx.moveTo(-s*0.18, 0);
+  ctx.lineTo(-s*0.12, -s*0.70);
+  ctx.lineTo(s*0.12, -s*0.70);
+  ctx.lineTo(s*0.18, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Stone texture lines
+  ctx.strokeStyle = 'rgba(107,114,128,0.3)';
+  ctx.lineWidth = 0.8;
+  for (var row = 0; row < 7; row++) {
+    var ry = -row * s * 0.1;
+    var rw = s*0.18 - row * s * 0.008;
+    ctx.beginPath();
+    ctx.moveTo(-rw, ry);
+    ctx.lineTo(rw, ry);
+    ctx.stroke();
+    // Alternating brick joints
+    if (row % 2 === 0) {
+      ctx.beginPath();
+      ctx.moveTo(0, ry);
+      ctx.lineTo(0, ry - s*0.1);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(-rw*0.5, ry);
+      ctx.lineTo(-rw*0.5, ry - s*0.1);
+      ctx.stroke();
+    }
+  }
+
+  // Tower right shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.beginPath();
+  ctx.moveTo(s*0.12, -s*0.70);
+  ctx.lineTo(s*0.18, 0);
+  ctx.lineTo(s*0.22, 0);
+  ctx.lineTo(s*0.16, -s*0.70);
+  ctx.closePath();
+  ctx.fill();
+
+  // === DOME CAP ===
+  var domeGrad = ctx.createRadialGradient(-s*0.04, -s*0.76, 0, 0, -s*0.72, s*0.2);
+  domeGrad.addColorStop(0, '#fde68a');
+  domeGrad.addColorStop(0.5, '#d97706');
+  domeGrad.addColorStop(1, '#92400e');
+  ctx.fillStyle = domeGrad;
+  ctx.beginPath();
+  ctx.arc(0, -s*0.72, s*0.16, Math.PI, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#92400e';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // === DOOR ===
+  ctx.fillStyle = '#92400e';
+  ctx.beginPath();
+  ctx.roundRect(-s*0.06, -s*0.28, s*0.12, s*0.28, s*0.06);
+  ctx.fill();
+  ctx.fillStyle = '#78350f';
+  ctx.beginPath();
+  ctx.arc(0, -s*0.28, s*0.06, Math.PI, 0);
+  ctx.fill();
+  // Door handle
+  ctx.fillStyle = '#fbbf24';
+  ctx.beginPath();
+  ctx.arc(s*0.035, -s*0.14, 2.5, 0, Math.PI*2);
+  ctx.fill();
+
+  // === WINDOWS ===
+  for (var wd = 0; wd < 2; wd++) {
+    var wyy = -s*(0.42 + wd*0.16);
+    ctx.fillStyle = '#1e3a5f';
+    ctx.beginPath();
+    ctx.arc(0, wyy, s*0.04, Math.PI, 0);
+    ctx.fillRect(-s*0.04, wyy, s*0.08, s*0.04);
+    ctx.fill();
+    // Window shine
+    ctx.fillStyle = 'rgba(147,210,255,0.5)';
+    ctx.beginPath();
+    ctx.arc(-s*0.01, wyy - s*0.01, s*0.018, Math.PI, 0);
+    ctx.fill();
+  }
+
+  // === ROTATING SAILS (4 blades) ===
+  ctx.save();
+  ctx.translate(0, -s*0.72);
+  ctx.rotate(angle);
+
+  for (var blade = 0; blade < 4; blade++) {
+    ctx.save();
+    ctx.rotate(blade * Math.PI / 2);
+
+    // Blade arm
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -s*0.42);
+    ctx.stroke();
+
+    // Sail fabric (tapered)
+    var sailGrad = ctx.createLinearGradient(-s*0.12, 0, s*0.04, -s*0.42);
+    sailGrad.addColorStop(0, 'rgba(254,243,199,0.95)');
+    sailGrad.addColorStop(0.5, 'rgba(252,211,77,0.85)');
+    sailGrad.addColorStop(1, 'rgba(245,158,11,0.7)');
+    ctx.fillStyle = sailGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, -s*0.04);
+    ctx.lineTo(-s*0.14, -s*0.12);
+    ctx.lineTo(-s*0.10, -s*0.40);
+    ctx.lineTo(s*0.02, -s*0.42);
+    ctx.lineTo(s*0.03, -s*0.04);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sail stripes
+    ctx.strokeStyle = 'rgba(180,83,9,0.4)';
+    ctx.lineWidth = 1;
+    for (var stripe = 1; stripe < 4; stripe++) {
+      var sf = stripe / 4;
+      ctx.beginPath();
+      ctx.moveTo(-s*0.14*sf + s*0.03*(1-sf), -s*0.04 - sf*s*0.38);
+      ctx.lineTo(-s*0.10*sf + s*0.02*(1-sf), -s*0.12 - sf*s*0.28);
+      ctx.stroke();
+    }
+
+    // Cross brace
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-s*0.08, -s*0.16);
+    ctx.lineTo(s*0.02, -s*0.32);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // Centre hub
+  var hubGrad = ctx.createRadialGradient(-2, -2, 0, 0, 0, s*0.07);
+  hubGrad.addColorStop(0, '#f8fafc');
+  hubGrad.addColorStop(1, '#78350f');
+  ctx.fillStyle = hubGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, s*0.07, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#92400e';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Hub bolt
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.arc(0, 0, s*0.02, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // === WIND STREAKS (animated) ===
+  for (var ws = 0; ws < 5; ws++) {
+    var wt = (t * 1.2 + ws * 17) % 70;
+    var wx = (ws - 2) * s*0.14;
+    var walpha = Math.max(0, 0.4 - wt/70);
+    ctx.strokeStyle = 'rgba(147,210,255,' + walpha + ')';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([s*0.06, s*0.04]);
+    ctx.beginPath();
+    ctx.moveTo(wx - wt*0.8, -s*(0.4 + ws*0.06));
+    ctx.lineTo(wx, -s*(0.4 + ws*0.06));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // === ENERGY AURA (level >= 5) ===
+  if (level >= 5) {
+    var ea = 0.3 + 0.2 * Math.sin(t * 0.1);
+    var energyGrad = ctx.createRadialGradient(0, -s*0.4, 0, 0, -s*0.4, s*0.5);
+    energyGrad.addColorStop(0, 'rgba(167,243,208,' + ea + ')');
+    energyGrad.addColorStop(1, 'rgba(167,243,208,0)');
+    ctx.fillStyle = energyGrad;
+    ctx.beginPath();
+    ctx.arc(0, -s*0.4, s*0.5, 0, Math.PI*2);
+    ctx.fill();
+  }
 };
 
 // ─── roundRect polyfill ──────────────────────────────────────

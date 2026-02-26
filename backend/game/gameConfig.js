@@ -205,6 +205,30 @@ var BUILDING_TYPES = {
     category: 'special',
     unlockLevel: 13,
     energyCost: 6
+  },
+  road: {
+    name: 'Дорога',
+    emoji: '🛤️',
+    description: 'Привлекает жителей. Каждая дорога +3 к населению',
+    baseCost: { coins: 80, materials: 30 },
+    baseOutput: { population: 3 },
+    baseTime: 60,
+    maxLevel: 5,
+    category: 'infrastructure',
+    unlockLevel: 1,
+    energyCost: 0
+  },
+  windmill: {
+    name: 'Ветряная мельница',
+    emoji: '💨',
+    description: 'Вырабатывает чистую энергию. В 2 раза мощнее электростанции',
+    baseCost: { coins: 2400, materials: 900 },
+    baseOutput: { energy: 10 },
+    baseTime: 1800,
+    maxLevel: 30,
+    category: 'infrastructure',
+    unlockLevel: 3,
+    energyCost: 0
   }
 };
 
@@ -257,7 +281,11 @@ var QUEST_TEMPLATES = [
   { id: 's34', type: 'reach_population', target: 'population', count: 300, reward: { coins: 15000, crystals: 25 }, minLevel: 18, description: 'Достигни 300 населения' },
   { id: 's35', type: 'unlock_zone', target: 'zone', count: 8, reward: { coins: 20000, crystals: 30 }, minLevel: 20, description: 'Открой 8 зон' },
   { id: 's36', type: 'build', target: 'arcanetower', count: 1, reward: { coins: 20000, crystals: 15 }, minLevel: 13, description: 'Построй Магическую башню' },
-  { id: 's37', type: 'build', target: 'crystalmine', count: 1, reward: { coins: 50000, crystals: 25 }, minLevel: 15, description: 'Построй Кристальную шахту' }
+  { id: 's37', type: 'build', target: 'crystalmine', count: 1, reward: { coins: 50000, crystals: 25 }, minLevel: 15, description: 'Построй Кристальную шахту' },
+  { id: 's38', type: 'build', target: 'road', count: 1, reward: { coins: 150, materials: 50 }, minLevel: 1, description: 'Построй первую дорогу' },
+  { id: 's39', type: 'build', target: 'road', count: 5, reward: { coins: 400, food: 100 }, minLevel: 1, description: 'Построй 5 дорог' },
+  { id: 's40', type: 'build', target: 'windmill', count: 1, reward: { coins: 800, crystals: 5 }, minLevel: 3, description: 'Построй ветряную мельницу' },
+  { id: 's41', type: 'build', target: 'windmill', count: 3, reward: { coins: 2000, crystals: 10 }, minLevel: 5, description: 'Построй 3 ветряных мельницы' }
 ];
 
 // Random quest generators
@@ -275,7 +303,9 @@ var RANDOM_QUEST_POOLS = {
     { target: 'school', desc: 'Построй школу', base_reward: 500 },
     { target: 'park', desc: 'Построй парк', base_reward: 400 },
     { target: 'arcanetower', desc: 'Построй Магическую башню', base_reward: 5000 },
-    { target: 'crystalmine', desc: 'Построй Кристальную шахту', base_reward: 10000 }
+    { target: 'crystalmine', desc: 'Построй Кристальную шахту', base_reward: 10000 },
+    { target: 'road', desc: 'Построй дорогу', base_reward: 100 },
+    { target: 'windmill', desc: 'Построй ветряную мельницу', base_reward: 600 }
   ],
   collect: [
     { target: 'coins', desc: 'Заработай {n} монет', multiplier: 500 },
