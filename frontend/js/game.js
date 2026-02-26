@@ -33,7 +33,12 @@ Game.prototype.init = async function() {
     self.ui = new GameUI(self);
 
     self.updateRendererState();
-    self.renderer.centerCamera();
+    // Centre on buildings if any, otherwise on initial zone
+    if (self.player.buildings && self.player.buildings.length > 0) {
+      self.renderer.centerOnBuildings(self.player.buildings);
+    } else {
+      self.renderer.centerCamera();
+    }
     self.renderer.resize();
 
     self.ui.updateResources(self.player);

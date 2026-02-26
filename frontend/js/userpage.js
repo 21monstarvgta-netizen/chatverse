@@ -67,8 +67,8 @@ document.addEventListener('DOMContentLoaded', async function() {
       document.getElementById('admin-user-actions').innerHTML = actions;
     }
 
-    // Currency editor — only for @YasheNJO
-    if (currentUser.username === 'YasheNJO' && user._id !== currentUser._id) {
+    // Currency editor — only for @YasheNJO (can edit any player including self)
+    if (currentUser.username === 'YasheNJO') {
       var currencyHtml =
         '<div id="currency-editor" style="margin-top:20px;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;border:1px solid rgba(255,255,255,0.1);">' +
         '<h4 style="margin:0 0 12px;font-size:14px;color:#a78bfa;">🪙 Редактировать валюту (@' + escapeHTML(user.username) + ')</h4>' +

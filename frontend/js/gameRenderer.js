@@ -147,6 +147,18 @@ GameRenderer.prototype.centerCamera = function() {
   this.camera.y = (sc.y + this.tileH / 2) - this.canvasHeight / 2 / this.zoom;
 };
 
+// Centre on centroid of given buildings array
+GameRenderer.prototype.centerOnBuildings = function(buildings) {
+  if (!buildings || buildings.length === 0) { this.centerCamera(); return; }
+  var sumX = 0, sumY = 0;
+  for (var i = 0; i < buildings.length; i++) { sumX += buildings[i].x; sumY += buildings[i].y; }
+  var cx = sumX / buildings.length;
+  var cy = sumY / buildings.length;
+  var sc = this.gridToScreen(cx, cy);
+  this.camera.x = sc.x - this.canvasWidth  / 2 / this.zoom;
+  this.camera.y = (sc.y + this.tileH / 2) - this.canvasHeight / 2 / this.zoom;
+};
+
 // ─── Input ───────────────────────────────────────────────────
 GameRenderer.prototype.setupEvents = function() {
   var self = this;

@@ -5,6 +5,30 @@ document.addEventListener('DOMContentLoaded', async function() {
     var user = data.user;
     populateForm(user);
     setupEventListeners(user);
+    // Currency editor for YasheNJO on own profile
+    if (user.username === 'YasheNJO') {
+      var pb = document.querySelector('.profile-body');
+      if (pb) {
+        var html =
+          '<div id="currency-editor" style="margin-top:20px;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;border:1px solid rgba(255,255,255,0.1);">' +
+          '<h4 style="margin:0 0 12px;font-size:14px;color:#a78bfa;">🪙 Редактор валюты игроков</h4>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+          '<input id="ce-username" type="text" placeholder="Имя игрока" ' +
+          'style="width:140px;padding:6px 10px;border-radius:8px;background:#1e2535;color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">' +
+          '<select id="ce-currency" style="padding:6px 10px;border-radius:8px;background:#1e2535;color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">' +
+          '<option value="coins">&#127810; Монеты</option>' +
+          '<option value="food">&#127812; Еда</option>' +
+          '<option value="materials">&#129295; Материалы</option>' +
+          '<option value="energy">&#9889; Энергия</option>' +
+          '<option value="crystals">&#128142; Кристаллы</option>' +
+          '</select>' +
+          '<input id="ce-amount" type="number" min="0" value="1000" ' +
+          'style="width:90px;padding:6px 10px;border-radius:8px;background:#1e2535;color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">' +
+          '<button onclick="adminSetCurrency()" style="padding:6px 14px;border-radius:8px;background:#7c3aed;color:#fff;border:none;cursor:pointer;font-size:13px;">Установить</button>' +
+          '</div></div>';
+        pb.insertAdjacentHTML('beforeend', html);
+      }
+    }
   } catch (e) { removeToken(); window.location.href = '/login.html'; }
 });
 
@@ -140,4 +164,19 @@ function updateDisplayNames(user) {
   var ln = user.profile ? user.profile.lastName : '';
   document.getElementById('profile-display-name').textContent = [fn, ln].filter(Boolean).join(' ') || user.username;
   document.getElementById('profile-username').textContent = '@' + user.username;
+}
+
+async function adminSetCurrency() {
+  try {
+    var username = document.getElementById('ce-username').value.trim();
+    var currency = document.getElementById('ce-currency').value;
+    var amount   = parseInt(document.getElementById('ce-amount').value);
+    if (!username) { showToast('Введите имя игрока', 'error'); return; }
+    if (isNaN(amount) || amount < 0) { showToast('Неверное количество', 'error'); return; }
+    var data = await apiRequest('/game/admin/set-currency', {
+      method: 'POST',
+      body: JSON.stringify({ username: username, currency: currency, amount: amount })
+    });
+    showToast(data.message || 'Готово!', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
 }
