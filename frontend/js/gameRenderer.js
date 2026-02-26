@@ -756,57 +756,106 @@ GameRenderer.prototype._roof = function(ctx, x, y, w, h, col1, col2) {
 
 // ── FARM ─────────────────────────────────────────────────────
 GameRenderer.prototype._sFarm = function(ctx, s, level, tick) {
-  // Ground / soil patches
+  // Ground / soil patches with furrow rows
   var sg = ctx.createLinearGradient(-s*0.5, -s*0.08, s*0.5, 0);
-  sg.addColorStop(0, '#3d2008'); sg.addColorStop(1, '#5c3317');
+  sg.addColorStop(0, '#3d2008'); sg.addColorStop(0.5, '#5c3317'); sg.addColorStop(1, '#4a2810');
   ctx.fillStyle = sg;
-  ctx.beginPath(); ctx.ellipse(0, -s*0.02, s*0.48, s*0.12, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -s*0.02, s*0.48, s*0.14, 0, 0, Math.PI*2); ctx.fill();
+  // Soil furrows
+  ctx.strokeStyle = '#2d1506'; ctx.lineWidth = 1;
+  for (var f = -3; f <= 3; f++) {
+    ctx.beginPath(); ctx.moveTo(f*s*0.12, -s*0.12); ctx.lineTo(f*s*0.12, s*0.05); ctx.stroke();
+  }
 
-  // Crop rows with animated wheat
+  // Wooden fence around field
+  ctx.strokeStyle = '#8B5E3C'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(-s*0.46, -s*0.14, s*0.92, s*0.14);
+  // Fence posts
+  for (var fp = 0; fp < 7; fp++) {
+    var fxp = -s*0.46 + fp*s*0.155;
+    ctx.fillStyle = '#6B3A1F';
+    ctx.fillRect(fxp - 1.5, -s*0.16, 3, s*0.12);
+  }
+
+  // Crop rows with animated wheat — more varieties by level
   var rows = Math.min(3 + Math.floor(level / 2), 9);
   for (var r = 0; r < rows; r++) {
     var rx = -s*0.42 + r * (s*0.84 / (rows-1||1));
     var sway = Math.sin(tick * 0.035 + r * 0.7) * 2.5;
     var height = s * (0.22 + 0.1 * Math.sin(tick * 0.02 + r));
-    // Stem
-    ctx.strokeStyle = '#5a8a2a';
-    ctx.lineWidth = 1.5;
+    // Stem with nodes
+    ctx.strokeStyle = '#5a8a2a'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(rx, -s*0.06); ctx.lineTo(rx + sway, -s*0.06 - height); ctx.stroke();
-    // Leaves
-    ctx.strokeStyle = '#6aaa30';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(rx, -s*0.06 - height*0.4);
-    ctx.quadraticCurveTo(rx + 8 + sway, -s*0.06 - height*0.35, rx + 12, -s*0.06 - height*0.25);
-    ctx.stroke();
+    // Leaf pair
+    ctx.strokeStyle = '#6aaa30'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(rx + sway*0.4, -s*0.06 - height*0.4);
+    ctx.quadraticCurveTo(rx + 10 + sway, -s*0.06 - height*0.35, rx + 14, -s*0.06 - height*0.22); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx + sway*0.4, -s*0.06 - height*0.6);
+    ctx.quadraticCurveTo(rx - 8 + sway, -s*0.06 - height*0.55, rx - 12, -s*0.06 - height*0.44); ctx.stroke();
     // Wheat head
-    var wg = ctx.createLinearGradient(rx, -s*0.06-height, rx, -s*0.06-height-8);
+    var wg = ctx.createLinearGradient(rx, -s*0.06-height, rx, -s*0.06-height-10);
     wg.addColorStop(0, '#e8b740'); wg.addColorStop(1, '#f4d03f');
     ctx.fillStyle = wg;
-    ctx.beginPath(); ctx.ellipse(rx + sway, -s*0.06 - height - 5, 3, 7, sway*0.1, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(rx + sway, -s*0.06 - height - 6, 3.5, 8, sway*0.1, 0, Math.PI*2); ctx.fill();
+    // Awns (little barb lines)
+    ctx.strokeStyle = '#c8980a'; ctx.lineWidth = 0.5;
+    for (var awn = 0; awn < 3; awn++) {
+      var ay = -s*0.06 - height - 2 - awn*4;
+      ctx.beginPath(); ctx.moveTo(rx+sway, ay); ctx.lineTo(rx+sway+5, ay-3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(rx+sway, ay); ctx.lineTo(rx+sway-5, ay-3); ctx.stroke();
+    }
   }
 
+  // Scarecrow
+  ctx.strokeStyle = '#5c3317'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(s*0.38, -s*0.06); ctx.lineTo(s*0.38, -s*0.48); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(s*0.26, -s*0.34); ctx.lineTo(s*0.5, -s*0.34); ctx.stroke();
+  ctx.fillStyle = '#d4a76a'; ctx.font = '12px Arial'; ctx.textAlign='center';
+  ctx.fillText('🎃', s*0.38, -s*0.52);
+  // Hat
+  ctx.fillStyle = '#3d1f05';
+  ctx.fillRect(s*0.32, -s*0.62, s*0.12, s*0.04);
+  ctx.fillRect(s*0.34, -s*0.70, s*0.08, s*0.08);
+
   // Barn - detailed
-  this._isoBox(ctx, -s*0.2, -s*0.46, s*0.4, s*0.28, 25, 65, 35);
-  // Barn roof
-  this._roof(ctx, -s*0.24, -s*0.46, s*0.48, s*0.22, '#c0392b', '#922b21');
-  // Barn door
+  this._isoBox(ctx, -s*0.24, -s*0.48, s*0.42, s*0.3, 25, 65, 35);
+  // Barn roof with overhang
+  this._roof(ctx, -s*0.28, -s*0.48, s*0.52, s*0.24, '#c0392b', '#922b21');
+  // Barn door - double doors
   ctx.fillStyle = '#4a2800';
-  ctx.fillRect(-s*0.07, -s*0.38, s*0.14, s*0.2);
-  ctx.strokeStyle = '#6b3c10'; ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(0, -s*0.38); ctx.lineTo(0, -s*0.18); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-s*0.07, -s*0.28); ctx.lineTo(0, -s*0.28); ctx.stroke();
-  // Barn X detail
-  ctx.strokeStyle = '#7d4a1e'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(-s*0.16, -s*0.44); ctx.lineTo(s*0.16, -s*0.18); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(s*0.16, -s*0.44); ctx.lineTo(-s*0.16, -s*0.18); ctx.stroke();
+  ctx.fillRect(-s*0.1, -s*0.4, s*0.09, s*0.22);
+  ctx.fillRect(-s*0.005, -s*0.4, s*0.09, s*0.22);
+  // Door hinges
+  ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(-s*0.085, -s*0.36, 2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-s*0.085, -s*0.28, 2, 0, Math.PI*2); ctx.fill();
+  // Hay bale
+  ctx.fillStyle = '#e8b740';
+  ctx.beginPath(); ctx.ellipse(-s*0.02, -s*0.17, s*0.06, s*0.04, 0, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#c8980a'; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(-s*0.02, -s*0.21); ctx.lineTo(-s*0.02, -s*0.13); ctx.stroke();
   // Weathervane
   ctx.strokeStyle = '#888'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, -s*0.68); ctx.lineTo(0, -s*0.76); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -s*0.70); ctx.lineTo(0, -s*0.78); ctx.stroke();
   var wv = tick * 0.02;
   ctx.fillStyle = '#aaa';
-  ctx.beginPath(); ctx.moveTo(Math.cos(wv)*8, -s*0.76+Math.sin(wv)*4);
-  ctx.lineTo(0, -s*0.76); ctx.lineTo(Math.cos(wv+Math.PI)*5, -s*0.76+Math.sin(wv+Math.PI)*2);
+  ctx.beginPath(); ctx.moveTo(Math.cos(wv)*9, -s*0.78+Math.sin(wv)*5);
+  ctx.lineTo(0, -s*0.78); ctx.lineTo(Math.cos(wv+Math.PI)*6, -s*0.78+Math.sin(wv+Math.PI)*3);
   ctx.closePath(); ctx.fill();
+  // N/S/E/W compass on vane
+  ctx.fillStyle = '#ccc'; ctx.font = '5px Arial'; ctx.textBaseline='middle';
+  ctx.fillText('N', 0, -s*0.84);
+
+  // Rooster on roof
+  if (level >= 3) {
+    var rc = Math.sin(tick * 0.05) * 3;
+    ctx.font = '9px Arial'; ctx.textAlign='center';
+    ctx.fillText('🐓', -s*0.18, -s*0.54 + rc);
+  }
+  // Irrigation pipe
+  ctx.strokeStyle = 'rgba(100,180,255,0.6)'; ctx.lineWidth = 1;
+  ctx.setLineDash([2,3]);
+  ctx.beginPath(); ctx.moveTo(-s*0.46, -s*0.02); ctx.lineTo(s*0.46, -s*0.02); ctx.stroke();
+  ctx.setLineDash([]);
 };
 
 // ── HOUSE ────────────────────────────────────────────────────
@@ -814,35 +863,118 @@ GameRenderer.prototype._sHouse = function(ctx, s, level, tick) {
   var floors = Math.min(1 + Math.floor(level / 6), 4);
   var fh = s * 0.24;
   var wallHues = [30, 28, 32, 27];
+
+  // Foundation with grass strip
+  ctx.fillStyle = '#3a7d2f';
+  ctx.beginPath(); ctx.ellipse(0, s*0.02, s*0.44, s*0.06, 0, 0, Math.PI*2); ctx.fill();
+  // Paved path
+  ctx.fillStyle = '#c8b8a0';
+  ctx.beginPath(); ctx.moveTo(-s*0.05, 0); ctx.lineTo(s*0.05, 0); ctx.lineTo(s*0.04, s*0.06); ctx.lineTo(-s*0.04, s*0.06); ctx.closePath(); ctx.fill();
+  // Path stones
+  ctx.fillStyle = '#b0a090';
+  for (var ps = 0; ps < 2; ps++) {
+    ctx.beginPath(); ctx.ellipse(0, s*0.02 + ps*s*0.025, s*0.025, s*0.01, 0, 0, Math.PI*2); ctx.fill();
+  }
+
   for (var f = 0; f < floors; f++) {
     var fy = -f * fh;
     var h = wallHues[f % 4];
     this._isoBox(ctx, -s*0.38, fy - fh, s*0.76, fh, h, 50, 50);
-    // Windows
-    this._isoWin(ctx, -s*0.28, fy - fh + s*0.04, s*0.14, s*0.12, false, tick);
-    this._isoWin(ctx, s*0.06, fy - fh + s*0.04, s*0.14, s*0.12, f===0, tick);
-    if (f > 1) this._isoWin(ctx, -s*0.1, fy - fh + s*0.04, s*0.12, s*0.1, false, tick);
+    // Brick pattern on lower floors
+    if (f === 0) {
+      ctx.fillStyle = 'rgba(0,0,0,0.04)';
+      for (var br = 0; br < 3; br++) {
+        for (var bc = 0; bc < 5; bc++) {
+          if ((br+bc)%2===0) ctx.fillRect(-s*0.36 + bc*s*0.15, fy - fh + br*s*0.07, s*0.15, s*0.07);
+        }
+      }
+    }
+    // Windows with frames and curtains
+    var wPositions = [-s*0.28, s*0.06];
+    if (floors > 2 && f > 0) wPositions.push(-s*0.1);
+    for (var wi = 0; wi < wPositions.length; wi++) {
+      var wx2 = wPositions[wi];
+      // Window frame
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(wx2 - 2, fy - fh + s*0.02, s*0.14+4, s*0.14);
+      this._isoWin(ctx, wx2, fy - fh + s*0.04, s*0.14, s*0.12, f===0 && wi===1, tick);
+      // Curtains
+      ctx.fillStyle = 'rgba(255,150,50,0.35)';
+      ctx.fillRect(wx2, fy - fh + s*0.04, s*0.03, s*0.12);
+      ctx.fillRect(wx2 + s*0.11, fy - fh + s*0.04, s*0.03, s*0.12);
+      // Window sill
+      ctx.fillStyle = '#c8b090';
+      ctx.fillRect(wx2 - 2, fy - fh + s*0.16, s*0.14+4, s*0.02);
+    }
+    // Balcony on upper floors
+    if (f > 0) {
+      ctx.fillStyle = '#c8b090';
+      ctx.fillRect(-s*0.3, fy - s*0.02, s*0.6, s*0.03);
+      // Balcony railing
+      ctx.strokeStyle = '#888'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(-s*0.3, fy-s*0.02); ctx.lineTo(-s*0.3, fy-s*0.1); ctx.lineTo(s*0.3, fy-s*0.1); ctx.lineTo(s*0.3, fy-s*0.02); ctx.stroke();
+      for (var rl = -4; rl <= 4; rl++) { ctx.beginPath(); ctx.moveTo(rl*s*0.07, fy-s*0.02); ctx.lineTo(rl*s*0.07, fy-s*0.1); ctx.stroke(); }
+      // Flower pot on balcony
+      ctx.fillStyle = '#c84a2a'; ctx.fillRect(-s*0.26, fy-s*0.1, s*0.06, s*0.04);
+      ctx.fillStyle = '#e83b1e'; ctx.beginPath(); ctx.arc(-s*0.23, fy-s*0.13, 4, 0, Math.PI*2); ctx.fill();
+    }
   }
-  // Foundation
+
+  // Foundation base
   ctx.fillStyle = '#5a4a3a'; ctx.fillRect(-s*0.4, 0, s*0.8, s*0.04);
-  // Roof
+
+  // Roof with shingles
   var ry = -floors * fh;
   this._roof(ctx, -s*0.42, ry, s*0.84, s*0.32, '#8b1a1a', '#5a1111');
-  // Dormer window in roof
+  // Shingle lines on roof
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 0.5;
+  for (var sh = 1; sh < 4; sh++) {
+    var sy2 = ry + sh * s*0.08;
+    var sw3 = s*0.84 - sh*s*0.15;
+    ctx.beginPath(); ctx.moveTo(-sw3/2, sy2); ctx.lineTo(sw3/2, sy2); ctx.stroke();
+  }
+  // Dormer
   if (floors >= 2) {
     this._isoBox(ctx, -s*0.1, ry - s*0.22, s*0.2, s*0.14, 30, 50, 48);
     this._roof(ctx, -s*0.13, ry - s*0.22, s*0.26, s*0.1, '#8b1a1a', '#5a1111');
+    this._isoWin(ctx, -s*0.07, ry - s*0.2, s*0.14, s*0.1, false, tick);
   }
-  // Chimney
-  ctx.fillStyle = '#6d4c41'; ctx.fillRect(s*0.1, ry - s*0.36, s*0.1, s*0.22);
-  ctx.fillStyle = '#5d3c31'; ctx.fillRect(s*0.08, ry - s*0.38, s*0.14, s*0.04);
+
+  // Chimney with bricks
+  ctx.fillStyle = '#6d4c41'; ctx.fillRect(s*0.1, ry - s*0.38, s*0.1, s*0.24);
+  ctx.fillStyle = '#7d5c51';
+  for (var cb = 0; cb < 3; cb++) { ctx.fillRect(s*0.1, ry - s*0.38 + cb*s*0.07, s*0.05, s*0.06); }
+  ctx.fillStyle = '#5d3c31'; ctx.fillRect(s*0.08, ry - s*0.4, s*0.14, s*0.04);
   // Smoke
-  this._smoke(ctx, s*0.15, ry - s*0.36, tick, 0);
-  this._smoke(ctx, s*0.15, ry - s*0.36, tick, 18);
-  // Door
+  this._smoke(ctx, s*0.15, ry - s*0.38, tick, 0);
+  this._smoke(ctx, s*0.15, ry - s*0.38, tick, 18);
+
+  // Door with arch and details
   ctx.fillStyle = '#4a2800';
-  ctx.beginPath(); ctx.roundRect(-s*0.08, -s*0.22, s*0.16, s*0.22, [4, 4, 0, 0]); ctx.fill();
-  ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(-s*0.02, -s*0.11, 2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(-s*0.08, -s*0.22, s*0.16, s*0.22, [6, 6, 0, 0]); ctx.fill();
+  // Door panels
+  ctx.strokeStyle = '#6b3810'; ctx.lineWidth = 0.5;
+  ctx.strokeRect(-s*0.06, -s*0.2, s*0.12, s*0.08);
+  ctx.strokeRect(-s*0.06, -s*0.1, s*0.12, s*0.08);
+  // Doorknob
+  ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(s*0.04, -s*0.12, 2, 0, Math.PI*2); ctx.fill();
+  // Door lamp
+  var dl = 0.5 + 0.5*Math.sin(tick*0.07);
+  ctx.shadowColor = '#fef9c3'; ctx.shadowBlur = 10*dl;
+  ctx.fillStyle = '#fef9c3'; ctx.beginPath(); ctx.arc(-s*0.1, -s*0.22, 3, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Street lamp
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(s*0.36, -s*0.02); ctx.lineTo(s*0.36, -s*0.44); ctx.lineTo(s*0.28, -s*0.48); ctx.stroke();
+  var lp2 = 0.6 + 0.4*Math.sin(tick*0.05);
+  ctx.shadowColor = '#fef9c3'; ctx.shadowBlur = 15*lp2;
+  ctx.fillStyle = '#fef9c3'; ctx.beginPath(); ctx.arc(s*0.28, -s*0.48, 4, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Mailbox
+  ctx.fillStyle = '#dc2626'; ctx.fillRect(-s*0.44, -s*0.1, s*0.08, s*0.06);
+  ctx.fillStyle = '#555'; ctx.fillRect(-s*0.43, -s*0.1, s*0.01, s*0.1);
 };
 
 // ── QUARRY ───────────────────────────────────────────────────
@@ -908,16 +1040,37 @@ GameRenderer.prototype._sQuarry = function(ctx, s, level, tick) {
 
 // ── FACTORY ──────────────────────────────────────────────────
 GameRenderer.prototype._sFactory = function(ctx, s, level, tick) {
+  // Ground / concrete pad
+  ctx.fillStyle = '#374151';
+  ctx.beginPath(); ctx.ellipse(0, s*0.02, s*0.52, s*0.07, 0, 0, Math.PI*2); ctx.fill();
+  // Concrete cracks
+  ctx.strokeStyle = '#2d3748'; ctx.lineWidth = 0.5; ctx.setLineDash([2,4]);
+  ctx.beginPath(); ctx.moveTo(-s*0.3, s*0.01); ctx.lineTo(-s*0.1, s*0.03); ctx.lineTo(s*0.2, s*0.00); ctx.stroke();
+  ctx.setLineDash([]);
+
   // Main building body
   this._isoBox(ctx, -s*0.44, -s*0.54, s*0.88, s*0.54, 220, 15, 38);
-  // Roof detail - concrete ledge
+  // Roof detail - concrete ledge with parapet
   ctx.fillStyle = '#475569';
   ctx.fillRect(-s*0.46, -s*0.56, s*0.92, s*0.04);
+  // Parapet crenelations
+  for (var pp = -4; pp <= 4; pp++) {
+    ctx.fillStyle = pp%2===0 ? '#3d4a5a' : '#475569';
+    ctx.fillRect(-s*0.44 + (pp+4)*s*0.11, -s*0.6, s*0.08, s*0.06);
+  }
+  // Wall panels
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-s*0.1, -s*0.54); ctx.lineTo(-s*0.1, 0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(s*0.1, -s*0.54); ctx.lineTo(s*0.1, 0); ctx.stroke();
 
-  // Windows - row of industrial windows
+  // Windows - row of industrial windows with grilles
   for (var wi = 0; wi < 3; wi++) {
     this._isoBox(ctx, -s*0.36 + wi*s*0.26, -s*0.44, s*0.18, s*0.28, 210, 30, 52);
     this._isoWin(ctx, -s*0.32 + wi*s*0.26, -s*0.42, s*0.14, s*0.2, wi===1, tick);
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1;
+    for (var wg2 = 1; wg2 <= 2; wg2++) {
+      ctx.beginPath(); ctx.moveTo(-s*0.32 + wi*s*0.26 + wg2*s*0.035, -s*0.42); ctx.lineTo(-s*0.32 + wi*s*0.26 + wg2*s*0.035, -s*0.22); ctx.stroke();
+    }
   }
 
   // Loading bay door
@@ -928,26 +1081,43 @@ GameRenderer.prototype._sFactory = function(ctx, s, level, tick) {
     ctx.fillStyle = ds%2===0 ? '#fbbf24' : '#1e293b';
     ctx.fillRect(-s*0.12, -s*0.28 + ds*s*0.07, s*0.24, s*0.07);
   }
+  // Dock bumpers
+  ctx.fillStyle = '#ef4444';
+  ctx.fillRect(-s*0.14, -s*0.04, s*0.04, s*0.04);
+  ctx.fillRect(s*0.1, -s*0.04, s*0.04, s*0.04);
 
-  // Chimneys
+  // Chimneys with safety bands
   var nc = Math.min(2 + Math.floor(level/3), 5);
   for (var ci = 0; ci < nc; ci++) {
     var cx2 = -s*0.36 + ci*(s*0.72/(nc-1||1));
-    // Chimney body
-    this._isoBox(ctx, cx2-s*0.05, -s*0.78, s*0.1, s*0.26, 220, 10, 30);
-    // Chimney cap
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(cx2-s*0.07, -s*0.78, s*0.14, s*0.03);
-    // Smoke
-    this._smoke(ctx, cx2, -s*0.78, tick, ci*15, null);
-    this._smoke(ctx, cx2, -s*0.78, tick, ci*15+25, null);
+    this._isoBox(ctx, cx2-s*0.05, -s*0.8, s*0.1, s*0.26, 220, 10, 30);
+    ctx.fillStyle = '#fbbf24'; ctx.fillRect(cx2-s*0.055, -s*0.74, s*0.11, s*0.025);
+    ctx.fillStyle = '#fbbf24'; ctx.fillRect(cx2-s*0.055, -s*0.62, s*0.11, s*0.025);
+    ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.arc(cx2, -s*0.8, s*0.065, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(cx2, -s*0.8, s*0.045, 0, Math.PI*2); ctx.fill();
+    this._smoke(ctx, cx2, -s*0.8, tick, ci*15, null);
+    this._smoke(ctx, cx2, -s*0.8, tick, ci*15+25, null);
   }
 
-  // Sign
+  // Warning lights
+  var bl = Math.floor(tick/20)%2===0;
+  ctx.shadowColor = '#ef4444'; ctx.shadowBlur = bl ? 12 : 0;
+  ctx.fillStyle = bl ? '#ef4444' : '#7f1d1d';
+  ctx.beginPath(); ctx.arc(-s*0.4, -s*0.58, 4, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = '#3b82f6'; ctx.shadowBlur = bl ? 0 : 12;
+  ctx.fillStyle = bl ? '#1d4ed8' : '#3b82f6';
+  ctx.beginPath(); ctx.arc(s*0.4, -s*0.58, 4, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Sign with neon effect
+  var ng = 0.8 + 0.2*Math.sin(tick*0.1);
+  ctx.shadowColor = '#3b82f6'; ctx.shadowBlur = 8*ng;
   ctx.fillStyle = '#1e40af';
   ctx.fillRect(-s*0.28, -s*0.52, s*0.56, s*0.1);
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 7px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255,255,255,'+ng+')'; ctx.font = 'bold 7px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText('FACTORY', 0, -s*0.47);
+  ctx.shadowBlur = 0;
 };
 
 // ── POWERPLANT ───────────────────────────────────────────────

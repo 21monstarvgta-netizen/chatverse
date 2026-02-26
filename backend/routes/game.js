@@ -782,6 +782,28 @@ router.post('/threat/damage/:threatId', auth, async function(req, res) {
 });
 
 // Rename
+router.post('/normalize-territory', auth, async function(req, res) {
+  try {
+    var x1 = parseInt(req.body.x1), y1 = parseInt(req.body.y1);
+    var x2 = parseInt(req.body.x2), y2 = parseInt(req.body.y2);
+    if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return res.status(400).json({ error: 'Неверные координаты' });
+    var gs = 40;
+    x1 = Math.max(0, x1); y1 = Math.max(0, y1);
+    x2 = Math.min(gs-1, x2); y2 = Math.min(gs-1, y2);
+
+    var player = await getOrCreatePlayer(req.userId);
+    // Add a new zone that covers the full bounding rectangle
+    if (!player.unlockedZones) player.unlockedZones = [];
+    // Check if this zone already exists or is covered
+    player.unlockedZones.push({ x1: x1, y1: y1, x2: x2, y2: y2 });
+    player.markModified('unlockedZones');
+    await player.save();
+    res.json({ success: true, player: getPlayerState(player) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка: ' + error.message });
+  }
+});
+
 router.post('/rename', auth, async function(req, res) {
   try {
     var name = req.body.name;

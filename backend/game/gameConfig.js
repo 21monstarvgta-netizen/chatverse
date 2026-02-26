@@ -216,7 +216,7 @@ var RESOURCE_DEFAULTS = {
   population: 0,
   experience: 0,
   crystals: 50,
-  maxStorage: 5000
+  maxStorage: 50000
 };
 
 // Fixed story quests

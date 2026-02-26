@@ -716,6 +716,54 @@ Game.prototype.updateHoverZonePreview = function(x, y) {
 };
 
 
+// Normalize all unlocked tiles to a perfect rectangle, fitting all buildings inside
+Game.prototype.normalizeTerritory = async function() {
+  var tiles = this.renderer.unlockedTiles;
+  var tileKeys = Object.keys(tiles);
+  if (tileKeys.length === 0) { this.showNotification('Нет открытых тайлов!', 'error'); return; }
+
+  // Find bounding box of all unlocked tiles
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (var i = 0; i < tileKeys.length; i++) {
+    var parts = tileKeys[i].split(',');
+    var tx = parseInt(parts[0]), ty = parseInt(parts[1]);
+    if (tx < minX) minX = tx; if (tx > maxX) maxX = tx;
+    if (ty < minY) minY = ty; if (ty > maxY) maxY = ty;
+  }
+
+  // Also include all buildings in the bounding box
+  var buildings = this.player.buildings || [];
+  for (var bi = 0; bi < buildings.length; bi++) {
+    var bx = buildings[bi].x, by = buildings[bi].y;
+    if (bx < minX) minX = bx; if (bx > maxX) maxX = bx;
+    if (by < minY) minY = by; if (by > maxY) maxY = by;
+  }
+
+  // Make the rectangle equal on opposite sides (make it a proper rectangle)
+  var w = maxX - minX + 1;
+  var h = maxY - minY + 1;
+  // Expand to equal dimensions if needed? No — just ensure it's a clean rect.
+  // But "равный прямоугольник" means opposite sides equal (that's always true for a rect).
+  // So we just fill in the bounding box uniformly.
+
+  // Send to backend to update zones
+  try {
+    var data = await apiRequest('/game/normalize-territory', {
+      method: 'POST',
+      body: JSON.stringify({ x1: minX, y1: minY, x2: maxX, y2: maxY })
+    });
+    if (data.success) {
+      this.player = data.player;
+      this.updateRendererState();
+      this.showNotification('✅ Территория нормализована: ' + w + 'x' + h + ' клеток', 'success');
+    } else {
+      this.showNotification(data.error || 'Ошибка', 'error');
+    }
+  } catch (e) {
+    this.showNotification('Ошибка нормализации: ' + e.message, 'error');
+  }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
   game = new Game();
 });
