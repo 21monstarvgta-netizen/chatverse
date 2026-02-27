@@ -4645,155 +4645,191 @@ GameRenderer.prototype._sFirestation = function(ctx, s, level, tick) {
 // ─── CENTRALPARK — 4×4 Urban Park ───────────────────────────
 GameRenderer.prototype._sCentralPark = function(ctx, s, level, tick) {
   var t = tick;
+  // s ~ tw*0.70*2.6 for 4x4, origin (0,0) = isometric center of footprint
+  // The footprint diamond in sprite-space: width = s*1.4, half-height = s*0.55
+  // Draw EVERYTHING within these bounds.
+  var W = s * 0.68;  // half-width of iso diamond (fits footprint)
+  var H = s * 0.44;  // half-height of iso diamond
 
-  // === PARK GROUND — multi-zone lawn ===
-  var parkGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, s*1.2);
-  parkGrad.addColorStop(0, '#56c75a'); parkGrad.addColorStop(0.5, '#3da842'); parkGrad.addColorStop(1, '#2d8a30');
+  // === ISOMETRIC GROUND — exact footprint shape ===
+  // Draw the isometric diamond as the lawn base
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, -H);        // top
+  ctx.lineTo(W, 0);         // right
+  ctx.lineTo(0, H);         // bottom
+  ctx.lineTo(-W, 0);        // left
+  ctx.closePath();
+  var parkGrad = ctx.createLinearGradient(-W, 0, W, 0);
+  parkGrad.addColorStop(0, '#2d8a30');
+  parkGrad.addColorStop(0.3, '#3da842');
+  parkGrad.addColorStop(0.7, '#56c75a');
+  parkGrad.addColorStop(1, '#2e7d32');
   ctx.fillStyle = parkGrad;
-  ctx.beginPath(); ctx.ellipse(0, s*0.1, s*1.1, s*0.55, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fill();
 
-  // Park paths (diagonal grid)
+  // Inner lawn texture bands
+  ctx.strokeStyle = 'rgba(60,160,60,0.25)'; ctx.lineWidth = 3;
+  for (var lb = 1; lb < 5; lb++) {
+    var lbf = lb / 5;
+    ctx.beginPath();
+    ctx.moveTo(0, -H*lbf);
+    ctx.lineTo(W*lbf, 0);
+    ctx.lineTo(0, H*lbf);
+    ctx.lineTo(-W*lbf, 0);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Clip all content to the diamond footprint
+  ctx.beginPath();
+  ctx.moveTo(0, -H); ctx.lineTo(W, 0); ctx.lineTo(0, H); ctx.lineTo(-W, 0);
+  ctx.closePath();
+  ctx.clip();
+
+  // === PATHS (diagonal cross — isometric aligned) ===
   ctx.fillStyle = '#d4c4a0';
-  // Main cross paths
-  ctx.fillRect(-s*0.07, -s*0.45, s*0.14, s*0.65);
-  ctx.fillRect(-s*0.8, -s*0.04, s*1.6, s*0.14);
-  // Diagonal corner paths
-  ctx.save(); ctx.translate(-s*0.35, -s*0.15); ctx.rotate(Math.PI/4);
-  ctx.fillRect(-s*0.04, -s*0.28, s*0.08, s*0.56); ctx.restore();
-  ctx.save(); ctx.translate(s*0.35, -s*0.15); ctx.rotate(-Math.PI/4);
-  ctx.fillRect(-s*0.04, -s*0.28, s*0.08, s*0.56); ctx.restore();
+  // Vertical axis path (top to bottom of diamond)
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(-s*0.05, -H); ctx.lineTo(s*0.05, -H);
+  ctx.lineTo(s*0.05, H);   ctx.lineTo(-s*0.05, H);
+  ctx.closePath(); ctx.fill();
+  // Horizontal axis path
+  ctx.beginPath();
+  ctx.moveTo(-W, -s*0.04); ctx.lineTo(W, -s*0.04);
+  ctx.lineTo(W, s*0.04);   ctx.lineTo(-W, s*0.04);
+  ctx.closePath(); ctx.fill();
+  // Diagonal paths
+  ctx.save(); ctx.rotate(Math.PI/4);
+  ctx.fillRect(-s*0.04, -H*0.8, s*0.08, H*1.6); ctx.restore();
+  ctx.save(); ctx.rotate(-Math.PI/4);
+  ctx.fillRect(-s*0.04, -H*0.8, s*0.08, H*1.6); ctx.restore();
+  ctx.restore();
 
-  // === GRAND FOUNTAIN (center) ===
-  // Basin outer rim
-  ctx.fillStyle = '#8bafc8';
-  ctx.beginPath(); ctx.ellipse(0, s*0.04, s*0.28, s*0.12, 0, 0, Math.PI*2); ctx.fill();
-  ctx.strokeStyle = '#c8dce8'; ctx.lineWidth = 2; ctx.stroke();
-  // Water surface
-  var wAnim = Math.sin(t*0.05)*0.02;
-  ctx.fillStyle = '#64b5f6';
-  ctx.beginPath(); ctx.ellipse(0, s*0.04+wAnim, s*0.24, s*0.1, 0, 0, Math.PI*2); ctx.fill();
-  // Water shimmer
-  for (var ws2 = 0; ws2 < 6; ws2++) {
-    var wsA = t*0.04+ws2*1.05;
-    ctx.strokeStyle = 'rgba(255,255,255,'+(0.2+0.2*Math.sin(wsA))+')'; ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(wsA)*s*0.1, s*0.04+Math.sin(wsA*0.7)*s*0.04);
-    ctx.lineTo(Math.cos(wsA)*s*0.14, s*0.04+Math.sin(wsA*0.7)*s*0.06);
-    ctx.stroke();
-  }
-  // Tiered fountain structure
-  ctx.fillStyle = '#7cb9e8';
-  ctx.beginPath(); ctx.ellipse(0, s*0.02, s*0.1, s*0.04, 0, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#5599cc';
-  ctx.beginPath(); ctx.ellipse(0, s*0.0, s*0.05, s*0.02, 0, 0, Math.PI*2); ctx.fill();
-  // Fountain spout streams
-  for (var fsp2 = 0; fsp2 < 6; fsp2++) {
-    var fspA2 = fsp2 * Math.PI/3;
-    var fspPh = (t*0.04 + fsp2*0.5) % 1;
-    var fspH = fspPh * s*0.22;
-    var fspAlpha = Math.max(0, 0.7*(1-fspPh));
-    ctx.strokeStyle = 'rgba(100,200,255,'+fspAlpha+')'; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.quadraticCurveTo(
-      Math.cos(fspA2)*s*0.08, -fspH*0.7,
-      Math.cos(fspA2)*s*0.12, -fspH+s*0.04
-    );
-    ctx.stroke();
-  }
-  // Central column
-  ctx.fillStyle = '#c0d0e0';
-  ctx.fillRect(-s*0.02, -s*0.2, s*0.04, s*0.22);
-  ctx.fillStyle = '#e0eef8';
-  ctx.beginPath(); ctx.arc(0, -s*0.22, s*0.03, 0, Math.PI*2); ctx.fill();
-
-  // === FLOWERBEDS (4 quadrants) ===
-  var fbQuads = [{x:-s*0.45,y:-s*0.25},{x:s*0.45,y:-s*0.25},{x:-s*0.45,y:s*0.22},{x:s*0.45,y:s*0.22}];
+  // === FLOWERBEDS (4 corners inside diamond) ===
+  var fbPos = [{x:-W*0.52,y:-H*0.2},{x:W*0.52,y:-H*0.2},{x:-W*0.52,y:H*0.3},{x:W*0.52,y:H*0.3}];
   var fbColors = [['#ff4444','#ff8800','#ffcc00'],['#ee44ee','#8844ff','#4488ff'],
                   ['#44ff88','#ffee44','#ff4488'],['#ff6644','#44aaff','#aaff44']];
-  for (var fb2 = 0; fb2 < fbQuads.length; fb2++) {
+  for (var fb2 = 0; fb2 < 4; fb2++) {
     ctx.fillStyle = '#2d8a30';
-    ctx.beginPath(); ctx.ellipse(fbQuads[fb2].x, fbQuads[fb2].y, s*0.14, s*0.06, 0, 0, Math.PI*2); ctx.fill();
-    // Flowers
-    for (var fl2 = 0; fl2 < 9; fl2++) {
-      var fla = fl2 * Math.PI*2/9 + Math.sin(t*0.01+fb2)*0.05;
-      var flr = (fl2 % 3)*s*0.035 + s*0.02;
-      var flx = fbQuads[fb2].x + Math.cos(fla)*flr;
-      var fly = fbQuads[fb2].y + Math.sin(fla)*flr*0.4;
+    ctx.beginPath(); ctx.ellipse(fbPos[fb2].x, fbPos[fb2].y, s*0.1, s*0.05, 0, 0, Math.PI*2); ctx.fill();
+    for (var fl2 = 0; fl2 < 7; fl2++) {
+      var fla = fl2 * Math.PI*2/7;
+      var flr = s*0.05;
+      var flx = fbPos[fb2].x + Math.cos(fla)*flr;
+      var fly = fbPos[fb2].y + Math.sin(fla)*flr*0.5;
       ctx.fillStyle = fbColors[fb2][fl2%3];
-      ctx.beginPath(); ctx.arc(flx, fly, s*0.014, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#fff700';
-      ctx.beginPath(); ctx.arc(flx, fly, s*0.006, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(flx, fly, s*0.012, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffff00';
+      ctx.beginPath(); ctx.arc(flx, fly, s*0.005, 0, Math.PI*2); ctx.fill();
     }
   }
 
-  // === TALL TREES (8 major trees) ===
-  var bigTrees = [
-    {x:-s*0.68,y:-s*0.22,h:s*0.38,r:s*0.1,c:'#1b5e20'},
-    {x:s*0.68,y:-s*0.22,h:s*0.38,r:s*0.1,c:'#1b5e20'},
-    {x:-s*0.68,y:s*0.16,h:s*0.32,r:s*0.09,c:'#2e7d32'},
-    {x:s*0.68,y:s*0.16,h:s*0.32,r:s*0.09,c:'#2e7d32'},
-    {x:-s*0.2,y:-s*0.38,h:s*0.28,r:s*0.08,c:'#388e3c'},
-    {x:s*0.2,y:-s*0.38,h:s*0.28,r:s*0.08,c:'#388e3c'},
-    {x:-s*0.5,y:-s*0.01,h:s*0.24,r:s*0.07,c:'#43a047'},
-    {x:s*0.5,y:-s*0.01,h:s*0.24,r:s*0.07,c:'#43a047'},
+  // === TREES (8, placed inside diamond bounds) ===
+  var treePos = [
+    {x:-W*0.7,y:-H*0.05,r:s*0.08,c:'#1b5e20'}, {x:W*0.7,y:-H*0.05,r:s*0.08,c:'#1b5e20'},
+    {x:0,y:-H*0.62,r:s*0.07,c:'#2e7d32'},       {x:0,y:H*0.62,r:s*0.07,c:'#2e7d32'},
+    {x:-W*0.42,y:-H*0.45,r:s*0.065,c:'#388e3c'},{x:W*0.42,y:-H*0.45,r:s*0.065,c:'#388e3c'},
+    {x:-W*0.42,y:H*0.45,r:s*0.065,c:'#43a047'}, {x:W*0.42,y:H*0.45,r:s*0.065,c:'#43a047'},
   ];
-  for (var bt3 = 0; bt3 < bigTrees.length; bt3++) {
-    var tr3 = bigTrees[bt3];
-    var twv = Math.sin(t*0.025+bt3*0.8)*s*0.012;
+  for (var tr3 = 0; tr3 < treePos.length; tr3++) {
+    var tp = treePos[tr3];
+    var twv = Math.sin(t*0.025+tr3*0.8)*s*0.008;
     // Trunk
     ctx.fillStyle = '#5d4037';
-    ctx.fillRect(tr3.x-s*0.015+twv*0.3, tr3.y, s*0.03, -tr3.h*0.35);
+    ctx.fillRect(tp.x-s*0.012+twv*0.3, tp.y, s*0.024, -tp.r*0.6);
     // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.12)';
-    ctx.beginPath(); ctx.ellipse(tr3.x+s*0.04, tr3.y-tr3.h*0.08, tr3.r*0.9, tr3.r*0.35, 0, 0, Math.PI*2); ctx.fill();
-    // 3 canopy layers
-    ctx.fillStyle = tr3.c;
-    ctx.beginPath(); ctx.arc(tr3.x+twv, tr3.y-tr3.h, tr3.r, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    ctx.beginPath(); ctx.ellipse(tp.x+s*0.025, tp.y-tp.r*0.1, tp.r*0.7, tp.r*0.28, 0, 0, Math.PI*2); ctx.fill();
+    // Canopy layers
+    ctx.fillStyle = tp.c;
+    ctx.beginPath(); ctx.arc(tp.x+twv, tp.y-tp.r*1.3, tp.r, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#4caf50';
-    ctx.beginPath(); ctx.arc(tr3.x+twv*0.7, tr3.y-tr3.h-tr3.r*0.4, tr3.r*0.75, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(tp.x+twv*0.7, tp.y-tp.r*1.7, tp.r*0.75, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#66bb6a';
-    ctx.beginPath(); ctx.arc(tr3.x+twv*0.4, tr3.y-tr3.h-tr3.r*0.75, tr3.r*0.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(tp.x+twv*0.4, tp.y-tp.r*2.05, tp.r*0.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  ctx.restore(); // end clip
+
+  // === GRAND FOUNTAIN (center, above clip so it can overflow slightly) ===
+  // Basin rim (isometric ellipse)
+  ctx.fillStyle = '#7cb9e8';
+  ctx.beginPath(); ctx.ellipse(0, s*0.02, s*0.16, s*0.07, 0, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#c8dce8'; ctx.lineWidth = 1.5; ctx.stroke();
+  // Water
+  ctx.fillStyle = '#42a5f5';
+  ctx.beginPath(); ctx.ellipse(0, s*0.02, s*0.13, s*0.055, 0, 0, Math.PI*2); ctx.fill();
+  // Shimmer
+  for (var ws2 = 0; ws2 < 4; ws2++) {
+    var wsA = t*0.05+ws2*1.57;
+    ctx.strokeStyle = 'rgba(255,255,255,'+(0.3+0.25*Math.sin(wsA))+')'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(wsA)*s*0.06, s*0.02+Math.sin(wsA*0.7)*s*0.025);
+    ctx.lineTo(Math.cos(wsA)*s*0.1,  s*0.02+Math.sin(wsA*0.7)*s*0.04);
+    ctx.stroke();
+  }
+  // Tiers
+  ctx.fillStyle = '#90caf9';
+  ctx.beginPath(); ctx.ellipse(0, -s*0.01, s*0.07, s*0.03, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#5c9ecf';
+  ctx.beginPath(); ctx.ellipse(0, -s*0.03, s*0.035, s*0.015, 0, 0, Math.PI*2); ctx.fill();
+  // Column
+  ctx.fillStyle = '#c0d0e0';
+  ctx.fillRect(-s*0.016, -s*0.18, s*0.032, s*0.15);
+  ctx.fillStyle = '#e0eef8';
+  ctx.beginPath(); ctx.arc(0, -s*0.18, s*0.025, 0, Math.PI*2); ctx.fill();
+  // Water jets
+  for (var fsp2 = 0; fsp2 < 5; fsp2++) {
+    var fspA2 = fsp2 * Math.PI*2/5;
+    var fspPh = (t*0.035 + fsp2*0.4) % 1;
+    var fspH = fspPh * s*0.16;
+    ctx.strokeStyle = 'rgba(100,200,255,'+(Math.max(0, 0.7*(1-fspPh)))+')'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -s*0.03);
+    ctx.quadraticCurveTo(
+      Math.cos(fspA2)*s*0.06, -fspH*0.6,
+      Math.cos(fspA2)*s*0.09, -fspH+s*0.02
+    );
+    ctx.stroke();
   }
 
   // === BENCHES ===
-  var benches2 = [{x:-s*0.22,y:-s*0.1},{x:s*0.22,y:s*0.12},{x:-s*0.08,y:s*0.25},{x:s*0.08,y:-s*0.2}];
-  for (var bn2 = 0; bn2 < benches2.length; bn2++) {
-    var bnA2 = Math.atan2(benches2[bn2].y, benches2[bn2].x);
-    ctx.save(); ctx.translate(benches2[bn2].x, benches2[bn2].y);
+  var bnPos = [{x:-s*0.18,y:s*0.04},{x:s*0.18,y:s*0.04},{x:0,y:-s*0.14},{x:0,y:s*0.22}];
+  for (var bn2 = 0; bn2 < 4; bn2++) {
+    ctx.save(); ctx.translate(bnPos[bn2].x, bnPos[bn2].y);
     ctx.fillStyle = '#8d6e63';
-    ctx.fillRect(-s*0.07, -s*0.01, s*0.14, s*0.025);
+    ctx.fillRect(-s*0.055, -s*0.008, s*0.11, s*0.02);
+    ctx.fillRect(-s*0.055, -s*0.03, s*0.11, s*0.015);
     ctx.fillStyle = '#795548';
-    ctx.fillRect(-s*0.06, s*0.015, s*0.02, s*0.03);
-    ctx.fillRect(s*0.04, s*0.015, s*0.02, s*0.03);
-    // Backrest
-    ctx.fillStyle = '#8d6e63';
-    ctx.fillRect(-s*0.07, -s*0.04, s*0.14, s*0.02);
+    ctx.fillRect(-s*0.05, s*0.012, s*0.015, s*0.025);
+    ctx.fillRect(s*0.035, s*0.012, s*0.015, s*0.025);
     ctx.restore();
   }
 
-  // === LAMP POSTS (6) ===
-  var lamps2 = [{x:-s*0.3,y:-s*0.18},{x:s*0.3,y:-s*0.18},{x:-s*0.3,y:s*0.12},{x:s*0.3,y:s*0.12},{x:0,y:-s*0.38},{x:0,y:s*0.3}];
-  for (var lp2 = 0; lp2 < lamps2.length; lp2++) {
+  // === LAMP POSTS ===
+  var lPos = [{x:-W*0.3,y:-H*0.25},{x:W*0.3,y:-H*0.25},{x:-W*0.3,y:H*0.2},{x:W*0.3,y:H*0.2}];
+  for (var lp2 = 0; lp2 < 4; lp2++) {
     ctx.strokeStyle = '#546e7a'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(lamps2[lp2].x, lamps2[lp2].y); ctx.lineTo(lamps2[lp2].x, lamps2[lp2].y-s*0.2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lPos[lp2].x, lPos[lp2].y); ctx.lineTo(lPos[lp2].x, lPos[lp2].y-s*0.16); ctx.stroke();
     var lglow = 0.4+0.3*Math.sin(t*0.04+lp2*1.1);
-    var lampH = ctx.createRadialGradient(lamps2[lp2].x, lamps2[lp2].y-s*0.22, 0, lamps2[lp2].x, lamps2[lp2].y-s*0.22, s*0.08);
-    lampH.addColorStop(0,'rgba(255,230,100,'+lglow+')'); lampH.addColorStop(1,'rgba(255,200,50,0)');
-    ctx.fillStyle=lampH; ctx.beginPath(); ctx.arc(lamps2[lp2].x, lamps2[lp2].y-s*0.22, s*0.08, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle='#ffd740'; ctx.beginPath(); ctx.arc(lamps2[lp2].x, lamps2[lp2].y-s*0.22, s*0.02, 0, Math.PI*2); ctx.fill();
+    var lampH2 = ctx.createRadialGradient(lPos[lp2].x, lPos[lp2].y-s*0.18, 0, lPos[lp2].x, lPos[lp2].y-s*0.18, s*0.07);
+    lampH2.addColorStop(0,'rgba(255,230,100,'+lglow+')'); lampH2.addColorStop(1,'rgba(255,200,50,0)');
+    ctx.fillStyle=lampH2; ctx.beginPath(); ctx.arc(lPos[lp2].x, lPos[lp2].y-s*0.18, s*0.07, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffd740'; ctx.beginPath(); ctx.arc(lPos[lp2].x, lPos[lp2].y-s*0.18, s*0.016, 0, Math.PI*2); ctx.fill();
   }
 
   // === BIRDS ===
   if (level >= 2) {
-    for (var bird2 = 0; bird2 < 5; bird2++) {
-      var bP2 = (t*0.015+bird2*1.26) % (Math.PI*2);
-      var bX2 = Math.cos(bP2)*s*0.55;
-      var bY2 = -s*0.4 - Math.abs(Math.sin(bP2*1.3))*s*0.12 - bird2*s*0.025;
-      ctx.strokeStyle = '#555'; ctx.lineWidth = 1.2;
+    for (var bird2 = 0; bird2 < 4; bird2++) {
+      var bP2 = (t*0.015+bird2*1.57) % (Math.PI*2);
+      var bX2 = Math.cos(bP2)*W*0.55;
+      var bY2 = -H*0.5 - Math.abs(Math.sin(bP2*1.3))*s*0.08 - bird2*s*0.02;
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(bX2-s*0.05, bY2);
-      ctx.quadraticCurveTo(bX2, bY2-s*0.025, bX2+s*0.05, bY2);
+      ctx.moveTo(bX2-s*0.04, bY2);
+      ctx.quadraticCurveTo(bX2, bY2-s*0.02, bX2+s*0.04, bY2);
       ctx.stroke();
     }
   }
@@ -4802,148 +4838,151 @@ GameRenderer.prototype._sCentralPark = function(ctx, s, level, tick) {
 // ─── BEACHLAKE — Resort Beach & Lake ────────────────────────
 GameRenderer.prototype._sBeachLake = function(ctx, s, level, tick) {
   var t = tick;
+  // s ~ tw*0.70*1.7 for 2x2, origin (0,0) = center of 2x2 footprint
+  var W = s * 0.68;  // half-width of iso diamond
+  var H = s * 0.44;  // half-height of iso diamond
 
-  // === SAND AREA ===
-  var sandGrad = ctx.createRadialGradient(s*0.1, s*0.12, 0, s*0.1, s*0.12, s*0.75);
-  sandGrad.addColorStop(0,'#f5deb3'); sandGrad.addColorStop(0.5,'#e8c98e'); sandGrad.addColorStop(1,'#d4b070');
-  ctx.fillStyle=sandGrad;
-  ctx.beginPath(); ctx.ellipse(s*0.08, s*0.1, s*0.7, s*0.32, 0, 0, Math.PI*2); ctx.fill();
+  // === ISOMETRIC GROUND — exact diamond footprint ===
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, -H); ctx.lineTo(W, 0); ctx.lineTo(0, H); ctx.lineTo(-W, 0);
+  ctx.closePath();
+  // Sand gradient across diamond
+  var sandGrad = ctx.createLinearGradient(-W, 0, W*0.4, 0);
+  sandGrad.addColorStop(0, '#1976d2');
+  sandGrad.addColorStop(0.35, '#42a5f5');
+  sandGrad.addColorStop(0.5, '#90caf9');
+  sandGrad.addColorStop(0.55, '#f5deb3');
+  sandGrad.addColorStop(1, '#e8c98e');
+  ctx.fillStyle = sandGrad;
+  ctx.fill();
 
-  // === LAKE (animated) ===
-  var lakePhase = Math.sin(t*0.04)*0.025;
-  var lakeGrad = ctx.createRadialGradient(-s*0.12, -s*0.06, 0, -s*0.12, -s*0.06, s*0.45);
-  lakeGrad.addColorStop(0,'#42a5f5'); lakeGrad.addColorStop(0.5,'#1976d2'); lakeGrad.addColorStop(1,'#0d47a1');
-  ctx.fillStyle=lakeGrad;
-  ctx.beginPath(); ctx.ellipse(-s*0.12, -s*0.04+lakePhase, s*0.44, s*0.22, -0.1, 0, Math.PI*2); ctx.fill();
-  // Shore edge
-  ctx.strokeStyle = 'rgba(100,180,255,0.5)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.ellipse(-s*0.12, -s*0.04, s*0.44, s*0.22, -0.1, 0, Math.PI*2); ctx.stroke();
-  // Lake shimmer lines
-  for (var sh2 = 0; sh2 < 7; sh2++) {
-    var shA2 = t*0.025+sh2*0.9;
-    var shX = -s*0.12+Math.cos(shA2)*s*0.3;
-    var shY = -s*0.04+Math.sin(shA2)*s*0.12;
-    ctx.strokeStyle='rgba(255,255,255,'+(0.25+0.2*Math.sin(t*0.08+sh2))+')'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(shX-s*0.04,shY); ctx.lineTo(shX+s*0.04,shY); ctx.stroke();
+  // Clip to diamond
+  ctx.beginPath();
+  ctx.moveTo(0, -H); ctx.lineTo(W, 0); ctx.lineTo(0, H); ctx.lineTo(-W, 0);
+  ctx.closePath();
+  ctx.clip();
+
+  // === LAKE (left half of diamond) ===
+  // Water texture ripples
+  for (var ri = 0; ri < 5; ri++) {
+    var rph = (t*0.03 + ri*0.6) % (Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,'+(0.12+0.1*Math.sin(rph))+')'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-W*0.55 + Math.cos(rph)*s*0.06, ri*s*0.06-s*0.1);
+    ctx.lineTo(-W*0.35 + Math.cos(rph)*s*0.04, ri*s*0.06-s*0.1);
+    ctx.stroke();
   }
+  // Shore divider (wavy diagonal)
+  var shoreWave = Math.sin(t*0.03)*s*0.015;
+  ctx.strokeStyle = 'rgba(100,180,255,0.6)'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-W*0.1+shoreWave, -H);
+  ctx.quadraticCurveTo(W*0.1+shoreWave, 0, -W*0.05+shoreWave, H);
+  ctx.stroke();
+
+  ctx.restore(); // end clip
 
   // === DOCK / PIER ===
   ctx.fillStyle = '#8d6e63';
-  ctx.fillRect(-s*0.02, -s*0.1, s*0.14, s*0.03);
-  // Dock posts
-  for (var dp2 = 0; dp2 < 4; dp2++) {
+  ctx.fillRect(-s*0.04, -s*0.06, s*0.12, s*0.025);
+  for (var dp2 = 0; dp2 < 3; dp2++) {
     ctx.fillStyle = '#6d4c41';
-    ctx.fillRect(-s*0.01+dp2*s*0.038, -s*0.1, s*0.015, s*0.08);
+    ctx.fillRect(-s*0.03+dp2*s*0.04, -s*0.06, s*0.012, s*0.05);
   }
-  // Boat at dock
+
+  // === SMALL SAILBOAT ===
   ctx.fillStyle = '#e8f0f8';
   ctx.beginPath();
-  ctx.moveTo(s*0.1, -s*0.12);
-  ctx.lineTo(s*0.18, -s*0.12);
-  ctx.lineTo(s*0.16, -s*0.07);
-  ctx.lineTo(s*0.08, -s*0.07);
+  ctx.moveTo(-s*0.22, s*0.02); ctx.lineTo(-s*0.1, s*0.02);
+  ctx.lineTo(-s*0.12, s*0.07); ctx.lineTo(-s*0.24, s*0.07);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#1565c0';
-  ctx.fillRect(s*0.11, -s*0.16, s*0.05, s*0.04);
-  ctx.strokeStyle = '#2196f3'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(s*0.135, -s*0.16); ctx.lineTo(s*0.135, -s*0.2); ctx.stroke();
-  // Sail
+  ctx.strokeStyle = '#90a4ae'; ctx.lineWidth = 0.8; ctx.stroke();
+  ctx.strokeStyle = '#78909c'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(-s*0.14, -s*0.12); ctx.lineTo(-s*0.14, s*0.02); ctx.stroke();
   ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.moveTo(s*0.135,-s*0.2); ctx.lineTo(s*0.175,-s*0.135); ctx.lineTo(s*0.135,-s*0.135); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-s*0.14,-s*0.12); ctx.lineTo(-s*0.02,s*0.02); ctx.lineTo(-s*0.14,s*0.02); ctx.closePath(); ctx.fill();
 
-  // === BEACH UMBRELLAS (3) ===
-  var umbX = [s*0.25, s*0.42, s*0.12];
-  var umbY = [-s*0.05, s*0.05, s*0.12];
-  var umbCol = ['#e53935','#ff8f00','#1565c0'];
-  var umbCol2 = ['#ffeb3b','#ff5722','#ffeb3b'];
-  for (var umb2 = 0; umb2 < 3; umb2++) {
-    var uvWave = Math.sin(t*0.04+umb2)*0.04;
-    ctx.save(); ctx.translate(umbX[umb2], umbY[umb2]); ctx.rotate(uvWave);
-    // Pole
-    ctx.strokeStyle='#795548'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(0,s*0.12); ctx.lineTo(0,-s*0.22); ctx.stroke();
-    // Canopy
-    ctx.fillStyle=umbCol[umb2];
-    ctx.beginPath(); ctx.arc(0,-s*0.22,s*0.14,Math.PI,0); ctx.fill();
-    // Stripes
-    for (var usp=0;usp<5;usp++) {
-      var usA=Math.PI+usp*Math.PI/4;
-      if(usp%2===0) {
-        ctx.fillStyle=umbCol2[umb2];
-        ctx.beginPath(); ctx.moveTo(0,-s*0.22);
-        ctx.arc(0,-s*0.22,s*0.14,usA,usA+Math.PI/4);
-        ctx.closePath(); ctx.fill();
-      }
-    }
-    ctx.restore();
-    // Beach chair
-    ctx.save(); ctx.translate(umbX[umb2]+s*0.06, umbY[umb2]+s*0.08);
-    ctx.fillStyle='#ff8f00';
-    ctx.fillRect(-s*0.07,0,s*0.14,s*0.03);
-    ctx.fillRect(-s*0.07,-s*0.07,s*0.02,s*0.07);
-    ctx.fillRect(s*0.05,-s*0.07,s*0.02,s*0.07);
-    ctx.restore();
-  }
-
-  // === PALM TREES ===
-  var palms = [{x:-s*0.58,y:-s*0.02},{x:s*0.6,y:-s*0.1},{x:-s*0.45,y:s*0.2}];
-  for (var palm = 0; palm < palms.length; palm++) {
+  // === PALM TREES (2, on right/sand side) ===
+  var palms = [{x:W*0.55,y:-H*0.35},{x:W*0.35,y:H*0.45}];
+  for (var palm = 0; palm < 2; palm++) {
     ctx.save(); ctx.translate(palms[palm].x, palms[palm].y);
-    var palmSway = Math.sin(t*0.03+palm)*0.05;
-    // Trunk (curved)
-    ctx.strokeStyle='#6d4c41'; ctx.lineWidth=4;
+    var palmSway = Math.sin(t*0.03+palm)*0.04;
+    ctx.strokeStyle='#6d4c41'; ctx.lineWidth=3;
     ctx.beginPath();
-    ctx.moveTo(0, s*0.12);
-    ctx.quadraticCurveTo(s*0.04+palmSway, -s*0.1, palmSway*s*3, -s*0.32);
+    ctx.moveTo(0, s*0.08);
+    ctx.quadraticCurveTo(s*0.03+palmSway*s, -s*0.08, palmSway*s*2, -s*0.24);
     ctx.stroke();
-    // Coconuts
     ctx.fillStyle='#8d6e63';
-    ctx.beginPath(); ctx.arc(palmSway*s*3, -s*0.32, s*0.025, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(palmSway*s*3-s*0.035, -s*0.34, s*0.02, 0, Math.PI*2); ctx.fill();
-    // Fronds (6)
-    for (var fr = 0; fr < 6; fr++) {
-      var frA = fr*Math.PI/3 + palmSway;
-      var frLen = s*0.18 + Math.sin(fr)*s*0.04;
-      ctx.strokeStyle='#2e7d32'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(palmSway*s*2, -s*0.25, s*0.02, 0, Math.PI*2); ctx.fill();
+    for (var fr = 0; fr < 5; fr++) {
+      var frA = fr*Math.PI*2/5 + palmSway;
+      ctx.strokeStyle='#2e7d32'; ctx.lineWidth=2;
       ctx.beginPath();
-      ctx.moveTo(palmSway*s*3, -s*0.32);
+      ctx.moveTo(palmSway*s*2, -s*0.24);
       ctx.quadraticCurveTo(
-        palmSway*s*3+Math.cos(frA)*frLen*0.5, -s*0.32+Math.sin(frA)*frLen*0.3,
-        palmSway*s*3+Math.cos(frA)*frLen, -s*0.32+Math.sin(frA)*frLen*0.5
+        palmSway*s*2+Math.cos(frA)*s*0.09, -s*0.24+Math.sin(frA)*s*0.06,
+        palmSway*s*2+Math.cos(frA)*s*0.15, -s*0.24+Math.sin(frA)*s*0.1
       );
       ctx.stroke();
     }
     ctx.restore();
   }
 
-  // === BEACH VOLLEYBALL NET ===
-  ctx.save(); ctx.translate(-s*0.28, s*0.15);
-  ctx.strokeStyle='#8d6e63'; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(-s*0.08,-s*0.12); ctx.lineTo(-s*0.08,0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(s*0.08,-s*0.12); ctx.lineTo(s*0.08,0); ctx.stroke();
-  ctx.strokeStyle='#f0f0f0'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(-s*0.08,-s*0.12); ctx.lineTo(s*0.08,-s*0.12); ctx.stroke();
-  // Net mesh
-  for (var nm=0;nm<4;nm++) {
-    ctx.strokeStyle='rgba(240,240,240,0.5)'; ctx.lineWidth=0.5;
-    ctx.beginPath(); ctx.moveTo(-s*0.08+nm*s*0.05,-s*0.12); ctx.lineTo(-s*0.08+nm*s*0.05-s*0.01,0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-s*0.08,(nm-2)*s*0.04-s*0.04); ctx.lineTo(s*0.08,(nm-2)*s*0.04-s*0.04); ctx.stroke();
+  // === BEACH UMBRELLAS (2) ===
+  var umbPos = [{x:W*0.38,y:s*0.04},{x:W*0.6,y:-H*0.1}];
+  var umbCols = [['#e53935','#ffeb3b'],['#ff8f00','#1565c0']];
+  for (var umb2 = 0; umb2 < 2; umb2++) {
+    var uvWave = Math.sin(t*0.04+umb2)*0.04;
+    ctx.save(); ctx.translate(umbPos[umb2].x, umbPos[umb2].y); ctx.rotate(uvWave);
+    ctx.strokeStyle='#795548'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(0,s*0.08); ctx.lineTo(0,-s*0.17); ctx.stroke();
+    ctx.fillStyle=umbCols[umb2][0];
+    ctx.beginPath(); ctx.arc(0,-s*0.17,s*0.1,Math.PI,0); ctx.fill();
+    for (var usp=0;usp<3;usp++) {
+      var usA=Math.PI+usp*Math.PI*2/3;
+      ctx.fillStyle=umbCols[umb2][1];
+      ctx.beginPath(); ctx.moveTo(0,-s*0.17);
+      ctx.arc(0,-s*0.17,s*0.1,usA,usA+Math.PI/3);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    // Chair
+    ctx.save(); ctx.translate(umbPos[umb2].x+s*0.05, umbPos[umb2].y+s*0.06);
+    ctx.fillStyle='#ff8f00';
+    ctx.fillRect(-s*0.055,0,s*0.11,s*0.025);
+    ctx.fillRect(-s*0.055,-s*0.055,s*0.015,s*0.055);
+    ctx.fillRect(s*0.04,-s*0.055,s*0.015,s*0.055);
+    ctx.restore();
+  }
+
+  // === VOLLEYBALL NET (on sand) ===
+  ctx.save(); ctx.translate(W*0.25, H*0.45);
+  ctx.strokeStyle='#8d6e63'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(-s*0.07,-s*0.08); ctx.lineTo(-s*0.07,0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(s*0.07,-s*0.08); ctx.lineTo(s*0.07,0); ctx.stroke();
+  ctx.strokeStyle='#f5f5f5'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(-s*0.07,-s*0.08); ctx.lineTo(s*0.07,-s*0.08); ctx.stroke();
+  for (var nm=0;nm<3;nm++) {
+    ctx.strokeStyle='rgba(245,245,245,0.5)'; ctx.lineWidth=0.5;
+    ctx.beginPath(); ctx.moveTo(-s*0.07+nm*s*0.07,-s*0.08); ctx.lineTo(-s*0.07+nm*s*0.07,0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-s*0.07,-s*0.04-nm*s*0.04); ctx.lineTo(s*0.07,-s*0.04-nm*s*0.04); ctx.stroke();
   }
   ctx.restore();
 
   // Coins float
   if (level >= 2) {
-    for (var c2 = 0; c2 < 4; c2++) {
-      var cP2=(t*0.05+c2*1.57)%(Math.PI*2);
+    for (var c2 = 0; c2 < 3; c2++) {
+      var cP2=(t*0.05+c2*2.09)%(Math.PI*2);
       ctx.globalAlpha=0.6+0.4*Math.sin(t*0.08+c2);
-      ctx.font=Math.round(s*0.09)+'px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText('🪙', Math.cos(cP2)*s*0.35, -s*0.15+Math.sin(cP2)*s*0.1);
+      ctx.font=Math.round(s*0.1)+'px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('🪙', Math.cos(cP2)*W*0.35, -H*0.3+Math.sin(cP2)*H*0.2);
       ctx.globalAlpha=1;
     }
   }
 };
 
-// ─── CARDEALER — Premium Auto Showroom ──────────────────────
+
 GameRenderer.prototype._sCarDealer = function(ctx, s, level, tick) {
   var t = tick;
 
