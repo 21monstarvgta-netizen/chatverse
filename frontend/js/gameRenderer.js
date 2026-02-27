@@ -658,8 +658,11 @@ GameRenderer.prototype._drawBuilding = function(ctx, b, tx, ty, tick) {
   }
 
   // cx/cy = visual center of merged footprint in isometric space
-  var cx = tx + (bSize - 1) * (tw / 2);
-  var cy = ty + (bSize - 1) * (th / 2) + th / 2;
+  // For isometric grid: gridToScreen(bx,by) = top corner (tx,ty)
+  // The visual center x = tx (no horizontal shift in iso!)
+  // The visual center y = ty + bSize * th/2  (spans bSize tiles down)
+  var cx = tx;
+  var cy = ty + bSize * (th / 2);
 
   // Ready glow ring around footprint tiles
   if (isReady) {
@@ -675,10 +678,11 @@ GameRenderer.prototype._drawBuilding = function(ctx, b, tx, ty, tick) {
     }
   }
 
-  // Draw the sprite centred on (cx, cy) — scaled up for multi-tile
+  // Draw the sprite centred on (cx, cy)
+  // Pass base tile dimensions -- sprites scale relative to ONE tile, bSize passed separately
   ctx.save();
   ctx.translate(cx, cy);
-  this._drawBuildingSprite(ctx, b.type, b.level, tw * bSize, th * bSize, tick, b.roadVariant, b.roadRotation);
+  this._drawBuildingSprite(ctx, b.type, b.level, tw, th, tick, b.roadVariant, b.roadRotation, bSize);
   ctx.restore();
 
   // Level badge — bottom-right of origin tile
@@ -741,9 +745,13 @@ GameRenderer.prototype._drawMultiTileSelectionRing = function(ctx, bx, by, bSize
 //  Origin = tile visual centre (cx, cy).
 //  All sprites draw around (0, 0), going UPWARD (negative y).
 //
-GameRenderer.prototype._drawBuildingSprite = function(ctx, type, level, tw, th, tick, roadVariant, roadRotation) {
-  // Scale: fit within ~70% of tile width, grow slightly with level
-  var s = (tw * 0.70) * Math.min(1 + (level - 1) * 0.04, 1.55);
+GameRenderer.prototype._drawBuildingSprite = function(ctx, type, level, tw, th, tick, roadVariant, roadRotation, bSize) {
+  // Scale: for multi-tile buildings, scale up proportionally but cap to fit footprint
+  // bSize=1 => s = tw*0.70; bSize=2 => s = tw*1.2; bSize=4 => s = tw*1.8
+  // Using sqrt scaling so sprites don't explode: s = tw * 0.70 * sqrt(bSize)
+  bSize = bSize || 1;
+  var sizeScale = bSize === 1 ? 1.0 : (bSize === 2 ? 1.7 : 2.6);
+  var s = (tw * 0.70) * sizeScale * Math.min(1 + (level - 1) * 0.04, 1.55);
   ctx.save();
   switch (type) {
     case 'farm':        this._sFarm(ctx, s, level, tick);       break;
