@@ -276,17 +276,30 @@ router.post('/build', auth, async function(req, res) {
     var bt = config.BUILDING_TYPES[buildingType];
     if (!bt) return res.status(400).json({ error: 'Неизвестное здание' });
     if (player.level < bt.unlockLevel) return res.status(400).json({ error: 'Требуется уровень ' + bt.unlockLevel });
-    if (!logic.isTileUnlocked(x, y, player.unlockedZones)) return res.status(400).json({ error: 'Территория не открыта' });
+
+    var bSize = bt.size || 1;
+
+    // Check all tiles for multi-tile buildings
+    for (var tx = x; tx < x + bSize; tx++) {
+      for (var ty = y; ty < y + bSize; ty++) {
+        if (!logic.isTileUnlocked(tx, ty, player.unlockedZones)) return res.status(400).json({ error: 'Территория не открыта' });
+      }
+    }
 
     var occupied = false;
     for (var i = 0; i < player.buildings.length; i++) {
-      if (player.buildings[i].x === x && player.buildings[i].y === y) { occupied = true; break; }
+      var ob = player.buildings[i];
+      var obSize = (config.BUILDING_TYPES[ob.type] && config.BUILDING_TYPES[ob.type].size) || 1;
+      // Check overlap of rectangles [x, x+bSize) x [y, y+bSize) with [ob.x, ob.x+obSize) x [ob.y, ob.y+obSize)
+      if (x < ob.x + obSize && x + bSize > ob.x && y < ob.y + obSize && y + bSize > ob.y) {
+        occupied = true; break;
+      }
     }
     if (occupied) return res.status(400).json({ error: 'Клетка занята' });
 
     var totalEnergy = logic.calculateTotalEnergy(player.buildings);
     var usedEnergy = logic.calculateUsedEnergy(player.buildings);
-    if (usedEnergy + bt.energyCost > totalEnergy && buildingType !== 'powerplant') {
+    if (usedEnergy + bt.energyCost > totalEnergy && bt.energyCost > 0 && !bt.baseOutput.energy) {
       return res.status(400).json({ error: 'Недостаточно энергии. Построй электростанцию!' });
     }
 

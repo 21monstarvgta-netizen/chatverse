@@ -31,9 +31,13 @@ GameUI.prototype.renderBuildList = function(buildingTypes, playerLevel, resource
   var self = this;
   var keys = Object.keys(buildingTypes);
   var category = this.selectedBuildCategory;
+  var sizeFilter = this.selectedBuildSize || 'all';
 
   var filtered = keys.filter(function(key) {
     var bt = buildingTypes[key];
+    var bSize = bt.size || 1;
+    if (sizeFilter === '1x1' && bSize !== 1) return false;
+    if (sizeFilter === 'large' && bSize < 2) return false;
     if (category === 'all') return true;
     return bt.category === category;
   });
@@ -49,10 +53,12 @@ GameUI.prototype.renderBuildList = function(buildingTypes, playerLevel, resource
       return '<span style="color:' + color + '">' + icon + need + '</span>';
     }).join(' ');
 
+    var bSize = bt.size || 1;
+    var sizeLabel = bSize > 1 ? ('<span style="background:#6c5ce7;color:#fff;padding:1px 5px;border-radius:4px;font-size:9px;margin-left:4px;">' + bSize + '×' + bSize + '</span>') : '';
     return '<div class="build-item' + (locked ? ' locked' : '') + '" data-type="' + key + '">' +
       '<div class="build-item-emoji">' + bt.emoji + '</div>' +
       '<div class="build-item-info">' +
-      '<div class="build-item-name">' + bt.name + '</div>' +
+      '<div class="build-item-name">' + bt.name + sizeLabel + '</div>' +
       '<div class="build-item-desc">' + bt.description + '</div>' +
       (locked ? '<div class="build-item-lock">🔒 Уровень ' + bt.unlockLevel + '</div>' :
         '<div class="build-item-cost">' + costStr + ' ⚡' + bt.energyCost + '</div>') +

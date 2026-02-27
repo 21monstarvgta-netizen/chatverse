@@ -152,10 +152,9 @@ function calculateTotalEnergy(buildings) {
   var total = config.RESOURCE_DEFAULTS.energy;
   if (!buildings) return total;
   for (var i = 0; i < buildings.length; i++) {
-    if (buildings[i].type === 'powerplant') {
-      var bt = config.BUILDING_TYPES.powerplant;
-      if (bt && bt.baseOutput && bt.baseOutput.energy)
-        total += config.INCOME_FORMULA(bt.baseOutput.energy, buildings[i].level);
+    var bt = config.BUILDING_TYPES[buildings[i].type];
+    if (bt && bt.baseOutput && bt.baseOutput.energy) {
+      total += config.INCOME_FORMULA(bt.baseOutput.energy, buildings[i].level);
     }
   }
   return total;

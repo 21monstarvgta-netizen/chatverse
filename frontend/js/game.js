@@ -155,6 +155,23 @@ Game.prototype.setupEvents = function() {
     });
   });
 
+  document.querySelectorAll('.build-size-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.build-size-btn').forEach(function(b) {
+        b.style.background = 'rgba(255,255,255,0.05)';
+        b.style.color = '#94a3b8';
+        b.style.borderColor = 'rgba(255,255,255,0.1)';
+        b.classList.remove('active');
+      });
+      btn.style.background = 'rgba(108,92,231,0.3)';
+      btn.style.color = '#a29bfe';
+      btn.style.borderColor = 'rgba(108,92,231,0.5)';
+      btn.classList.add('active');
+      self.ui.selectedBuildSize = btn.dataset.size;
+      self.ui.renderBuildList(self.config.buildingTypes, self.player.level, self.player.resources);
+    });
+  });
+
   var closeBuild = document.getElementById('close-build-panel');
   if (closeBuild) {
     closeBuild.addEventListener('click', function() {
