@@ -214,7 +214,6 @@ ChatApp.prototype.setupEventListeners = function() {
   document.getElementById('nav-general').addEventListener('click', function() { self.switchView('general'); });
   document.getElementById('btn-profile').addEventListener('click', function() { window.location.href = '/profile.html'; });
   document.getElementById('btn-game').addEventListener('click', function() { window.location.href = '/game.html'; });
-  document.getElementById('btn-farmhand').addEventListener('click', function() { window.location.href = '/farmhand.html'; });
   document.getElementById('btn-posts').addEventListener('click', function() { window.location.href = '/posts.html'; });
   document.getElementById('btn-logout').addEventListener('click', function() {
     if (self.socket) self.socket.disconnect();

@@ -611,8 +611,14 @@ router.post('/move', auth, async function(req, res) {
     if (idx < 0 || idx >= player.buildings.length) return res.status(400).json({ error: 'Здание не найдено' });
     if (!logic.isTileUnlocked(x, y, player.unlockedZones)) return res.status(400).json({ error: 'Территория не открыта' });
 
+    var movingBt = config.BUILDING_TYPES[player.buildings[idx].type];
+    var movingSz = (movingBt && movingBt.size) || 1;
     for (var i = 0; i < player.buildings.length; i++) {
-      if (i !== idx && player.buildings[i].x === x && player.buildings[i].y === y) {
+      if (i === idx) continue;
+      var ob2 = player.buildings[i];
+      var ob2Bt = config.BUILDING_TYPES[ob2.type];
+      var ob2Sz = (ob2Bt && ob2Bt.size) || 1;
+      if (x < ob2.x + ob2Sz && x + movingSz > ob2.x && y < ob2.y + ob2Sz && y + movingSz > ob2.y) {
         return res.status(400).json({ error: 'Клетка занята' });
       }
     }
@@ -1111,7 +1117,11 @@ router.get('/visit/:userId/building', auth, async function(req, res) {
     if (!player) return res.status(404).json({ error: 'Нет данных' });
 
     var x = parseInt(req.query.x), y = parseInt(req.query.y);
-    var building = (player.buildings || []).find(function(b) { return b.x === x && b.y === y; });
+    var building = (player.buildings || []).find(function(b) {
+      var bt = config.BUILDING_TYPES[b.type];
+      var bSz = (bt && bt.size) || 1;
+      return x >= b.x && x < b.x + bSz && y >= b.y && y < b.y + bSz;
+    });
     if (!building) return res.status(404).json({ error: 'Нет здания на этой клетке' });
 
     res.json({ building: building, cityName: player.cityName, ownerName: targetUser.username });
