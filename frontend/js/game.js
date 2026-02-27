@@ -291,8 +291,15 @@ Game.prototype.onTileClick = function(x, y) {
     }
     var buildings = this.player.buildings || [];
     var occupied = false;
+    var placingBt = this.config.buildingTypes[this.placingType];
+    var placingSize = (placingBt && placingBt.size) || 1;
     for (var i = 0; i < buildings.length; i++) {
-      if (buildings[i].x === x && buildings[i].y === y) { occupied = true; break; }
+      var ob = buildings[i];
+      var obBt = this.config.buildingTypes[ob.type];
+      var obSz = (obBt && obBt.size) || 1;
+      if (x < ob.x + obSz && x + placingSize > ob.x && y < ob.y + obSz && y + placingSize > ob.y) {
+        occupied = true; break;
+      }
     }
     if (occupied) {
       showToast('Клетка занята', 'error');
@@ -305,14 +312,17 @@ Game.prototype.onTileClick = function(x, y) {
   var buildingIndex = -1;
   var pBuildings = this.player.buildings || [];
   for (var j = 0; j < pBuildings.length; j++) {
-    if (pBuildings[j].x === x && pBuildings[j].y === y) {
+    var pb = pBuildings[j];
+    var pbBt = this.config.buildingTypes[pb.type];
+    var pbSz = (pbBt && pbBt.size) || 1;
+    if (x >= pb.x && x < pb.x + pbSz && y >= pb.y && y < pb.y + pbSz) {
       buildingIndex = j;
       break;
     }
   }
 
   if (buildingIndex >= 0) {
-    this.renderer.selectedTile = { x: x, y: y };
+    this.renderer.selectedTile = { x: pBuildings[buildingIndex].x, y: pBuildings[buildingIndex].y };
     this.ui.showBuildingInfo(pBuildings[buildingIndex], buildingIndex, this.config.buildingTypes);
   } else if (!isUnlocked) {
     this.showZoneUnlock(x, y);

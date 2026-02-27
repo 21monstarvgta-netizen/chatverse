@@ -393,7 +393,12 @@ GameRenderer.prototype.render = function() {
     // buildings extend upward — add a bigger margin
     if (sc2.x + hw < viewL || sc2.x - hw > viewR) continue;
     if (sc2.y + th < viewT - th * 5 || sc2.y > viewB) continue;
-    drawList.push({ kind: 1, b: b, tx: sc2.x, ty: sc2.y, order: b.x + b.y + 0.5 });
+    // For multi-tile buildings, use the BOTTOM-RIGHT corner for painter order
+    // so all tiles of the footprint are drawn BEFORE the building
+    var bCfg = this.buildingTypeConfig[b.type];
+    var bSz = (bCfg && bCfg.size) || 1;
+    var bOrder = (b.x + bSz - 1) + (b.y + bSz - 1) + 0.5;
+    drawList.push({ kind: 1, b: b, tx: sc2.x, ty: sc2.y, order: bOrder });
   }
 
   for (var ti = 0; ti < this.threats.length; ti++) {
