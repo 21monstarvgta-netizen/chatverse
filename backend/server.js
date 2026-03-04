@@ -56,6 +56,8 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/game', gameRoutes);
+var shoppingRoutes = require('./routes/shopping');
+app.use('/api/shopping', shoppingRoutes);
 
 app.get('/api/health', function(req, res) {
   res.json({ status: 'ok', timestamp: new Date() });
