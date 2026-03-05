@@ -1,6 +1,24 @@
 var express = require('express');
 var router = express.Router();
 var mongoose = require('mongoose');
+var https = require('https');
+
+var BOT_TOKEN = process.env.BOT_TOKEN;
+
+function sendTgMessage(chat_id, text) {
+  if (!BOT_TOKEN) return;
+  var data = JSON.stringify({ chat_id: parseInt(chat_id), text, parse_mode: 'Markdown' });
+  var options = {
+    hostname: 'api.telegram.org',
+    path: '/bot' + BOT_TOKEN + '/sendMessage',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+  };
+  var req = https.request(options);
+  req.on('error', function(e) { console.error('TG notify error:', e.message); });
+  req.write(data);
+  req.end();
+}
 
 var itemSchema = new mongoose.Schema({
   name: String,
@@ -36,6 +54,8 @@ router.post('/:chat_id', async function(req, res) {
     var { list_id, name, creator } = req.body;
     var list = new List({ list_id, chat_id: req.params.chat_id, name, creator, items: {} });
     await list.save();
+    // Уведомление в чат
+    sendTgMessage(req.params.chat_id, `🛒 *${creator}* создал(а) новый список покупок: *«${name}»*`);
     res.json(list);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
