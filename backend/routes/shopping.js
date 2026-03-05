@@ -31,6 +31,7 @@ var itemSchema = new mongoose.Schema({
   bought: { type: Boolean, default: false },
   buyer: { type: String, default: null },
   added_by: String,
+  price: { type: Number, default: 0 },
 }, { _id: false });
 
 var listSchema = new mongoose.Schema({
@@ -81,7 +82,7 @@ router.post('/:chat_id/:list_id/toggle', async function(req, res) {
     if (list.items.get(key)) {
       list.items.delete(key);
     } else {
-      list.items.set(key, { name, cat_id, bought: false, buyer: null, added_by });
+      list.items.set(key, { name, cat_id, bought: false, buyer: null, added_by, price: req.body.price || 0 });
     }
     list.markModified('items');
     await list.save();
@@ -97,7 +98,7 @@ router.post('/:chat_id/:list_id/custom', async function(req, res) {
     if (!list) return res.status(404).json({ error: 'Not found' });
     var key = 'custom::' + name;
     if (!list.items.get(key)) {
-      list.items.set(key, { name, cat_id: 'custom', bought: false, buyer: null, added_by });
+      list.items.set(key, { name, cat_id: 'custom', bought: false, buyer: null, added_by, price: req.body.price || 0 });
       list.markModified('items');
       await list.save();
     }
@@ -146,6 +147,25 @@ router.post('/:chat_id/:list_id/clearbought', async function(req, res) {
     }
     list.markModified('items');
     await list.save();
+    res.json(list);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// Редактировать товар
+router.post('/:chat_id/:list_id/edititem', async function(req, res) {
+  try {
+    var { key, name, price } = req.body;
+    var list = await List.findOne({ chat_id: req.params.chat_id, list_id: req.params.list_id });
+    if (!list) return res.status(404).json({ error: 'Not found' });
+    var item = list.items.get(key);
+    if (item) {
+      item.name = name;
+      item.price = price || 0;
+      list.items.set(key, item);
+      list.markModified('items');
+      await list.save();
+    }
     res.json(list);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
