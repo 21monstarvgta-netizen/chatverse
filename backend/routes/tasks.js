@@ -7,7 +7,7 @@ var BOT_TOKEN = process.env.BOT_TOKEN;
 
 function sendTgMessage(chat_id, text) {
   if (!BOT_TOKEN) return;
-  var data = JSON.stringify({ chat_id: parseInt(chat_id), text, parse_mode: 'Markdown' });
+  var data = JSON.stringify({ chat_id: Number(chat_id), text, parse_mode: 'Markdown' });
   var options = {
     hostname: 'api.telegram.org',
     path: '/bot' + BOT_TOKEN + '/sendMessage',
