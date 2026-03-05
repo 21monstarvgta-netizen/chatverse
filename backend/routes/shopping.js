@@ -6,7 +6,8 @@ var https = require('https');
 var BOT_TOKEN = process.env.BOT_TOKEN;
 
 function sendTgMessage(chat_id, text) {
-  if (!BOT_TOKEN) return;
+  if (!BOT_TOKEN) { console.log('BOT_TOKEN missing!'); return; }
+  console.log('Sending TG message to:', chat_id);
   var data = JSON.stringify({ chat_id: Number(chat_id), text, parse_mode: 'Markdown' });
   var options = {
     hostname: 'api.telegram.org',
@@ -14,7 +15,11 @@ function sendTgMessage(chat_id, text) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
   };
-  var req = https.request(options);
+  var req = https.request(options, function(res) {
+    var body = '';
+    res.on('data', function(chunk) { body += chunk; });
+    res.on('end', function() { console.log('TG response:', body); });
+  });
   req.on('error', function(e) { console.error('TG notify error:', e.message); });
   req.write(data);
   req.end();
@@ -54,8 +59,7 @@ router.post('/:chat_id', async function(req, res) {
     var { list_id, name, creator } = req.body;
     var list = new List({ list_id, chat_id: req.params.chat_id, name, creator, items: {} });
     await list.save();
-    // Уведомление в чат
-    sendTgMessage(req.params.chat_id, `🛒 *${creator}* создал(а) новый список покупок: *«${name}»*`);
+    sendTgMessage(req.params.chat_id, '🛒 *' + creator + '* создал(а) новый список покупок: *«' + name + '»*');
     res.json(list);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
